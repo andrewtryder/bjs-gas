@@ -1,0 +1,28 @@
+{
+  "name": "bjs-gas",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Discovery tooling for BJ's Wholesale Club locations and gas stations",
+  "scripts": {
+    "discover": "tsx src/cli.ts discover",
+    "discover:clubs": "tsx src/cli.ts discover:clubs",
+    "discover:gas": "tsx src/cli.ts discover:gas",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "lint": "tsc --noEmit"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "@types/node": "^24.3.0",
+    "tsx": "^4.20.5",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  },
+  "dependencies": {
+    "playwright": "^1.55.0",
+    "zod": "^3.25.76"
+  }
+}

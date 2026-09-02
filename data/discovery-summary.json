@@ -1,0 +1,12 @@
+{
+  "generatedAt": "2026-09-02T11:36:42.178Z",
+  "totalClubs": 286,
+  "gasClubs": 221,
+  "nonGasClubs": 65,
+  "unknownGasStatus": 0,
+  "discoveryMethod": "POST club/search/10201 with large US-radius body via headless Chrome (Playwright persistent profile)",
+  "sourceEndpoints": [
+    "https://api.bjs.com/digital/live/api/v1.2/club/search/10201",
+    "https://api.bjs.com/digital/live/apis/v1.0/clublocatorpage/statetowns/10201"
+  ]
+}
