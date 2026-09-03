@@ -1,0 +1,15 @@
+name = "bjs-gas-trigger"
+main = "src/index.ts"
+compatibility_date = "2026-09-01"
+workers_dev = true
+
+[triggers]
+crons = ["0 * * * *"]
+
+# Secrets (never commit values):
+#   wrangler secret put COLLECTOR_SECRET
+#
+# Do NOT configure DATABASE_URL here. This Worker only POSTs to Prisma Compute.
+
+[vars]
+PRISMA_COLLECT_URL = "https://a3i9pecpa5hxogp2hpozah6d.ewr.prisma.build/internal/collect"

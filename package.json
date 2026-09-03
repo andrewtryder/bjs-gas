@@ -3,26 +3,54 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Discovery tooling for BJ's Wholesale Club locations and gas stations",
+  "description": "BJ's gas price collector on Prisma Compute; Cloudflare cron trigger only",
   "scripts": {
+    "build": "pnpm run build:api",
+    "build:api": "bun build src/server.ts --target=bun --outfile dist/server.mjs && node scripts/copy-prisma-engine.mjs && mkdir -p dist/data && cp data/gas-clubs.json data/clubs.json dist/data/",
     "discover": "tsx src/cli.ts discover",
     "discover:clubs": "tsx src/cli.ts discover:clubs",
     "discover:gas": "tsx src/cli.ts discover:gas",
+    "discovery:diff": "tsx src/cli.ts discovery:diff",
+    "discovery:accept": "tsx src/cli.ts discovery:accept",
+    "discover:sitemap-canary": "tsx src/cli.ts discover:sitemap-canary",
+    "probe:sitemap": "node scripts/probe-sitemap-discovery.mjs",
+    "import:clubs": "tsx src/cli.ts import:clubs",
+    "collect:club": "tsx src/cli.ts collect:club",
+    "collect:once": "tsx src/cli.ts collect:once",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "lint": "tsc --noEmit"
+    "test:integration": "vitest run tests/persist.integration.test.ts",
+    "lint": "tsc --noEmit",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate deploy",
+    "prisma:migrate:dev": "prisma migrate dev",
+    "deploy:compute": "pnpm run build:api && pnpm dlx @prisma/cli@latest deploy module.ts --name bjs-gas",
+    "deploy:trigger": "cd cloudflare-trigger && pnpm exec wrangler deploy"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22.18"
   },
   "devDependencies": {
+    "@types/bun": "^1.4.0",
     "@types/node": "^24.3.0",
+    "prisma": "^6.19.3",
     "tsx": "^4.20.5",
     "typescript": "^5.9.2",
-    "vitest": "^3.2.4"
+    "vitest": "^3.2.4",
+    "wrangler": "^4.127.1"
   },
   "dependencies": {
+    "@prisma/client": "^6.19.3",
+    "@prisma/composer": "^0.16.0",
+    "@prisma/composer-prisma-cloud": "^0.16.0",
+    "alchemy": "2.0.0-beta.74",
+    "arktype": "^2.2.3",
+    "effect": "4.0.0-rc.112",
+    "hono": "^4.13.5",
     "playwright": "^1.55.0",
     "zod": "^3.25.76"
+  },
+  "overrides": {
+    "effect": "4.0.0-rc.112"
   }
 }

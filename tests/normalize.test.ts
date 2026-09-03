@@ -39,6 +39,8 @@ describe("deduplication", () => {
       services: ["Optical"],
       hasGas: false,
       gasStatus: "no",
+      storeType: "CLUB",
+      gasClassification: { source: "locator", signals: [] },
       source: "a",
     };
     const b: BjsClub = {
@@ -52,6 +54,8 @@ describe("deduplication", () => {
       services: ["Gas"],
       hasGas: true,
       gasStatus: "yes",
+      storeType: "CLUB",
+      gasClassification: { source: "locator", signals: ["Features=Gas"] },
       source: "b",
     };
 
@@ -59,6 +63,7 @@ describe("deduplication", () => {
     expect(result).toHaveLength(1);
     expect(result[0]?.hasGas).toBe(true);
     expect(result[0]?.services).toEqual(["Gas", "Optical"]);
+    expect(result[0]?.gasClassification.signals).toContain("Features=Gas");
   });
 });
 
@@ -98,6 +103,11 @@ describe("API response parsing", () => {
     expect(club.clubId).toBe("0189");
     expect(club.hasGas).toBe(true);
     expect(club.gasStatus).toBe("yes");
+    expect(club.storeType).toBe("CLUB");
+    expect(club.gasClassification.source).toBe("locator");
+    expect(club.gasClassification.signals).toEqual(
+      expect.arrayContaining(["Features=Gas", "GasHours"]),
+    );
     expect(club.services).toContain("Gas");
     expect(club.phone).toBe("978-241-1050");
     expect(club.latitude).toBeCloseTo(42.75717);
@@ -127,6 +137,10 @@ describe("API response parsing", () => {
 
     expect(club.hasGas).toBe(true);
     expect(club.gasStatus).toBe("yes");
+    expect(club.storeType).toBe("GAS");
+    expect(club.gasClassification.signals).toEqual(
+      expect.arrayContaining(["StoreType=GAS", "GasHours", "Name=GasStation"]),
+    );
   });
 
   it("marks clubs without Gas feature as no-gas", () => {
@@ -223,6 +237,8 @@ describe("validation", () => {
       services: ["Gas"],
       hasGas: true,
       gasStatus: "yes",
+      storeType: "CLUB",
+      gasClassification: { source: "locator", signals: ["Features=Gas"] },
       source: "t",
     };
     const issues = validateClubs([base, { ...base }], { requireKnownGas: false });

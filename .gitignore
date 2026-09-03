@@ -1,5 +1,6 @@
 # Dependencies
 node_modules/
+cloudflare-trigger/node_modules/
 
 # Build / coverage
 dist/
@@ -16,6 +17,9 @@ coverage/
 *.key
 credentials*.json
 
+# Prisma local pin may include workspace ids (keep committed if non-secret)
+# .prisma/local.json is a project link pin — safe to commit
+
 # OS / editor
 .DS_Store
 Thumbs.db
@@ -30,6 +34,7 @@ npm-debug.log*
 pnpm-debug.log*
 .cache/
 .turbo/
+.wrangler/
 
 # Playwright / test artifacts
 playwright-report/
@@ -39,3 +44,9 @@ blob-report/
 
 # Local discovery dumps (keep normalized data/)
 data/raw-*.json
+data/*.candidate.json
+data/discovery-diff.ok.json
+.prisma/
+.prisma-composer/
+.alchemy/
+package.json.tmp

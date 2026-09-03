@@ -1,5 +1,10 @@
 import type { PhysicalStore } from "./schemas.js";
-import type { BjsClub, GasStatus } from "./types.js";
+import type {
+  BjsClub,
+  GasClassification,
+  GasStatus,
+  LocationStoreType,
+} from "./types.js";
 
 const CLUB_ID_WIDTH = 4;
 
@@ -29,12 +34,29 @@ export function dedupeClubsByNumber(clubs: BjsClub[]): BjsClub[] {
   return [...byNumber.values()].sort((a, b) => a.clubNumber - b.clubNumber);
 }
 
+function mergeStoreType(a: LocationStoreType, b: LocationStoreType): LocationStoreType {
+  const rank: Record<LocationStoreType, number> = {
+    GAS: 4,
+    CLUB: 3,
+    DC: 2,
+    COMING_SOON: 1,
+    UNKNOWN: 0,
+  };
+  return rank[a] >= rank[b] ? a : b;
+}
+
 function mergeClub(a: BjsClub, b: BjsClub): BjsClub {
   const prefer = (left: string | null | undefined, right: string | null | undefined) =>
     left && left.length > 0 ? left : (right ?? left ?? null);
 
   const services = [...new Set([...a.services, ...b.services])].sort();
   const gasStatus = resolveMergedGasStatus(a.gasStatus, b.gasStatus);
+  const signals = [
+    ...new Set([
+      ...(a.gasClassification?.signals ?? []),
+      ...(b.gasClassification?.signals ?? []),
+    ]),
+  ].sort();
 
   return {
     clubNumber: a.clubNumber,
@@ -51,6 +73,8 @@ function mergeClub(a: BjsClub, b: BjsClub): BjsClub {
     services,
     hasGas: gasStatus === "yes",
     gasStatus,
+    storeType: mergeStoreType(a.storeType, b.storeType),
+    gasClassification: { source: "locator", signals },
     clubUrl: prefer(a.clubUrl, b.clubUrl),
     source: a.source === b.source ? a.source : `${a.source}|${b.source}`,
   };
@@ -60,7 +84,6 @@ function resolveMergedGasStatus(a: GasStatus, b: GasStatus): GasStatus {
   if (a === "yes" || b === "yes") return "yes";
   if (a === "no" && b === "no") return "no";
   if (a === "no" || b === "no") {
-    // Prefer explicit no over unknown only when both agree elsewhere; unknown stays if other is unknown
     return a === "unknown" || b === "unknown" ? "unknown" : "no";
   }
   return "unknown";
@@ -86,7 +109,6 @@ function preferredAttrText(
   if (!attr) return "";
   const display = attr.displayValue?.trim() ?? "";
   const value = attr.value?.trim() ?? "";
-  // Features.value is often truncated; prefer the longer usable string.
   if (name === "Features") {
     return display.length >= value.length ? display : value;
   }
@@ -105,6 +127,31 @@ export function parseServices(featuresText: string): string[] {
   ].sort();
 }
 
+export function normalizeStoreType(raw: string, name: string): LocationStoreType {
+  if (/coming\s*soon/i.test(name)) return "COMING_SOON";
+  const upper = raw.trim().toUpperCase();
+  if (upper === "GAS" || upper === "CLUB" || upper === "DC") return upper;
+  if (/distribution\s+center/i.test(name)) return "DC";
+  if (/gas\s*station/i.test(name)) return "GAS";
+  if (!upper) return "UNKNOWN";
+  return "UNKNOWN";
+}
+
+export function collectGasSignals(input: {
+  services: string[];
+  storeTypeRaw: string;
+  gasHours: string;
+  name: string;
+}): string[] {
+  const signals: string[] = [];
+  if (input.services.includes("Gas")) signals.push("Features=Gas");
+  if (input.services.includes("Diesel")) signals.push("Features=Diesel");
+  if (input.storeTypeRaw.toUpperCase() === "GAS") signals.push("StoreType=GAS");
+  if (input.gasHours.trim().length > 0) signals.push("GasHours");
+  if (/gas\s*station/i.test(input.name)) signals.push("Name=GasStation");
+  return signals;
+}
+
 export function determineGasStatus(input: {
   services: string[];
   storeType: string;
@@ -116,9 +163,7 @@ export function determineGasStatus(input: {
   if (storeType.toUpperCase() === "GAS") return "yes";
   if (gasHours.trim().length > 0) return "yes";
   if (/gas\s*station/i.test(name)) return "yes";
-  // Locator returned usable feature metadata without Gas ⇒ confirmed no.
   if (services.length > 0 || storeType.toUpperCase() === "CLUB") return "no";
-  // Distribution centers and other non-retail sites are not gas locations.
   if (storeType.toUpperCase() === "DC" || /distribution\s+center/i.test(name)) {
     return "no";
   }
@@ -146,18 +191,28 @@ export function normalizePhysicalStore(
   const attrs = attrMap(store);
   const featuresText = preferredAttrText(attrs, "Features");
   const services = parseServices(featuresText);
-  const storeType = preferredAttrText(attrs, "StoreType");
+  const storeTypeRaw = preferredAttrText(attrs, "StoreType");
   const gasHours = preferredAttrText(attrs, "Gas Hours");
   const name =
     store.Description?.[0]?.displayStoreName?.trim() ||
     store.city?.trim() ||
     `Club ${clubId}`;
+  const storeType = normalizeStoreType(storeTypeRaw, name);
   const gasStatus = determineGasStatus({
     services,
-    storeType,
+    storeType: storeTypeRaw || storeType,
     gasHours,
     name,
   });
+  const gasClassification: GasClassification = {
+    source: "locator",
+    signals: collectGasSignals({
+      services,
+      storeTypeRaw: storeTypeRaw || storeType,
+      gasHours,
+      name,
+    }),
+  };
 
   const addressLines = (store.addressLine ?? []).map((line) => line.trim()).filter(Boolean);
   const address1 = addressLines[0] ?? "";
@@ -178,6 +233,8 @@ export function normalizePhysicalStore(
     services,
     hasGas: gasStatus === "yes",
     gasStatus,
+    storeType,
+    gasClassification,
     clubUrl: `https://www.bjs.com/club/${clubId}`,
     source,
   };

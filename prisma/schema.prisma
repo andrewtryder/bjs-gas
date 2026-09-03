@@ -1,0 +1,92 @@
+generator client {
+  provider      = "prisma-client-js"
+  // Compute runs Bun on Linux (debian openssl 3); local Mac needs native.
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Club {
+  clubNumber Int     @id
+  clubId     String  @unique
+  name       String
+  address1   String
+  address2   String?
+  city       String
+  state      String
+  postalCode String
+  latitude   Float?
+  longitude  Float?
+  phone      String?
+  hasGas             Boolean
+  storeType          String?
+  /// Operational locator provenance { source, signals[] }; not for public map UI.
+  gasClassification  Json?
+  services           String[] @default([])
+  clubUrl            String?
+  source             String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  currentPrices FuelPriceCurrent[]
+  priceHistory  FuelPriceHistory[]
+}
+
+/// Latest known price per club + fuel SKU. Price is NUMERIC(6,3) exact.
+model FuelPriceCurrent {
+  clubNumber         Int
+  fuelSku            String
+  fuelName           String
+  price              Decimal  @db.Decimal(6, 3)
+  /// BJ's priceDateTime with no timezone; stored as text YYYY-MM-DDTHH:mm:ss
+  sourcePriceAtLocal String?
+  observedAt         DateTime
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  club Club @relation(fields: [clubNumber], references: [clubNumber], onDelete: Cascade)
+
+  @@id([clubNumber, fuelSku])
+  @@index([observedAt])
+}
+
+/// Price-change events only (not hourly snapshots).
+model FuelPriceHistory {
+  id                 BigInt   @id @default(autoincrement())
+  clubNumber         Int
+  fuelSku            String
+  fuelName           String
+  price              Decimal  @db.Decimal(6, 3)
+  sourcePriceAtLocal String?
+  observedAt         DateTime
+
+  club Club @relation(fields: [clubNumber], references: [clubNumber], onDelete: Cascade)
+
+  @@index([clubNumber, observedAt])
+  @@index([clubNumber, fuelSku, observedAt])
+  @@index([observedAt])
+}
+
+/// One row per hourly (or ad-hoc) collection run. Written in the same bulk SQL as prices.
+model CollectionRun {
+  id                 BigInt   @id @default(autoincrement())
+  startedAt          DateTime
+  finishedAt         DateTime
+  durationMs         Int
+  clubsConfigured    Int
+  clubsSucceeded     Int
+  clubsEmptyFuels    Int
+  /// Hard failures only (excludes empty-fuel clubs).
+  clubsHardFailed    Int
+  fuelObservations   Int
+  historyChanges     Int
+  databaseQueries    Int
+  degraded           Boolean
+  failures           Json
+  createdAt          DateTime @default(now())
+
+  @@index([finishedAt(sort: Desc)])
+}

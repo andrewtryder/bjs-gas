@@ -1,2 +1,9 @@
 allowBuilds:
+  "@prisma/client": true
+  "@prisma/engines": true
   esbuild: true
+  msgpackr-extract: true
+  prisma: true
+  workerd: true
+overrides:
+  effect: 4.0.0-rc.112

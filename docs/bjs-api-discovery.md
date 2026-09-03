@@ -29,6 +29,46 @@ Cookies, tokens, tracking IDs, and analytics parameters are redacted.
 
 `eisapi.bjs.com` is reachable without a browser session.
 
+## DISCOVERY DATA SEMANTICS
+
+The BJ's **locator** discovery output is authoritative for location membership and `hasGas`.
+
+Do **not** attempt to infer production gas-club membership from the fuel API.
+
+The following are **NOT** evidence that a club is non-gas:
+
+- HTTP 200 with `fuelPriceResponse.data = []`
+- absence from BJ's sitemap
+- a temporarily incomplete/thin club HTML page
+- a temporary fetch failure
+
+`data: []` can mean gas-with-no-prices, non-gas warehouse, DC, or invalid ID.
+
+Hourly collector must poll every `data/gas-clubs.json` entry; empty fuels preserve currents and must not change `Club.hasGas` or the poll list. Only locator discovery → accept → import may change `hasGas`.
+
+Maintenance flow: `pnpm discover` → `discovery:diff` → `discovery:accept` → `import:clubs`.
+
+Sitemap is a **canary** (`pnpm discover:sitemap-canary`): alert on new `/cl/` IDs not in `clubs.json`. See [sitemap-discovery-investigation.md](./sitemap-discovery-investigation.md).
+
+## Sitemap / Chromium-free inventory probe (2026-09-02)
+
+See [sitemap-discovery-investigation.md](./sitemap-discovery-investigation.md) for the full report.
+
+Summary:
+
+- `robots.txt` advertises `https://www.bjs.com/bjs_sitemap.xml` (sitemap **index**).
+- Club SEO URLs live in `bjs_ancillary_sitemap.xml` as `/cl/<slug>/<id>/` — **272** unique IDs.
+- That set is a **strict subset** of locator `club/search` (**286**): **14** clubs (11 gas + 3 DCs / coming-soon) are missing from the sitemap.
+- Full `/cl/` HTML often embeds the same `PhysicalStore`-style fields (Features, StoreType, lat/lng). Thin SPA shells sometimes omit them.
+- eisapi empty `data: []` cannot classify gas vs non-gas.
+- **Decision:** do not replace Playwright discovery yet; do not ship `discover:http` until inventory parity (or an accepted gap policy) exists.
+
+Reproduce:
+
+```bash
+pnpm probe:sitemap
+```
+
 ## Club search (`/digital/live/api/v1.2/club/search/10201`)
 
 ### Method and bodies (verified)
@@ -192,10 +232,11 @@ Normalization: strip non-digits, parse int for `clubNumber`, zero-pad to 4 for `
 1. Large-radius `club/search` currently returns the full fleet; if BJ's caps results later, fall back to multi-center geo searches or `findnearestclub` with high `maxClub`.
 2. Statetowns can lag behind search (3 clubs missing on discovery day).
 3. Fuel API is incomplete for dedicated gas stations — locator attributes are authoritative.
-4. Akamai behavior may change; plain Node HTTP and stock automated Chromium remain blocked. Persistent Chrome channel + disabled automation markers is required today.
+4. Akamai behavior may change. `api.bjs.com` still requires persistent Chrome for discovery. `www.bjs.com` SEO/sitemap pages sometimes work with plain Node `fetch` and sometimes return 403 — do not assume either is stable.
 5. `Features.value` truncation means parsers must prefer `displayValue`.
 6. Coming-soon clubs (e.g. name containing `ComingSoon`) may still appear in search.
 7. `StoreType=DC` distribution centers appear in club/search but not in the all-clubs HTML index; they are treated as non-gas.
+8. Public sitemap `/cl/` coverage (272) lags locator search (286); see sitemap investigation doc.
 
 ## Reproduction without interactive browsing
 

@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "Club" ADD COLUMN IF NOT EXISTS "storeType" TEXT;
+ALTER TABLE "Club" ADD COLUMN IF NOT EXISTS "gasClassification" JSONB;
