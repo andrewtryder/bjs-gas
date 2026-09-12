@@ -10,4 +10,5 @@ allowBuilds:
   prisma: true
   workerd: true
 overrides:
+  "@prisma/config>effect": "3.21.0"
   effect: 4.0.0-rc.112
