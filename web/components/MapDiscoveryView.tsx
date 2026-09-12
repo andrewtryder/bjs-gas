@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 
@@ -45,6 +45,21 @@ export default function MapDiscoveryView({
     }
     return null;
   });
+
+  useEffect(() => {
+    if (initialState) {
+      setSelectedState(initialState);
+    }
+  }, [initialState]);
+
+  useEffect(() => {
+    if (initialStationNumber != null) {
+      const target = stations.find((s) => s.clubNumber === initialStationNumber) || null;
+      if (target) {
+        setSelectedStation(target);
+      }
+    }
+  }, [initialStationNumber, stations]);
 
   const availableStates = useMemo(() => getAvailableStates(stations), [stations]);
   const availableFuels = useMemo(() => getAvailableFuels(stations), [stations]);
