@@ -4,8 +4,11 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "predev": "node scripts/copy-maplibre-worker.js",
     "dev": "next dev",
+    "prebuild": "node scripts/copy-maplibre-worker.js",
     "build": "next build",
+    "postbuild": "node scripts/copy-maplibre-worker.js",
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "lint": "tsc --noEmit"
