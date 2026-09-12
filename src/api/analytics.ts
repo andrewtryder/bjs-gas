@@ -28,14 +28,15 @@ export function createAnalyticsRouter(prisma: PrismaClient): Hono {
     }
   });
 
-  // 2. Historical Trends
+  // 2. Historical Trends (National or State-Scoped)
   router.get("/trends", async (c) => {
     const fuelSku = c.req.query("fuelSku");
     const daysRaw = c.req.query("days");
+    const state = c.req.query("state");
     const days = daysRaw ? Number.parseInt(daysRaw, 10) : 30;
 
     try {
-      const result = await getNationalTrends(prisma, { fuelSku, days });
+      const result = await getNationalTrends(prisma, { fuelSku, days, state });
       c.header("Cache-Control", "public, max-age=300, s-maxage=1800");
       return c.json(result);
     } catch (err) {
@@ -46,6 +47,27 @@ export function createAnalyticsRouter(prisma: PrismaClient): Hono {
         }),
       );
       return c.json({ error: "analytics_trends_failed" }, 500);
+    }
+  });
+
+  router.get("/states/:state/trends", async (c) => {
+    const state = c.req.param("state");
+    const fuelSku = c.req.query("fuelSku");
+    const daysRaw = c.req.query("days");
+    const days = daysRaw ? Number.parseInt(daysRaw, 10) : 30;
+
+    try {
+      const result = await getNationalTrends(prisma, { fuelSku, days, state });
+      c.header("Cache-Control", "public, max-age=300, s-maxage=1800");
+      return c.json(result);
+    } catch (err) {
+      console.error(
+        JSON.stringify({
+          event: "analytics_state_trends_error",
+          error: err instanceof Error ? err.message : String(err),
+        }),
+      );
+      return c.json({ error: "analytics_state_trends_failed" }, 500);
     }
   });
 

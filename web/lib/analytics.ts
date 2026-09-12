@@ -40,6 +40,7 @@ export interface NationalTrendsResponse {
     name: string;
   };
   days: number;
+  state?: string;
   points: TrendPoint[];
 }
 
@@ -99,16 +100,24 @@ export async function getNationalSummary(fuelSku = "1"): Promise<NationalSummary
   return res.json();
 }
 
-export async function getNationalTrends(days = 30, fuelSku = "1"): Promise<NationalTrendsResponse> {
+export async function getNationalTrends(
+  days = 30,
+  fuelSku = "1",
+  state?: string,
+): Promise<NationalTrendsResponse> {
   const baseUrl = getApiBaseUrl();
-  const res = await fetch(
-    `${baseUrl}/api/v1/analytics/trends?days=${days}&fuelSku=${encodeURIComponent(fuelSku)}`,
-    {
-      cache: "no-store",
-    },
-  );
+  const query = new URLSearchParams({
+    days: String(days),
+    fuelSku,
+  });
+  if (state) {
+    query.set("state", state.trim().toUpperCase());
+  }
+  const res = await fetch(`${baseUrl}/api/v1/analytics/trends?${query.toString()}`, {
+    cache: "no-store",
+  });
   if (!res.ok) {
-    throw new Error(`Failed to fetch national trends: ${res.status} ${res.statusText}`);
+    throw new Error(`Failed to fetch trends: ${res.status} ${res.statusText}`);
   }
   return res.json();
 }

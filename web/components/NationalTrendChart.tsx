@@ -14,11 +14,15 @@ import {
 import type { NationalTrendsResponse, TrendPoint } from "../lib/analytics";
 import { formatPrice } from "../lib/stats";
 
+import { getStateName } from "../lib/states";
+
 interface NationalTrendChartProps {
   initialTrends: NationalTrendsResponse;
+  title?: string;
+  subtitle?: string;
 }
 
-export default function NationalTrendChart({ initialTrends }: NationalTrendChartProps) {
+export default function NationalTrendChart({ initialTrends, title, subtitle }: NationalTrendChartProps) {
   const [mounted, setMounted] = useState(false);
   const [selectedDays, setSelectedDays] = useState<number>(30);
 
@@ -94,10 +98,16 @@ export default function NationalTrendChart({ initialTrends }: NationalTrendChart
       >
         <div>
           <h3 style={{ fontSize: "1.25rem", fontWeight: 700, color: "var(--text-primary)" }}>
-            National {initialTrends.fuel.name} Price Trend
+            {title ||
+              (initialTrends.state
+                ? `${getStateName(initialTrends.state)} (${initialTrends.state}) ${initialTrends.fuel.name} Price Trend`
+                : `National ${initialTrends.fuel.name} Price Trend`)}
           </h3>
           <p style={{ fontSize: "0.875rem", color: "var(--text-secondary)", marginTop: "0.25rem" }}>
-            Reconstructed daily median and price range across reporting BJ&apos;s stations
+            {subtitle ||
+              (initialTrends.state
+                ? `Reconstructed daily median and price range for BJ's stations in ${getStateName(initialTrends.state)}`
+                : `Reconstructed daily median and price range across reporting BJ's stations`)}
           </p>
         </div>
 

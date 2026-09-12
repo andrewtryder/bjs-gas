@@ -1,4 +1,4 @@
-import type { PrismaClient } from "@prisma/client";
+import { type PrismaClient, Prisma } from "@prisma/client";
 import { calculateMedian, formatPriceString } from "./median.js";
 
 export const CANONICAL_FUEL_SKU = "1";
@@ -43,6 +43,7 @@ export interface NationalTrendsResult {
     name: string;
   };
   days: number;
+  state?: string | undefined;
   points: TrendPoint[];
 }
 
@@ -193,12 +194,20 @@ export async function getNationalSummary(
  */
 export async function getNationalTrends(
   prisma: PrismaClient,
-  options: { fuelSku?: string | undefined; days?: number | undefined } = {},
+  options: {
+    fuelSku?: string | undefined;
+    days?: number | undefined;
+    state?: string | undefined;
+  } = {},
 ): Promise<NationalTrendsResult> {
   const fuelSku = options.fuelSku || CANONICAL_FUEL_SKU;
   const rawDays = options.days !== undefined ? options.days : 30;
   // Clamp days between 1 and 90
   const days = Math.min(Math.max(Number.isFinite(rawDays) ? rawDays : 30, 1), 90);
+  const normalizedState = options.state ? options.state.trim().toUpperCase() : undefined;
+  const stateFilter = normalizedState
+    ? Prisma.sql`AND c.state = ${normalizedState}`
+    : Prisma.empty;
 
   const fuel = await resolveFuelInfo(prisma, fuelSku);
 
@@ -256,6 +265,7 @@ export async function getNationalTrends(
       JOIN "Club" c
         ON c."clubNumber" = p."clubNumber"
       WHERE c."hasGas" = true
+      ${stateFilter}
     )
     SELECT
       day AS date,
@@ -273,6 +283,7 @@ export async function getNationalTrends(
     generatedAt: new Date().toISOString(),
     fuel,
     days,
+    ...(normalizedState ? { state: normalizedState } : {}),
     points,
   };
 }

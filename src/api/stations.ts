@@ -1,4 +1,5 @@
 import type { PrismaClient } from "@prisma/client";
+import { haversineDistanceMiles } from "../analytics/haversine.js";
 
 export type StationFuel = {
   sku: string;
@@ -135,3 +136,105 @@ export async function getStationHistory(
     observedAt: r.observedAt.toISOString(),
   }));
 }
+
+export type NearbyStationDto = StationDto & {
+  distanceMiles: number;
+  distanceFormatted: string;
+  regularPrice: string | null;
+  priceDeltaVsTarget: string | null;
+  priceDeltaFormatted: string | null;
+};
+
+export async function getNearbyStations(
+  prisma: PrismaClient,
+  clubNumber: number,
+  options: { limit?: number | undefined; maxMiles?: number | undefined } = {},
+): Promise<{
+  targetStation: StationDto;
+  nearby: NearbyStationDto[];
+} | null> {
+  const target = await prisma.club.findUnique({
+    where: { clubNumber },
+    include: {
+      currentPrices: { orderBy: { fuelSku: "asc" } },
+    },
+  });
+
+  if (!target) return null;
+  const targetStation = toStationDto(target);
+
+  if (targetStation.latitude == null || targetStation.longitude == null) {
+    return { targetStation, nearby: [] };
+  }
+
+  const limit = Math.min(Math.max(options.limit ?? 5, 1), 50);
+  const maxMiles = options.maxMiles;
+
+  // Single bounded query fetching all gas stations with coordinates
+  const candidates = await prisma.club.findMany({
+    where: {
+      hasGas: true,
+      clubNumber: { not: clubNumber },
+      latitude: { not: null },
+      longitude: { not: null },
+    },
+    include: {
+      currentPrices: { orderBy: { fuelSku: "asc" } },
+    },
+  });
+
+  const targetRegularFuel = targetStation.fuels.find((f) => f.sku === "1");
+  const targetRegularNum = targetRegularFuel ? Number.parseFloat(targetRegularFuel.price) : null;
+
+  const resultsWithDistance: NearbyStationDto[] = [];
+
+  for (const candidate of candidates) {
+    const dist = haversineDistanceMiles(
+      targetStation.latitude,
+      targetStation.longitude,
+      candidate.latitude,
+      candidate.longitude,
+    );
+
+    if (dist == null) continue;
+    if (maxMiles != null && dist > maxMiles) continue;
+
+    const stationDto = toStationDto(candidate);
+    const candidateRegularFuel = stationDto.fuels.find((f) => f.sku === "1");
+    const candidateRegularNum = candidateRegularFuel
+      ? Number.parseFloat(candidateRegularFuel.price)
+      : null;
+
+    let priceDeltaVsTarget: string | null = null;
+    let priceDeltaFormatted: string | null = null;
+
+    if (targetRegularNum != null && candidateRegularNum != null) {
+      const diff = candidateRegularNum - targetRegularNum;
+      priceDeltaVsTarget = (diff >= 0 ? "+" : "") + diff.toFixed(3);
+      if (Math.abs(diff) < 0.0005) {
+        priceDeltaFormatted = "Same price";
+      } else if (diff < 0) {
+        priceDeltaFormatted = `$${Math.abs(diff).toFixed(3)} cheaper`;
+      } else {
+        priceDeltaFormatted = `$${diff.toFixed(3)} more expensive`;
+      }
+    }
+
+    resultsWithDistance.push({
+      ...stationDto,
+      distanceMiles: Number(dist.toFixed(1)),
+      distanceFormatted: `${dist.toFixed(1)} miles`,
+      regularPrice: candidateRegularFuel ? candidateRegularFuel.price : null,
+      priceDeltaVsTarget,
+      priceDeltaFormatted,
+    });
+  }
+
+  resultsWithDistance.sort((a, b) => a.distanceMiles - b.distanceMiles);
+
+  return {
+    targetStation,
+    nearby: resultsWithDistance.slice(0, limit),
+  };
+}
+

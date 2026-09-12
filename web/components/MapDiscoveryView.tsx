@@ -27,13 +27,24 @@ const InteractiveMap = dynamic(() => import("./InteractiveMap"), {
 
 interface MapDiscoveryViewProps {
   stations: StationDto[];
+  initialState?: string;
+  initialStationNumber?: number;
 }
 
-export default function MapDiscoveryView({ stations }: MapDiscoveryViewProps) {
+export default function MapDiscoveryView({
+  stations,
+  initialState,
+  initialStationNumber,
+}: MapDiscoveryViewProps) {
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedState, setSelectedState] = useState("ALL");
+  const [selectedState, setSelectedState] = useState(initialState || "ALL");
   const [selectedFuel, setSelectedFuel] = useState("ALL");
-  const [selectedStation, setSelectedStation] = useState<StationDto | null>(null);
+  const [selectedStation, setSelectedStation] = useState<StationDto | null>(() => {
+    if (initialStationNumber != null) {
+      return stations.find((s) => s.clubNumber === initialStationNumber) || null;
+    }
+    return null;
+  });
 
   const availableStates = useMemo(() => getAvailableStates(stations), [stations]);
   const availableFuels = useMemo(() => getAvailableFuels(stations), [stations]);

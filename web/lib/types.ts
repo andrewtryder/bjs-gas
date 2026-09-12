@@ -60,3 +60,19 @@ export type FuelStats = {
     price: number;
   } | null;
 };
+
+export type NearbyStationDto = StationDto & {
+  distanceMiles: number;
+  distanceFormatted: string;
+  regularPrice: string | null;
+  priceDeltaVsTarget: string | null;
+  priceDeltaFormatted: string | null;
+};
+
+export type NearbyStationsResponse = {
+  generatedAt: string;
+  clubNumber: number;
+  station: StationDto;
+  nearby: NearbyStationDto[];
+};
+

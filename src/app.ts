@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import type { PrismaClient } from "@prisma/client";
 import { authorizeCollector } from "./auth.js";
 import { isCollectionInProgress, loadGasClubs, runCollection } from "./collector.js";
-import { getStationHistory, getStationWithPrices, listStationsWithPrices } from "./api/stations.js";
+import { getNearbyStations, getStationHistory, getStationWithPrices, listStationsWithPrices } from "./api/stations.js";
 import { getCollectionStatus } from "./api/status.js";
 import { createAnalyticsRouter } from "./api/analytics.js";
 import { fetchClubFuel } from "./fuel/client.js";
@@ -114,6 +114,32 @@ export function createApp(env: AppEnv): Hono {
     });
     c.header("Cache-Control", "public, max-age=120, s-maxage=300");
     return c.json({ clubNumber, history });
+  });
+
+  app.get("/api/v1/stations/:clubNumber/nearby", async (c) => {
+    const clubNumber = Number.parseInt(c.req.param("clubNumber"), 10);
+    if (!Number.isFinite(clubNumber)) {
+      return c.json({ error: "invalid_club_number" }, 400);
+    }
+    const limitRaw = c.req.query("limit");
+    const milesRaw = c.req.query("miles");
+    const limit = limitRaw ? Number.parseInt(limitRaw, 10) : 5;
+    const maxMiles = milesRaw ? Number.parseFloat(milesRaw) : undefined;
+
+    const result = await getNearbyStations(env.prisma, clubNumber, {
+      limit: Number.isFinite(limit) ? limit : 5,
+      maxMiles: maxMiles != null && Number.isFinite(maxMiles) ? maxMiles : undefined,
+    });
+
+    if (!result) return c.json({ error: "not_found" }, 404);
+
+    c.header("Cache-Control", "public, max-age=300, s-maxage=600");
+    return c.json({
+      generatedAt: new Date().toISOString(),
+      clubNumber,
+      station: result.targetStation,
+      nearby: result.nearby,
+    });
   });
 
   app.route("/api/v1/analytics", createAnalyticsRouter(env.prisma));

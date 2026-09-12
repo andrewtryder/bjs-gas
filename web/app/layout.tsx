@@ -3,9 +3,9 @@ import Link from "next/link";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "BJ's Gas Prices",
+  title: "BJ's Gas Prices — Current Prices, Trends & Locations",
   description:
-    "Real-time fuel prices, interactive map, and price history across BJ's Wholesale Club gas stations.",
+    "Real-time fuel prices, interactive map, historical trends, and state price directories across BJ's Wholesale Club gas stations.",
 };
 
 export default function RootLayout({
@@ -24,7 +24,10 @@ export default function RootLayout({
               </Link>
               <nav className="header-nav">
                 <Link href="/" className="nav-link">
-                  Directory
+                  Overview
+                </Link>
+                <Link href="/states" className="nav-link">
+                  By State
                 </Link>
                 <Link href="/map" className="nav-link nav-link-highlight">
                   Interactive Map

@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import type { StateSummaryItem } from "../lib/analytics";
 import { formatPrice } from "../lib/stats";
-
+import { getStateName } from "../lib/states";
 interface StateComparisonTableProps {
   states: StateSummaryItem[];
   fuelName: string;
@@ -91,21 +91,32 @@ export default function StateComparisonTable({
                     #{rank}
                   </td>
                   <td>
-                    <Link
-                      href={`/map`}
-                      style={{
-                        fontWeight: 700,
-                        color: "var(--accent)",
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: "0.5rem",
-                      }}
-                    >
-                      <span>{s.state}</span>
-                      <span style={{ fontSize: "0.75rem", fontWeight: 500, color: "var(--text-muted)" }}>
-                        (View on map)
-                      </span>
-                    </Link>
+                    <div style={{ display: "inline-flex", alignItems: "center", gap: "0.5rem" }}>
+                      <Link
+                        href={`/states/${s.state.toLowerCase()}`}
+                        style={{
+                          fontWeight: 700,
+                          color: "var(--primary)",
+                          textDecoration: "none",
+                        }}
+                        className="hover:underline"
+                      >
+                        {getStateName(s.state)} ({s.state})
+                      </Link>
+                      <Link
+                        href={`/map?state=${s.state}`}
+                        style={{
+                          fontSize: "0.75rem",
+                          fontWeight: 500,
+                          color: "var(--text-muted)",
+                          textDecoration: "none",
+                        }}
+                        className="hover:underline"
+                        title={`View ${s.state} stations on map`}
+                      >
+                        Map ↗
+                      </Link>
+                    </div>
                   </td>
                   <td
                     style={{
@@ -131,6 +142,24 @@ export default function StateComparisonTable({
             })}
           </tbody>
         </table>
+      </div>
+
+      <div style={{ marginTop: "1rem", display: "flex", justifyContent: "flex-end" }}>
+        <Link
+          href="/states"
+          style={{
+            color: "var(--primary)",
+            fontSize: "0.875rem",
+            fontWeight: 600,
+            textDecoration: "none",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "0.25rem",
+          }}
+          className="hover:underline"
+        >
+          View all state guides & statistics →
+        </Link>
       </div>
     </div>
   );

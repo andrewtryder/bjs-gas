@@ -11,9 +11,17 @@ export const metadata: Metadata = {
     "Explore BJ's Wholesale Club gas station locations, live fuel prices, and regional coverage across 200+ clubs.",
 };
 
-export default async function MapPage() {
+interface MapPageProps {
+  searchParams?: Promise<{ state?: string; station?: string }>;
+}
+
+export default async function MapPage({ searchParams }: MapPageProps) {
   let stations: StationDto[] = [];
   let fetchError: string | null = null;
+
+  const resolvedParams = searchParams ? await searchParams : {};
+  const initialState = resolvedParams.state ? resolvedParams.state.trim().toUpperCase() : undefined;
+  const initialStation = resolvedParams.station ? Number.parseInt(resolvedParams.station, 10) : undefined;
 
   try {
     const data = await getStations();
@@ -49,7 +57,11 @@ export default async function MapPage() {
           </p>
         </div>
       ) : (
-        <MapDiscoveryView stations={stations} />
+        <MapDiscoveryView
+          stations={stations}
+          initialState={initialState}
+          initialStationNumber={Number.isFinite(initialStation) ? initialStation : undefined}
+        />
       )}
     </div>
   );
