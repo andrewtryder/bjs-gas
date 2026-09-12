@@ -16,7 +16,7 @@ import type { StyleSpecification } from "maplibre-gl";
 export function getMapStyle(apiKey?: string | null): StyleSpecification {
   const queryParam =
     apiKey && apiKey.trim().length > 0
-      ? `?api_key=${encodeURIComponent(apiKey.trim())}`
+      ? `?key=${encodeURIComponent(apiKey.trim())}`
       : "";
 
   return {
