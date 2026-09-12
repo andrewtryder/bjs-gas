@@ -229,6 +229,30 @@ describe("Environment and config helpers", () => {
     expect(process.env.NODE_ENV).toBe("test");
     expect(isHoneybadgerEnabled(false)).toBe(false);
   });
+
+  it("suppresses reportApiError during testing without throwing", async () => {
+    const { reportApiError, isTestingEnvironment } = await import("../src/honeybadger.js");
+    expect(isTestingEnvironment()).toBe(true);
+    // Calling reportApiError with an error in tests must be a safe no-op
+    expect(() => {
+      reportApiError(new Error("simulated test error that must not go to honeybadger"), {
+        route: "/test",
+        statusCode: 500,
+      });
+    }).not.toThrow();
+  });
+
+  it("suppresses reportErrorToHoneybadger during testing without throwing", async () => {
+    const webHbModule = "../web/lib/honeybadger";
+    const { reportErrorToHoneybadger, isTestingEnvironment } = await import(webHbModule);
+    expect(isTestingEnvironment()).toBe(true);
+    // Calling reportErrorToHoneybadger with an error in tests must be a safe no-op
+    expect(() => {
+      reportErrorToHoneybadger(new Error("simulated web test error that must not go to honeybadger"), {
+        route: "/",
+      });
+    }).not.toThrow();
+  });
 });
 
 describe("CARTO basemap style configuration", () => {

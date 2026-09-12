@@ -13,6 +13,15 @@ export interface HoneybadgerInitOptions {
   forceEnable?: boolean;
 }
 
+export function isTestingEnvironment(): boolean {
+  return (
+    process.env.NODE_ENV === "test" ||
+    Boolean(process.env.VITEST) ||
+    Boolean(process.env.JEST_WORKER_ID) ||
+    Boolean(process.env.PLAYWRIGHT_TEST)
+  );
+}
+
 /**
  * Initialize Honeybadger client for browser and Node/SSR runtimes.
  *
@@ -23,17 +32,19 @@ export interface HoneybadgerInitOptions {
  * - environment: production (suppressed in test/development unless forced)
  */
 export function initHoneybadger(options: HoneybadgerInitOptions = {}) {
-  const apiKey = options.apiKey || getHoneybadgerApiKey();
-  const environment = getAppEnvironment();
+  const isTest = isTestingEnvironment();
+  const apiKey = isTest ? null : options.apiKey || getHoneybadgerApiKey();
+  const environment = isTest ? "test" : getAppEnvironment();
   const revision = getAppRevision();
 
   const isTestOrDev =
+    isTest ||
     environment === "development" ||
     environment === "test" ||
     process.env.NODE_ENV === "test";
 
   const shouldReport =
-    options.forceEnable || (!isTestOrDev && Boolean(apiKey));
+    !isTest && (options.forceEnable || (!isTestOrDev && Boolean(apiKey)));
 
   if (!isInitialized) {
     Honeybadger.configure({
@@ -46,6 +57,9 @@ export function initHoneybadger(options: HoneybadgerInitOptions = {}) {
     } as any);
 
     Honeybadger.beforeNotify((notice: any) => {
+      if (isTestingEnvironment()) {
+        return false;
+      }
       return shouldReportNotice(notice as NoticeLike);
     });
 
@@ -55,7 +69,7 @@ export function initHoneybadger(options: HoneybadgerInitOptions = {}) {
       ...(apiKey ? { apiKey } : {}),
       ...(options.forceEnable !== undefined
         ? { reportData: options.forceEnable }
-        : {}),
+        : { reportData: shouldReport }),
     } as any);
   }
 
@@ -72,6 +86,11 @@ export function reportErrorToHoneybadger(
   context?: Record<string, unknown>,
 ): void {
   try {
+    // Never send error reports during testing
+    if (isTestingEnvironment()) {
+      return;
+    }
+
     // Avoid double-reporting or reporting expected Next.js 404 navigation
     if (
       error instanceof Error &&
