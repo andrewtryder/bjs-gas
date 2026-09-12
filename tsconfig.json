@@ -19,5 +19,5 @@
     "types": ["node"]
   },
   "include": ["src/**/*.ts", "tests/**/*.ts"],
-  "exclude": ["node_modules", "dist", "cloudflare-trigger", "module.ts", "prisma-composer.config.ts", "src/server.ts", "src/service.ts"]
+  "exclude": ["node_modules", "dist", "module.ts", "prisma-composer.config.ts", "src/server.ts", "src/service.ts", "src/schedule.ts"]
 }

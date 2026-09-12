@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "BJ's gas price collector on Prisma Compute; Cloudflare cron trigger only",
+  "description": "BJ's gas price collector on Prisma Compute; native cron scheduler",
   "scripts": {
     "build": "pnpm run build:api && pnpm run build:web",
     "build:api": "bun build src/server.ts --target=bun --outfile dist/server.mjs && node scripts/copy-prisma-engine.mjs && mkdir -p dist/data && cp data/gas-clubs.json data/clubs.json dist/data/",
@@ -26,8 +26,7 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate deploy",
     "prisma:migrate:dev": "prisma migrate dev",
-    "deploy:compute": "pnpm run build && pnpm dlx @prisma/cli@latest deploy module.ts --name bjs-gas",
-    "deploy:trigger": "cd cloudflare-trigger && pnpm exec wrangler deploy"
+    "deploy:compute": "pnpm run build && pnpm dlx @prisma/cli@latest deploy module.ts --name bjs-gas"
   },
   "engines": {
     "node": ">=22.18"
@@ -39,8 +38,7 @@
     "prisma": "^6.19.3",
     "tsx": "^4.20.5",
     "typescript": "^5.9.2",
-    "vitest": "^3.2.4",
-    "wrangler": "^4.127.1"
+    "vitest": "^3.2.4"
   },
   "dependencies": {
     "@honeybadger-io/js": "^6.16.3",
