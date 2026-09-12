@@ -14,8 +14,9 @@ import { formatPrice } from "../lib/stats";
 import { getFreshnessInfo } from "../lib/freshness";
 import StationList from "../components/StationList";
 import NationalTrendChart from "../components/NationalTrendChart";
-import StateComparisonTable from "../components/StateComparisonTable";
+import StatePricePreview from "../components/StatePricePreview";
 import PriceMovers from "../components/PriceMovers";
+import SectionHeader from "../components/ui/SectionHeader";
 
 import type { StationDto, SystemStatusResponse } from "../lib/types";
 
@@ -50,7 +51,10 @@ export default async function HomePage() {
     if (stationsRes.status === "fulfilled") {
       stations = stationsRes.value.stations || [];
     } else {
-      fetchError = stationsRes.reason instanceof Error ? stationsRes.reason.message : "Failed to load stations";
+      fetchError =
+        stationsRes.reason instanceof Error
+          ? stationsRes.reason.message
+          : "Failed to load stations";
     }
 
     if (summaryRes.status === "fulfilled") {
@@ -69,19 +73,37 @@ export default async function HomePage() {
       systemStatus = statusRes.value;
     }
   } catch (err) {
-    fetchError = err instanceof Error ? err.message : "Failed to load dashboard data";
+    fetchError = err instanceof Error ? err.message : "Failed to load data";
   }
 
   const latestObservedAt = systemStatus?.freshness?.latestObservedAt;
   const freshnessInfo = latestObservedAt ? getFreshnessInfo(latestObservedAt) : null;
 
+  // Derive 30-day delta from existing trends data if available
+  let delta30d: { text: string; isFavorable: boolean; isUnfavorable: boolean } | null = null;
+  if (trends && trends.points.length >= 2) {
+    const startVal = Number.parseFloat(trends.points[0]!.medianPrice);
+    const endVal = Number.parseFloat(trends.points[trends.points.length - 1]!.medianPrice);
+    if (Number.isFinite(startVal) && Number.isFinite(endVal)) {
+      const diff = endVal - startVal;
+      const cents = Math.round(diff * 100);
+      if (cents > 0) {
+        delta30d = { text: `+${cents}¢ over 30 days`, isFavorable: false, isUnfavorable: true };
+      } else if (cents < 0) {
+        delta30d = { text: `${cents}¢ over 30 days`, isFavorable: true, isUnfavorable: false };
+      } else {
+        delta30d = { text: "No change over 30 days", isFavorable: false, isUnfavorable: false };
+      }
+    }
+  }
+
   const websiteJsonLd = {
     "@context": "https://schema.org",
     "@type": "WebSite",
-    name: "BJ's Gas Price Tracker",
+    name: "BJ's gas prices",
     url: getWebBaseUrl(),
     description:
-      "Real-time fuel prices, interactive map, and historical price analytics for BJ's Wholesale Club gas stations.",
+      "Current BJ's gas prices, price history, and locations across the U.S. Updated hourly.",
     potentialAction: {
       "@type": "SearchAction",
       target: {
@@ -93,166 +115,165 @@ export default async function HomePage() {
   };
 
   return (
-    <div>
+    <div className="homepage-content">
       {/* Schema.org WebSite Structured Data */}
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteJsonLd) }}
       />
 
-      <section className="page-intro">
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "0.75rem" }}>
-          <div>
-            <h1 className="page-title">BJ&apos;s Wholesale Club Gas Tracker</h1>
-            <p className="page-description">
-              Real-time gas prices, historical analytics, national trends, and interactive station discovery across BJ&apos;s clubs.
-            </p>
-          </div>
-          {freshnessInfo && (
-            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginTop: "0.25rem" }}>
+      {/* Hero Section */}
+      <header className="hero-section">
+        <div className="hero-content">
+          <div className="hero-badge-row">
+            {freshnessInfo && (
               <Link
                 href="/status"
-                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${freshnessInfo.badgeClass}`}
-                title="View system status and collection pipeline"
+                className={`hero-freshness-pill ${freshnessInfo.badgeClass}`}
+                title="Data collection and pipeline status"
               >
-                <span className="h-1.5 w-1.5 rounded-full bg-current" aria-hidden="true" />
-                {freshnessInfo.relativeText} &bull; {freshnessInfo.label}
+                <span className="status-dot-sm" aria-hidden="true" />
+                <span>Updated hourly &bull; {freshnessInfo.relativeText}</span>
               </Link>
-            </div>
-          )}
+            )}
+          </div>
+
+          <h1 className="hero-title">BJ&apos;s gas prices</h1>
+          <p className="hero-subtitle">
+            Current BJ&apos;s gas prices, price history, and locations across the U.S. Updated hourly.
+          </p>
+
+          <div className="hero-actions">
+            <a href="#stations" className="btn btn-primary">
+              Find a station
+            </a>
+            <Link href="/map" className="btn btn-secondary">
+              View map
+            </Link>
+          </div>
         </div>
-      </section>
+      </header>
 
       {fetchError && (
-        <div
-          className="card"
-          style={{
-            marginBottom: "2rem",
-            borderColor: "var(--expensive)",
-            backgroundColor: "var(--expensive-bg)",
-          }}
-        >
-          <h3 style={{ color: "var(--expensive)", marginBottom: "0.25rem" }}>
-            Unable to load complete station data
-          </h3>
-          <p style={{ color: "var(--text-secondary)", fontSize: "0.9375rem" }}>
-            {fetchError}
-          </p>
+        <div className="notice-banner notice-banner-error" role="alert">
+          <p className="notice-title">Unable to load complete gas price data</p>
+          <p className="notice-message">{fetchError}</p>
         </div>
       )}
 
-      {/* Map Callout Banner */}
-      <section className="map-banner-card">
-        <div className="map-banner-text">
-          <h2 className="map-banner-title">Interactive Station Map</h2>
-          <p className="map-banner-desc">
-            Explore all {stations.length} locations across 20+ states with
-            interactive clustering, live fuel pricing, and state filters.
-          </p>
-        </div>
-        <Link href="/map" className="map-banner-btn">
-          Open Map View &rarr;
-        </Link>
-      </section>
-
-      {/* National Summary Cards */}
-      <section className="stats-grid">
-        <div className="card">
-          <div className="stat-label">National Median ({summary?.fuel.name || "Regular"})</div>
-          <div className="stat-value">
-            {summary?.medianPrice ? formatPrice(summary.medianPrice) : "—"}
-          </div>
-          <div className="stat-subtext">
-            Across {summary?.stationCount ?? stations.length} reporting stations
-          </div>
-        </div>
-
-        <div className="card stat-cheapest">
-          <div className="stat-label" style={{ color: "var(--cheapest)" }}>
-            Cheapest Station
-          </div>
-          <div className="stat-value" style={{ color: "var(--cheapest)" }}>
-            {summary?.min ? formatPrice(summary.min.price) : "—"}
-          </div>
-          <div className="stat-subtext">
-            {summary?.min ? (
-              <Link
-                href={`/stations/${summary.min.station.clubNumber}`}
-                style={{
-                  color: "var(--cheapest)",
-                  fontWeight: 600,
-                  textDecoration: "underline",
-                }}
+      {/* National Summary Section: Price-First Hierarchy */}
+      <section className="national-summary-section" aria-label="National gas price summary">
+        <div className="national-median-block">
+          <span className="national-median-label">National median</span>
+          <div className="national-median-value-row">
+            <span className="national-median-price tabular-nums">
+              {summary?.medianPrice ? formatPrice(summary.medianPrice) : "—"}
+            </span>
+            {delta30d && (
+              <span
+                className={`national-median-delta ${
+                  delta30d.isFavorable
+                    ? "text-cheaper"
+                    : delta30d.isUnfavorable
+                    ? "text-higher"
+                    : "text-muted"
+                }`}
               >
-                {summary.min.station.name} ({summary.min.station.state})
-              </Link>
-            ) : (
-              "No price data available"
+                {delta30d.text}
+              </span>
             )}
           </div>
+          <span className="national-median-fuel">
+            Regular unleaded across {summary?.stationCount ?? stations.length} stations
+          </span>
         </div>
 
-        <div className="card stat-expensive">
-          <div className="stat-label" style={{ color: "var(--expensive)" }}>
-            Highest Station
+        {/* Subordinate secondary metrics */}
+        <div className="supporting-metrics-grid">
+          {/* Lowest */}
+          <div className="supporting-metric-item">
+            <span className="supporting-metric-label">Lowest price</span>
+            <span className="supporting-metric-value tabular-nums text-cheaper">
+              {summary?.min ? formatPrice(summary.min.price) : "—"}
+            </span>
+            <div className="supporting-metric-subtext">
+              {summary?.min ? (
+                <Link
+                  href={`/stations/${summary.min.station.clubNumber}`}
+                  className="supporting-metric-link"
+                >
+                  {summary.min.station.name} ({summary.min.station.state})
+                </Link>
+              ) : (
+                "No price reported"
+              )}
+            </div>
           </div>
-          <div className="stat-value" style={{ color: "var(--expensive)" }}>
-            {summary?.max ? formatPrice(summary.max.price) : "—"}
-          </div>
-          <div className="stat-subtext">
-            {summary?.max ? (
-              <Link
-                href={`/stations/${summary.max.station.clubNumber}`}
-                style={{
-                  color: "var(--expensive)",
-                  fontWeight: 600,
-                  textDecoration: "underline",
-                }}
-              >
-                {summary.max.station.name} ({summary.max.station.state})
-              </Link>
-            ) : (
-              "No price data available"
-            )}
-          </div>
-        </div>
 
-        <div className="card">
-          <div className="stat-label">Total Gas Clubs</div>
-          <div className="stat-value">{stations.length}</div>
-          <div className="stat-subtext">
-            Active clubs with fuel facility
+          {/* Highest */}
+          <div className="supporting-metric-item">
+            <span className="supporting-metric-label">Highest price</span>
+            <span className="supporting-metric-value tabular-nums text-higher">
+              {summary?.max ? formatPrice(summary.max.price) : "—"}
+            </span>
+            <div className="supporting-metric-subtext">
+              {summary?.max ? (
+                <Link
+                  href={`/stations/${summary.max.station.clubNumber}`}
+                  className="supporting-metric-link"
+                >
+                  {summary.max.station.name} ({summary.max.station.state})
+                </Link>
+              ) : (
+                "No price reported"
+              )}
+            </div>
+          </div>
+
+          {/* Locations */}
+          <div className="supporting-metric-item">
+            <span className="supporting-metric-label">Locations tracked</span>
+            <span className="supporting-metric-value tabular-nums">
+              {stations.length}
+            </span>
+            <div className="supporting-metric-subtext">
+              BJ&apos;s clubs with fuel stations
+            </div>
           </div>
         </div>
       </section>
 
-      {/* National Historical Trend Chart */}
+      {/* Historical Trend Section */}
       {trends && trends.points.length > 0 && (
-        <section>
+        <section className="section-block">
           <NationalTrendChart initialTrends={trends} />
         </section>
       )}
 
-      {/* Recent Price Movers */}
-      {moversData && (moversData.increases.length > 0 || moversData.decreases.length > 0) && (
-        <section>
-          <PriceMovers movers={moversData} />
-        </section>
-      )}
+      {/* Price Movers Section */}
+      {moversData &&
+        (moversData.increases.length > 0 || moversData.decreases.length > 0) && (
+          <section className="section-block">
+            <PriceMovers movers={moversData} />
+          </section>
+        )}
 
-      {/* State Price Rankings */}
+      {/* State Price Preview */}
       {statesData && statesData.states.length > 0 && (
-        <section>
-          <StateComparisonTable
+        <section className="section-block">
+          <StatePricePreview
             states={statesData.states}
             fuelName={statesData.fuel.name}
           />
         </section>
       )}
 
-      {/* Station Directory */}
-      <section>
-        <h2 className="section-title">Gas Stations Directory</h2>
+      {/* Find a Station Section */}
+      <section id="stations" className="section-block station-directory-section">
+        <SectionHeader
+          title="Find a station"
+          subtitle={`Browse all ${stations.length} BJ's gas stations with current fuel prices`}
+        />
         <StationList stations={stations} />
       </section>
     </div>

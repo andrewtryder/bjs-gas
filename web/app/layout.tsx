@@ -15,13 +15,13 @@ export const metadata: Metadata = {
     template: "%s | BJ's Gas Prices",
   },
   description:
-    "Real-time fuel prices, interactive map, historical trends, and state price directories across BJ's Wholesale Club gas stations.",
+    "Current fuel prices, price trends, and station directories across BJ's Wholesale Club gas stations. Updated hourly.",
   openGraph: {
     title: "BJ's Gas Prices — Current Prices, Trends & Locations",
     description:
-      "Real-time fuel prices, interactive map, historical trends, and state price directories across BJ's Wholesale Club gas stations.",
+      "Current fuel prices, price trends, and station directories across BJ's Wholesale Club gas stations. Updated hourly.",
     url: "/",
-    siteName: "BJ's Gas Price Tracker",
+    siteName: "BJ's Gas Prices",
     type: "website",
     locale: "en_US",
   },
@@ -29,7 +29,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "BJ's Gas Prices — Current Prices, Trends & Locations",
     description:
-      "Real-time fuel prices, interactive map, historical trends, and state price directories across BJ's Wholesale Club gas stations.",
+      "Current fuel prices, price trends, and station directories across BJ's Wholesale Club gas stations. Updated hourly.",
   },
 };
 
@@ -47,46 +47,47 @@ export default function RootLayout({
         <div className="site-wrapper">
           <header className="site-header">
             <div className="header-container">
-              <Link href="/" className="brand-link">
-                <span className="brand-title">BJ&apos;s Gas Tracker</span>
+              <Link href="/" className="brand-link" aria-label="BJ's Gas Prices Home">
+                <span className="brand-title">BJ&apos;s gas prices</span>
               </Link>
               <nav className="header-nav" aria-label="Main Navigation">
-                <Link href="/" className="nav-link">
-                  Overview
+                <Link href="/map" className="nav-link">
+                  Map
                 </Link>
                 <Link href="/states" className="nav-link">
-                  By State
+                  States
                 </Link>
-                <Link href="/map" className="nav-link nav-link-highlight">
-                  Interactive Map
-                </Link>
-                <Link href="/status" className="nav-link flex items-center gap-1.5" title="System & Data Pipeline Status">
-                  <span className="inline-block h-2 w-2 rounded-full bg-emerald-500" aria-hidden="true" />
-                  Status
+                <Link
+                  href="/status"
+                  className="nav-link nav-status-link"
+                  title="Data collection & pipeline status"
+                >
+                  <span className="status-dot status-dot-healthy" aria-hidden="true" />
+                  <span>Data status</span>
                 </Link>
               </nav>
             </div>
           </header>
           <main className="site-main">{children}</main>
           <footer className="site-footer">
-            <div className="mx-auto max-w-4xl space-y-3">
-              <div className="flex flex-wrap justify-center gap-6 text-sm font-medium">
-                <Link href="/" className="hover:text-slate-900 transition-colors">
-                  Overview
+            <div className="footer-container">
+              <nav className="footer-nav" aria-label="Footer Navigation">
+                <Link href="/map" className="footer-link">
+                  Map
                 </Link>
-                <Link href="/states" className="hover:text-slate-900 transition-colors">
-                  Browse by State
+                <Link href="/states" className="footer-link">
+                  States
                 </Link>
-                <Link href="/map" className="hover:text-slate-900 transition-colors">
-                  Interactive Map
+                <Link href="/status" className="footer-link">
+                  Data status
                 </Link>
-                <Link href="/status" className="hover:text-slate-900 transition-colors">
-                  System Status &amp; Pipeline
-                </Link>
+              </nav>
+              <div className="footer-copy">
+                <p className="footer-title">BJ&apos;s Gas Prices</p>
+                <p className="footer-disclaimer">
+                  Independent price tracking project. Not affiliated with BJ&apos;s Wholesale Club.
+                </p>
               </div>
-              <p className="text-xs text-slate-500">
-                BJ&apos;s Gas Price Tracker &bull; Independent community observation tool &bull; Powered by Prisma Compute
-              </p>
             </div>
           </footer>
         </div>
