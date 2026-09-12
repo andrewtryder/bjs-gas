@@ -7,6 +7,13 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const nextConfig = {
   output: "standalone",
   outputFileTracingRoot: path.join(__dirname, "../"),
+  turbopack: {
+    resolveAlias: {
+      "../src/service.js": "../src/service.ts",
+      "./stats.js": "./lib/stats.ts",
+      "./types.js": "./lib/types.ts",
+    },
+  },
   webpack: (config) => {
     config.resolve.extensionAlias = {
       ".js": [".ts", ".tsx", ".js"],

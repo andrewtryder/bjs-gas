@@ -9,6 +9,17 @@ allowBuilds:
   msgpackr-extract: true
   prisma: true
   workerd: true
+minimumReleaseAgeExclude:
+  - '@next/env@16.3.5'
+  - '@next/swc-darwin-arm64@16.3.5'
+  - '@next/swc-darwin-x64@16.3.5'
+  - '@next/swc-linux-arm64-gnu@16.3.5'
+  - '@next/swc-linux-arm64-musl@16.3.5'
+  - '@next/swc-linux-x64-gnu@16.3.5'
+  - '@next/swc-linux-x64-musl@16.3.5'
+  - '@next/swc-win32-arm64-msvc@16.3.5'
+  - '@next/swc-win32-x64-msvc@16.3.5'
+  - next@16.3.5
 overrides:
   "@prisma/config>effect": "3.21.0"
   effect: 4.0.0-rc.112
