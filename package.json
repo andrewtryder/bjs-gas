@@ -5,8 +5,9 @@
   "type": "module",
   "description": "BJ's gas price collector on Prisma Compute; Cloudflare cron trigger only",
   "scripts": {
-    "build": "pnpm run build:api",
+    "build": "pnpm run build:api && pnpm run build:web",
     "build:api": "bun build src/server.ts --target=bun --outfile dist/server.mjs && node scripts/copy-prisma-engine.mjs && mkdir -p dist/data && cp data/gas-clubs.json data/clubs.json dist/data/",
+    "build:web": "pnpm --filter web run build",
     "discover": "tsx src/cli.ts discover",
     "discover:clubs": "tsx src/cli.ts discover:clubs",
     "discover:gas": "tsx src/cli.ts discover:gas",
@@ -17,14 +18,15 @@
     "import:clubs": "tsx src/cli.ts import:clubs",
     "collect:club": "tsx src/cli.ts collect:club",
     "collect:once": "tsx src/cli.ts collect:once",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && pnpm run typecheck:web",
+    "typecheck:web": "pnpm --filter web run typecheck",
     "test": "vitest run",
     "test:integration": "vitest run tests/persist.integration.test.ts",
     "lint": "tsc --noEmit",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate deploy",
     "prisma:migrate:dev": "prisma migrate dev",
-    "deploy:compute": "pnpm run build:api && pnpm dlx @prisma/cli@latest deploy module.ts --name bjs-gas",
+    "deploy:compute": "pnpm run build && pnpm dlx @prisma/cli@latest deploy module.ts --name bjs-gas",
     "deploy:trigger": "cd cloudflare-trigger && pnpm exec wrangler deploy"
   },
   "engines": {
