@@ -206,3 +206,27 @@ describe("stationsToGeoJson", () => {
     expect(geojson.features).toHaveLength(0);
   });
 });
+
+describe("MapLibre GL worker assets & configuration", () => {
+  it("provides worker and shared scripts in web/public", async () => {
+    const fs = await import("node:fs");
+    const path = await import("node:path");
+    const workerPath = path.resolve(process.cwd(), "web/public/maplibre-gl-worker.mjs");
+    const sharedPath = path.resolve(process.cwd(), "web/public/maplibre-gl-shared.mjs");
+    expect(fs.existsSync(workerPath)).toBe(true);
+    expect(fs.statSync(workerPath).size).toBeGreaterThan(1000);
+    expect(fs.existsSync(sharedPath)).toBe(true);
+    expect(fs.statSync(sharedPath).size).toBeGreaterThan(1000);
+  });
+
+  it("configures WORKER_URL in InteractiveMap component", async () => {
+    const fs = await import("node:fs");
+    const path = await import("node:path");
+    const componentSource = fs.readFileSync(
+      path.resolve(process.cwd(), "web/components/InteractiveMap.tsx"),
+      "utf-8",
+    );
+    expect(componentSource).toContain('WORKER_URL = "/maplibre-gl-worker.mjs"');
+  });
+});
+

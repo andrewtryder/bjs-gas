@@ -5,6 +5,11 @@ import * as maplibregl from "maplibre-gl";
 import type { Map as MapLibreMap, GeoJSONSource } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 
+// Configure MapLibre GL v6 worker URL to static local worker script
+if (typeof window !== "undefined" && maplibregl.config) {
+  maplibregl.config.WORKER_URL = "/maplibre-gl-worker.mjs";
+}
+
 import { MAP_CONFIG, getMapStyle } from "../lib/map-config";
 import { formatPrice } from "../lib/stats";
 import type {
@@ -119,6 +124,10 @@ export default function InteractiveMap({
   // Initialize MapLibre instance
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
+
+    if (maplibregl.config) {
+      maplibregl.config.WORKER_URL = "/maplibre-gl-worker.mjs";
+    }
 
     const map = new maplibregl.Map({
       container: containerRef.current,
