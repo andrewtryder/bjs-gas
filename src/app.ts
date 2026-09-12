@@ -4,6 +4,7 @@ import { authorizeCollector } from "./auth.js";
 import { isCollectionInProgress, loadGasClubs, runCollection } from "./collector.js";
 import { getStationHistory, getStationWithPrices, listStationsWithPrices } from "./api/stations.js";
 import { getCollectionStatus } from "./api/status.js";
+import { createAnalyticsRouter } from "./api/analytics.js";
 import { fetchClubFuel } from "./fuel/client.js";
 
 export const SERVICE_NAME = "bjs-gas-api";
@@ -114,6 +115,8 @@ export function createApp(env: AppEnv): Hono {
     c.header("Cache-Control", "public, max-age=120, s-maxage=300");
     return c.json({ clubNumber, history });
   });
+
+  app.route("/api/v1/analytics", createAnalyticsRouter(env.prisma));
 
   return app;
 }

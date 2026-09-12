@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getStation, getStationHistory } from "../../../lib/api";
+import { getNationalSummary, getStateSummaries } from "../../../lib/analytics";
 import { formatDate, formatPrice } from "../../../lib/stats";
 import PriceHistoryChart from "../../../components/PriceHistoryChart";
 
@@ -18,17 +19,51 @@ export default async function StationDetailPage({
     notFound();
   }
 
-  const [stationData, historyData] = await Promise.all([
+  const [stationData, historyData, nationalSummaryRes, stateSummariesRes] = await Promise.allSettled([
     getStation(clubNumber),
     getStationHistory(clubNumber),
+    getNationalSummary("1"),
+    getStateSummaries("1"),
   ]);
 
-  if (!stationData || !stationData.station) {
+  if (stationData.status !== "fulfilled" || !stationData.value?.station) {
     notFound();
   }
 
-  const station = stationData.station;
-  const history = historyData?.history || [];
+  const station = stationData.value.station;
+  const history =
+    historyData.status === "fulfilled" && historyData.value
+      ? historyData.value.history || []
+      : [];
+  const nationalSummary = nationalSummaryRes.status === "fulfilled" ? nationalSummaryRes.value : null;
+  const stateSummaries = stateSummariesRes.status === "fulfilled" ? stateSummariesRes.value : null;
+
+  // Regular fuel comparison
+  const regularFuel = station.fuels.find((f) => f.sku === "1");
+  const regularPrice = regularFuel ? Number.parseFloat(regularFuel.price) : null;
+
+  let nationalDiffStr: string | null = null;
+  let nationalIsCheaper = false;
+  if (regularPrice !== null && nationalSummary?.medianPrice) {
+    const natMed = Number.parseFloat(nationalSummary.medianPrice);
+    if (Number.isFinite(natMed)) {
+      const diff = regularPrice - natMed;
+      nationalIsCheaper = diff <= 0;
+      nationalDiffStr = (diff >= 0 ? "+" : "") + diff.toFixed(3);
+    }
+  }
+
+  let stateDiffStr: string | null = null;
+  let stateIsCheaper = false;
+  const stateData = stateSummaries?.states.find((s) => s.state === station.state);
+  if (regularPrice !== null && stateData?.medianPrice) {
+    const stMed = Number.parseFloat(stateData.medianPrice);
+    if (Number.isFinite(stMed)) {
+      const diff = regularPrice - stMed;
+      stateIsCheaper = diff <= 0;
+      stateDiffStr = (diff >= 0 ? "+" : "") + diff.toFixed(3);
+    }
+  }
 
   return (
     <div>
@@ -43,6 +78,46 @@ export default async function StationDetailPage({
         <div style={{ fontSize: "0.875rem", color: "var(--text-muted)", marginTop: "0.25rem" }}>
           Club #{station.clubNumber} &bull; {station.storeType || "Standard Club"}
         </div>
+
+        {/* Analytics Context Badges */}
+        {(nationalDiffStr || stateDiffStr) && (
+          <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", marginTop: "0.75rem" }}>
+            {nationalDiffStr && (
+              <span
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  fontSize: "0.75rem",
+                  fontWeight: 600,
+                  padding: "0.25rem 0.6rem",
+                  borderRadius: "var(--radius-sm)",
+                  backgroundColor: nationalIsCheaper ? "var(--cheapest-bg)" : "var(--expensive-bg)",
+                  color: nationalIsCheaper ? "var(--cheapest)" : "var(--expensive)",
+                  border: "1px solid var(--border-color)",
+                }}
+              >
+                {nationalDiffStr} vs National Median
+              </span>
+            )}
+            {stateDiffStr && (
+              <span
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  fontSize: "0.75rem",
+                  fontWeight: 600,
+                  padding: "0.25rem 0.6rem",
+                  borderRadius: "var(--radius-sm)",
+                  backgroundColor: stateIsCheaper ? "var(--cheapest-bg)" : "var(--expensive-bg)",
+                  color: stateIsCheaper ? "var(--cheapest)" : "var(--expensive)",
+                  border: "1px solid var(--border-color)",
+                }}
+              >
+                {stateDiffStr} vs {station.state} Median
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
       <section style={{ marginBottom: "2.5rem" }}>
@@ -60,19 +135,8 @@ export default async function StationDetailPage({
                 <div className="stat-label">{fuel.name}</div>
                 <div className="stat-value">{formatPrice(fuel.price)}</div>
                 <div className="stat-subtext">
-                  Observed {formatDate(fuel.observedAt)}
+                  Updated: {formatDate(fuel.observedAt)}
                 </div>
-                {fuel.sourcePriceAtLocal && (
-                  <div
-                    style={{
-                      fontSize: "0.75rem",
-                      color: "var(--text-muted)",
-                      marginTop: "0.25rem",
-                    }}
-                  >
-                    Station time: {fuel.sourcePriceAtLocal}
-                  </div>
-                )}
               </div>
             ))}
           </div>
@@ -80,51 +144,37 @@ export default async function StationDetailPage({
       </section>
 
       <section className="chart-section">
-        <h2 className="section-title">Price Change History</h2>
+        <h2 className="section-title">Historical Price Trends</h2>
         <PriceHistoryChart history={history} />
       </section>
 
-      <section className="history-section">
-        <h2 className="section-title">Chronological Price Changes</h2>
-        {history.length === 0 ? (
-          <div className="empty-state">
-            <p>No historical price change events recorded yet.</p>
-          </div>
-        ) : (
+      {history.length > 0 && (
+        <section className="history-section">
+          <h2 className="section-title">Price Change History Log</h2>
           <div className="table-container">
             <table className="station-table">
               <thead>
                 <tr>
-                  <th>Date &amp; Time</th>
-                  <th>Fuel Type</th>
+                  <th>Fuel</th>
                   <th>Price</th>
-                  <th>BJ&apos;s Local Timestamp</th>
+                  <th>Observed At (UTC)</th>
                 </tr>
               </thead>
               <tbody>
-                {history.map((item, idx) => (
-                  <tr key={`${item.observedAt}-${item.fuelSku}-${idx}`}>
-                    <td>{formatDate(item.observedAt)}</td>
-                    <td>
-                      <span className="fuel-badge">
-                        <span className="fuel-badge-name">{item.fuelName}</span>
-                      </span>
-                    </td>
-                    <td>
-                      <span style={{ fontWeight: 600 }}>{formatPrice(item.price)}</span>
-                    </td>
-                    <td>
-                      <span style={{ color: "var(--text-muted)", fontSize: "0.875rem" }}>
-                        {item.sourcePriceAtLocal || "—"}
-                      </span>
+                {history.map((item, index) => (
+                  <tr key={`${item.fuelSku}-${item.observedAt}-${index}`}>
+                    <td style={{ fontWeight: 600 }}>{item.fuelName}</td>
+                    <td style={{ fontWeight: 700 }}>{formatPrice(item.price)}</td>
+                    <td style={{ color: "var(--text-secondary)", fontSize: "0.875rem" }}>
+                      {formatDate(item.observedAt)}
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-        )}
-      </section>
+        </section>
+      )}
     </div>
   );
 }
