@@ -2,18 +2,32 @@ import Honeybadger from "@honeybadger-io/js";
 
 let initialized = false;
 
+export function isTestingEnvironment(): boolean {
+  return (
+    process.env.NODE_ENV === "test" ||
+    Boolean(process.env.VITEST) ||
+    Boolean(process.env.JEST_WORKER_ID) ||
+    Boolean(process.env.PLAYWRIGHT_TEST)
+  );
+}
+
 export function initApiHoneybadger(apiKey?: string | null) {
   if (initialized) return Honeybadger;
 
-  const key = apiKey || process.env.HONEYBADGER_API_KEY;
-  const isProd = process.env.NODE_ENV === "production";
+  const isTest = isTestingEnvironment();
+  const key = isTest ? null : apiKey || process.env.HONEYBADGER_API_KEY;
+  const isProd = process.env.NODE_ENV === "production" && !isTest;
   const shouldSend = Boolean(key && isProd);
 
   Honeybadger.configure({
     apiKey: key || "unconfigured",
-    environment: isProd ? "production" : "development",
+    environment: isTest ? "test" : isProd ? "production" : "development",
     reportData: shouldSend,
   });
+
+  if (isTest) {
+    Honeybadger.beforeNotify(() => false);
+  }
 
   initialized = true;
   return Honeybadger;
@@ -24,8 +38,12 @@ export function reportApiError(
   context?: Record<string, unknown>,
 ) {
   try {
+    // Never send error reports during testing
+    if (isTestingEnvironment()) {
+      return;
+    }
+
     const isProd = process.env.NODE_ENV === "production";
-    // In test or dev without key, skip
     if (!isProd && !process.env.HONEYBADGER_FORCE_TEST) {
       return;
     }

@@ -96,9 +96,17 @@ export function getAppRevision(): string | undefined {
  * Only enabled in production with a valid API key, unless forced for testing.
  */
 export function isHoneybadgerEnabled(forceEnable = false): boolean {
+  if (
+    process.env.NODE_ENV === "test" ||
+    Boolean(process.env.VITEST) ||
+    Boolean(process.env.JEST_WORKER_ID) ||
+    Boolean(process.env.PLAYWRIGHT_TEST)
+  ) {
+    return false;
+  }
   if (forceEnable) return true;
   const env = getAppEnvironment();
-  if (env === "development" || env === "test" || process.env.NODE_ENV === "test") {
+  if (env === "development" || env === "test") {
     return false;
   }
   const key = getHoneybadgerApiKey();
