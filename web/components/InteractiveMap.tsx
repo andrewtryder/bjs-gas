@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
-import maplibregl, { type Map as MapLibreMap, type GeoJSONSource } from "maplibre-gl";
+import * as maplibregl from "maplibre-gl";
+import type { Map as MapLibreMap, GeoJSONSource } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 
 import { MAP_CONFIG, getMapStyle } from "../lib/map-config";
@@ -229,7 +230,14 @@ export default function InteractiveMap({
       });
 
       // Click on cluster -> zoom in
-      map.on("click", "clusters", (e) => {
+      map.on(
+        "click",
+        "clusters",
+        (
+          e: maplibregl.MapMouseEvent & {
+            features?: maplibregl.MapGeoJSONFeature[];
+          },
+        ) => {
         const features = map.queryRenderedFeatures(e.point, {
           layers: ["clusters"],
         });
