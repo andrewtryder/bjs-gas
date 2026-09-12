@@ -263,15 +263,15 @@ describe("CARTO basemap style configuration", () => {
     expect(rasterSource.tiles[0]).toBe(
       "https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}@2x.png",
     );
-    expect(rasterSource.tiles[0]).not.toContain("?api_key=");
+    expect(rasterSource.tiles[0]).not.toContain("?key=");
   });
 
-  it("appends encoded api_key when provided", async () => {
+  it("appends encoded key when provided", async () => {
     const { getMapStyle } = await import("../web/lib/map-config.js");
     const style = getMapStyle("test-carto-key-123");
     const rasterSource = style.sources["carto-positron"] as any;
     expect(rasterSource.tiles[0]).toBe(
-      "https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}@2x.png?api_key=test-carto-key-123",
+      "https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}@2x.png?key=test-carto-key-123",
     );
   });
 });
