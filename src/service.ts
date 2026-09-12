@@ -5,6 +5,7 @@ import { compute, rawPostgres } from "@prisma/composer-prisma-cloud";
 
 const apiInput = type({
   collectorSecret: secretString(),
+  "honeybadgerApiKey?": secretString(),
 });
 
 export default compute({

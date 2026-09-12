@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import maplibregl, { type Map as MapLibreMap, type GeoJSONSource } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 
-import { MAP_CONFIG } from "../lib/map-config";
+import { MAP_CONFIG, getMapStyle } from "../lib/map-config";
 import { formatPrice } from "../lib/stats";
 import type {
   StationDto,
@@ -29,6 +29,7 @@ interface InteractiveMapProps {
   selectedStation: StationDto | null;
   onSelectStation: (station: StationDto | null) => void;
   stations: StationDto[];
+  cartoApiKey?: string | null;
 }
 
 export default function InteractiveMap({
@@ -36,6 +37,7 @@ export default function InteractiveMap({
   selectedStation,
   onSelectStation,
   stations,
+  cartoApiKey,
 }: InteractiveMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
@@ -119,11 +121,16 @@ export default function InteractiveMap({
 
     const map = new maplibregl.Map({
       container: containerRef.current,
-      style: MAP_CONFIG.style,
+      style: getMapStyle(cartoApiKey),
       center: MAP_CONFIG.defaultCenter,
       zoom: MAP_CONFIG.defaultZoom,
       minZoom: MAP_CONFIG.minZoom,
       maxZoom: MAP_CONFIG.maxZoom,
+    });
+
+    map.on("error", () => {
+      // Graceful degradation log: never expose API key or query string in logs
+      console.warn("carto_map_load_failed");
     });
 
     map.addControl(

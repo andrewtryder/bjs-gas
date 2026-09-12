@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import "./globals.css";
+import { getHoneybadgerApiKey } from "../lib/config";
+import HoneybadgerInit from "../components/HoneybadgerInit";
 
 export const metadata: Metadata = {
   metadataBase: new URL(
@@ -36,9 +38,12 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const honeybadgerApiKey = getHoneybadgerApiKey();
+
   return (
     <html lang="en">
       <body>
+        <HoneybadgerInit apiKey={honeybadgerApiKey} />
         <div className="site-wrapper">
           <header className="site-header">
             <div className="header-container">

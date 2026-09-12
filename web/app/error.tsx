@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import Link from "next/link";
+import { reportErrorToHoneybadger } from "../lib/honeybadger";
 
 export default function ErrorBoundary({
   error,
@@ -13,6 +14,10 @@ export default function ErrorBoundary({
   useEffect(() => {
     // Log error to console for client-side diagnosis
     console.error("App Error Boundary caught:", error);
+    reportErrorToHoneybadger(error, {
+      digest: error.digest,
+      runtime: "client_error_boundary",
+    });
   }, [error]);
 
   return (

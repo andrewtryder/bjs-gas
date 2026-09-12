@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { getStations } from "../../lib/api";
+import { getCartoApiKey } from "../../lib/config";
 import type { StationDto } from "../../lib/types";
 import MapDiscoveryView from "../../components/MapDiscoveryView";
 
@@ -18,6 +19,7 @@ interface MapPageProps {
 export default async function MapPage({ searchParams }: MapPageProps) {
   let stations: StationDto[] = [];
   let fetchError: string | null = null;
+  const cartoApiKey = getCartoApiKey();
 
   const resolvedParams = searchParams ? await searchParams : {};
   const initialState = resolvedParams.state ? resolvedParams.state.trim().toUpperCase() : undefined;
@@ -61,6 +63,7 @@ export default async function MapPage({ searchParams }: MapPageProps) {
           stations={stations}
           initialState={initialState}
           initialStationNumber={Number.isFinite(initialStation) ? initialStation : undefined}
+          cartoApiKey={cartoApiKey}
         />
       )}
     </div>

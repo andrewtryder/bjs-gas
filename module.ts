@@ -12,10 +12,15 @@ export default module("bjs-gas", ({ provision }) => {
     deps: { db },
     input: {
       collectorSecret: envSecret("COLLECTOR_SECRET"),
+      honeybadgerApiKey: envSecret("HONEYBADGER_API_KEY"),
     },
   });
   provision(webService, {
     id: "bjsgasweb",
     deps: { api },
+    input: {
+      cartoApiKey: envSecret("CARTO_API_KEY"),
+      honeybadgerApiKey: envSecret("HONEYBADGER_API_KEY"),
+    },
   });
 });

@@ -29,12 +29,14 @@ interface MapDiscoveryViewProps {
   stations: StationDto[];
   initialState?: string;
   initialStationNumber?: number;
+  cartoApiKey?: string | null;
 }
 
 export default function MapDiscoveryView({
   stations,
   initialState,
   initialStationNumber,
+  cartoApiKey,
 }: MapDiscoveryViewProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedState, setSelectedState] = useState(initialState || "ALL");
@@ -297,6 +299,7 @@ export default function MapDiscoveryView({
             selectedStation={selectedStation}
             onSelectStation={handleSelectStation}
             stations={filteredStations}
+            cartoApiKey={cartoApiKey}
           />
         </div>
       </div>

@@ -6,6 +6,7 @@ import { getNearbyStations, getStationHistory, getStationWithPrices, listStation
 import { getCollectionStatus } from "./api/status.js";
 import { createAnalyticsRouter } from "./api/analytics.js";
 import { fetchClubFuel } from "./fuel/client.js";
+import { reportApiError } from "./honeybadger.js";
 
 export const SERVICE_NAME = "bjs-gas-api";
 export const SERVICE_VERSION = "0.1.0";
@@ -13,10 +14,25 @@ export const SERVICE_VERSION = "0.1.0";
 export type AppEnv = {
   prisma: PrismaClient;
   collectorSecret: string;
+  honeybadgerApiKey?: string;
 };
 
 export function createApp(env: AppEnv): Hono {
   const app = new Hono();
+
+  app.onError((err, c) => {
+    const status =
+      "status" in err && typeof err.status === "number" ? err.status : 500;
+    if (status >= 500) {
+      reportApiError(err, {
+        route: c.req.path,
+        method: c.req.method,
+        statusCode: status,
+      });
+    }
+    console.error("API error caught:", err);
+    return c.json({ error: "internal_server_error" }, 500);
+  });
 
   app.get("/health", (c) => {
     const gasClubs = loadGasClubs();
@@ -67,6 +83,11 @@ export function createApp(env: AppEnv): Hono {
       if (code === "COLLECTION_IN_PROGRESS") {
         return c.json({ error: "collection_in_progress" }, 409);
       }
+      reportApiError(error, {
+        route: "/internal/collect",
+        method: "POST",
+        statusCode: 500,
+      });
       console.error(
         JSON.stringify({
           event: "gas_collection_error",
