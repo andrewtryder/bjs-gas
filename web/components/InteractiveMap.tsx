@@ -178,7 +178,7 @@ export default function InteractiveMap({
         filter: ["has", "point_count"],
         layout: {
           "text-field": "{point_count_abbreviated}",
-          "text-font": ["Noto Sans Regular", "Open Sans Regular"],
+          "text-font": ["Noto Sans Regular"],
           "text-size": 13,
         },
         paint: {
@@ -208,7 +208,7 @@ export default function InteractiveMap({
         filter: ["!", ["has", "point_count"]],
         layout: {
           "text-field": ["get", "priceFormatted"],
-          "text-font": ["Noto Sans Regular", "Open Sans Regular"],
+          "text-font": ["Noto Sans Regular"],
           "text-size": 12,
           "text-offset": [0, 1.4],
           "text-anchor": "top",
