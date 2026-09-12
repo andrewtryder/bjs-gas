@@ -4,6 +4,7 @@ import type {
   StationDetailResponse,
   StationHistoryResponse,
   StationsResponse,
+  SystemStatusResponse,
 } from "./types";
 
 export function getApiBaseUrl(): string {
@@ -81,4 +82,16 @@ export async function getNearbyStations(
   }
   return res.json();
 }
+
+export async function getSystemStatus(): Promise<SystemStatusResponse> {
+  const baseUrl = getApiBaseUrl();
+  const res = await fetch(`${baseUrl}/api/v1/status`, {
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    throw new Error(`Failed to fetch system status: ${res.status} ${res.statusText}`);
+  }
+  return res.json();
+}
+
 

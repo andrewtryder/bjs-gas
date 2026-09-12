@@ -72,11 +72,11 @@ export default function StateComparisonTable({
         <table className="station-table">
           <thead>
             <tr>
-              <th style={{ width: "60px" }}>Rank</th>
-              <th>State</th>
-              <th>Median Price</th>
-              <th>Range (Min – Max)</th>
-              <th style={{ textAlign: "right" }}>Stations</th>
+              <th scope="col" style={{ width: "60px" }}>Rank</th>
+              <th scope="col">State</th>
+              <th scope="col">Median Price</th>
+              <th scope="col">Range (Min – Max)</th>
+              <th scope="col" style={{ textAlign: "right" }}>Stations</th>
             </tr>
           </thead>
           <tbody>

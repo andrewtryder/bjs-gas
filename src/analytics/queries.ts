@@ -115,6 +115,19 @@ async function resolveFuelInfo(
 }
 
 /**
+ * Wraps analytics queries to track latency and warn if execution exceeds 500ms.
+ */
+async function timedQuery<T>(name: string, fn: () => Promise<T>): Promise<T> {
+  const start = performance.now();
+  const result = await fn();
+  const durationMs = performance.now() - start;
+  if (durationMs > 500) {
+    console.warn(`[analytics_query_slow] query=${name} duration=${durationMs.toFixed(1)}ms`);
+  }
+  return result;
+}
+
+/**
  * 1. Current National Summary
  * Computes national median, minimum, maximum, and station count for the active fuel.
  */
@@ -122,69 +135,71 @@ export async function getNationalSummary(
   prisma: PrismaClient,
   fuelSku: string = CANONICAL_FUEL_SKU,
 ): Promise<NationalSummaryResult> {
-  const fuel = await resolveFuelInfo(prisma, fuelSku);
+  return timedQuery("getNationalSummary", async () => {
+    const fuel = await resolveFuelInfo(prisma, fuelSku);
 
-  const rows = await prisma.$queryRaw<
-    Array<{
-      clubNumber: number;
-      name: string;
-      city: string;
-      state: string;
-      price: string;
-    }>
-  >`
-    SELECT
-      c."clubNumber",
-      c.name,
-      c.city,
-      c.state,
-      p.price::text as price
-    FROM "FuelPriceCurrent" p
-    JOIN "Club" c ON c."clubNumber" = p."clubNumber"
-    WHERE p."fuelSku" = ${fuelSku}
-    ORDER BY p.price ASC, c."clubNumber" ASC;
-  `;
+    const rows = await prisma.$queryRaw<
+      Array<{
+        clubNumber: number;
+        name: string;
+        city: string;
+        state: string;
+        price: string;
+      }>
+    >`
+      SELECT
+        c."clubNumber",
+        c.name,
+        c.city,
+        c.state,
+        p.price::text as price
+      FROM "FuelPriceCurrent" p
+      JOIN "Club" c ON c."clubNumber" = p."clubNumber"
+      WHERE p."fuelSku" = ${fuelSku}
+      ORDER BY p.price ASC, c."clubNumber" ASC;
+    `;
 
-  if (rows.length === 0) {
+    if (rows.length === 0) {
+      return {
+        generatedAt: new Date().toISOString(),
+        fuel,
+        stationCount: 0,
+        medianPrice: null,
+        min: null,
+        max: null,
+      };
+    }
+
+    const prices = rows.map((r) => Number.parseFloat(r.price));
+    const median = calculateMedian(prices);
+    const minRow = rows[0]!;
+    const maxRow = rows[rows.length - 1]!;
+
     return {
       generatedAt: new Date().toISOString(),
       fuel,
-      stationCount: 0,
-      medianPrice: null,
-      min: null,
-      max: null,
+      stationCount: rows.length,
+      medianPrice: median !== null ? formatPriceString(median) : null,
+      min: {
+        price: formatPriceString(minRow.price),
+        station: {
+          clubNumber: minRow.clubNumber,
+          name: minRow.name,
+          city: minRow.city,
+          state: minRow.state,
+        },
+      },
+      max: {
+        price: formatPriceString(maxRow.price),
+        station: {
+          clubNumber: maxRow.clubNumber,
+          name: maxRow.name,
+          city: maxRow.city,
+          state: maxRow.state,
+        },
+      },
     };
-  }
-
-  const prices = rows.map((r) => Number.parseFloat(r.price));
-  const median = calculateMedian(prices);
-  const minRow = rows[0]!;
-  const maxRow = rows[rows.length - 1]!;
-
-  return {
-    generatedAt: new Date().toISOString(),
-    fuel,
-    stationCount: rows.length,
-    medianPrice: median !== null ? formatPriceString(median) : null,
-    min: {
-      price: formatPriceString(minRow.price),
-      station: {
-        clubNumber: minRow.clubNumber,
-        name: minRow.name,
-        city: minRow.city,
-        state: minRow.state,
-      },
-    },
-    max: {
-      price: formatPriceString(maxRow.price),
-      station: {
-        clubNumber: maxRow.clubNumber,
-        name: maxRow.name,
-        city: maxRow.city,
-        state: maxRow.state,
-      },
-    },
-  };
+  });
 }
 
 /**
@@ -200,16 +215,17 @@ export async function getNationalTrends(
     state?: string | undefined;
   } = {},
 ): Promise<NationalTrendsResult> {
-  const fuelSku = options.fuelSku || CANONICAL_FUEL_SKU;
-  const rawDays = options.days !== undefined ? options.days : 30;
-  // Clamp days between 1 and 90
-  const days = Math.min(Math.max(Number.isFinite(rawDays) ? rawDays : 30, 1), 90);
-  const normalizedState = options.state ? options.state.trim().toUpperCase() : undefined;
-  const stateFilter = normalizedState
-    ? Prisma.sql`AND c.state = ${normalizedState}`
-    : Prisma.empty;
+  return timedQuery("getNationalTrends", async () => {
+    const fuelSku = options.fuelSku || CANONICAL_FUEL_SKU;
+    const rawDays = options.days !== undefined ? options.days : 30;
+    // Clamp days between 1 and 90
+    const days = Math.min(Math.max(Number.isFinite(rawDays) ? rawDays : 30, 1), 90);
+    const normalizedState = options.state ? options.state.trim().toUpperCase() : undefined;
+    const stateFilter = normalizedState
+      ? Prisma.sql`AND c.state = ${normalizedState}`
+      : Prisma.empty;
 
-  const fuel = await resolveFuelInfo(prisma, fuelSku);
+    const fuel = await resolveFuelInfo(prisma, fuelSku);
 
   const points = await prisma.$queryRaw<
     Array<{
@@ -279,13 +295,14 @@ export async function getNationalTrends(
     ORDER BY day ASC;
   `;
 
-  return {
-    generatedAt: new Date().toISOString(),
-    fuel,
-    days,
-    ...(normalizedState ? { state: normalizedState } : {}),
-    points,
-  };
+    return {
+      generatedAt: new Date().toISOString(),
+      fuel,
+      days,
+      ...(normalizedState ? { state: normalizedState } : {}),
+      points,
+    };
+  });
 }
 
 /**
@@ -296,35 +313,37 @@ export async function getStateSummaries(
   prisma: PrismaClient,
   fuelSku: string = CANONICAL_FUEL_SKU,
 ): Promise<StateSummariesResult> {
-  const fuel = await resolveFuelInfo(prisma, fuelSku);
+  return timedQuery("getStateSummaries", async () => {
+    const fuel = await resolveFuelInfo(prisma, fuelSku);
 
-  const states = await prisma.$queryRaw<
-    Array<{
-      state: string;
-      stationCount: number;
-      minPrice: string;
-      maxPrice: string;
-      medianPrice: string;
-    }>
-  >`
-    SELECT
-      c.state,
-      count(*)::int AS "stationCount",
-      min(p.price)::numeric(6,3)::text AS "minPrice",
-      max(p.price)::numeric(6,3)::text AS "maxPrice",
-      percentile_cont(0.5) WITHIN GROUP (ORDER BY p.price)::numeric(6,3)::text AS "medianPrice"
-    FROM "FuelPriceCurrent" p
-    JOIN "Club" c ON c."clubNumber" = p."clubNumber"
-    WHERE p."fuelSku" = ${fuelSku}
-    GROUP BY c.state
-    ORDER BY percentile_cont(0.5) WITHIN GROUP (ORDER BY p.price) ASC, c.state ASC;
-  `;
+    const states = await prisma.$queryRaw<
+      Array<{
+        state: string;
+        stationCount: number;
+        minPrice: string;
+        maxPrice: string;
+        medianPrice: string;
+      }>
+    >`
+      SELECT
+        c.state,
+        count(*)::int AS "stationCount",
+        min(p.price)::numeric(6,3)::text AS "minPrice",
+        max(p.price)::numeric(6,3)::text AS "maxPrice",
+        percentile_cont(0.5) WITHIN GROUP (ORDER BY p.price)::numeric(6,3)::text AS "medianPrice"
+      FROM "FuelPriceCurrent" p
+      JOIN "Club" c ON c."clubNumber" = p."clubNumber"
+      WHERE p."fuelSku" = ${fuelSku}
+      GROUP BY c.state
+      ORDER BY percentile_cont(0.5) WITHIN GROUP (ORDER BY p.price) ASC, c.state ASC;
+    `;
 
-  return {
-    generatedAt: new Date().toISOString(),
-    fuel,
-    states,
-  };
+    return {
+      generatedAt: new Date().toISOString(),
+      fuel,
+      states,
+    };
+  });
 }
 
 /**
@@ -339,93 +358,95 @@ export async function getPriceMovers(
     limit?: number | undefined;
   } = {},
 ): Promise<PriceMoversResult> {
-  const fuelSku = options.fuelSku || CANONICAL_FUEL_SKU;
-  const rawDays = options.days !== undefined ? options.days : 7;
-  const days = Math.min(Math.max(Number.isFinite(rawDays) ? rawDays : 7, 1), 90);
-  const limit = Math.min(Math.max(options.limit || 10, 1), 50);
+  return timedQuery("getPriceMovers", async () => {
+    const fuelSku = options.fuelSku || CANONICAL_FUEL_SKU;
+    const rawDays = options.days !== undefined ? options.days : 7;
+    const days = Math.min(Math.max(Number.isFinite(rawDays) ? rawDays : 7, 1), 90);
+    const limit = Math.min(Math.max(options.limit || 10, 1), 50);
 
-  const fuel = await resolveFuelInfo(prisma, fuelSku);
+    const fuel = await resolveFuelInfo(prisma, fuelSku);
 
-  const rows = await prisma.$queryRaw<
-    Array<{
-      clubNumber: number;
-      name: string;
-      city: string;
-      state: string;
-      fuelName: string;
-      currentPrice: string;
-      currentObservedAt: Date;
-      startingPrice: string;
-      startObservedAt: Date;
-      absoluteChange: number;
-      percentageChange: number;
-    }>
-  >`
-    WITH starting_prices AS (
-      SELECT DISTINCT ON (h."clubNumber")
-        h."clubNumber",
-        h.price AS starting_price,
-        h."observedAt" AS start_observed_at
-      FROM "FuelPriceHistory" h
-      WHERE h."fuelSku" = ${fuelSku}
-        AND h."observedAt" <= now() - (${days} * INTERVAL '1 day')
-      ORDER BY h."clubNumber", h."observedAt" DESC
-    )
-    SELECT
-      c."clubNumber",
-      c.name,
-      c.city,
-      c.state,
-      curr."fuelName",
-      curr.price::numeric(6,3)::text AS "currentPrice",
-      curr."observedAt" AS "currentObservedAt",
-      s.starting_price::numeric(6,3)::text AS "startingPrice",
-      s.start_observed_at AS "startObservedAt",
-      (curr.price - s.starting_price)::numeric(6,3)::float8 AS "absoluteChange",
-      ROUND(((curr.price - s.starting_price) / s.starting_price) * 100, 2)::float8 AS "percentageChange"
-    FROM "FuelPriceCurrent" curr
-    JOIN starting_prices s
-      ON s."clubNumber" = curr."clubNumber"
-    JOIN "Club" c
-      ON c."clubNumber" = curr."clubNumber"
-    WHERE curr."fuelSku" = ${fuelSku}
-      AND curr.price IS DISTINCT FROM s.starting_price
-    ORDER BY "absoluteChange" DESC;
-  `;
+    const rows = await prisma.$queryRaw<
+      Array<{
+        clubNumber: number;
+        name: string;
+        city: string;
+        state: string;
+        fuelName: string;
+        currentPrice: string;
+        currentObservedAt: Date;
+        startingPrice: string;
+        startObservedAt: Date;
+        absoluteChange: number;
+        percentageChange: number;
+      }>
+    >`
+      WITH starting_prices AS (
+        SELECT DISTINCT ON (h."clubNumber")
+          h."clubNumber",
+          h.price AS starting_price,
+          h."observedAt" AS start_observed_at
+        FROM "FuelPriceHistory" h
+        WHERE h."fuelSku" = ${fuelSku}
+          AND h."observedAt" <= now() - (${days} * INTERVAL '1 day')
+        ORDER BY h."clubNumber", h."observedAt" DESC
+      )
+      SELECT
+        c."clubNumber",
+        c.name,
+        c.city,
+        c.state,
+        curr."fuelName",
+        curr.price::numeric(6,3)::text AS "currentPrice",
+        curr."observedAt" AS "currentObservedAt",
+        s.starting_price::numeric(6,3)::text AS "startingPrice",
+        s.start_observed_at AS "startObservedAt",
+        (curr.price - s.starting_price)::numeric(6,3)::float8 AS "absoluteChange",
+        ROUND(((curr.price - s.starting_price) / s.starting_price) * 100, 2)::float8 AS "percentageChange"
+      FROM "FuelPriceCurrent" curr
+      JOIN starting_prices s
+        ON s."clubNumber" = curr."clubNumber"
+      JOIN "Club" c
+        ON c."clubNumber" = curr."clubNumber"
+      WHERE curr."fuelSku" = ${fuelSku}
+        AND curr.price IS DISTINCT FROM s.starting_price
+      ORDER BY "absoluteChange" DESC;
+    `;
 
-  const increases: PriceMoverItem[] = [];
-  const decreases: PriceMoverItem[] = [];
+    const increases: PriceMoverItem[] = [];
+    const decreases: PriceMoverItem[] = [];
 
-  for (const r of rows) {
-    const item: PriceMoverItem = {
-      clubNumber: r.clubNumber,
-      name: r.name,
-      city: r.city,
-      state: r.state,
-      fuel: { sku: fuelSku, name: r.fuelName },
-      startingPrice: formatPriceString(r.startingPrice),
-      currentPrice: formatPriceString(r.currentPrice),
-      absoluteChange: (r.absoluteChange > 0 ? "+" : "") + r.absoluteChange.toFixed(3),
-      percentageChange: (r.percentageChange > 0 ? "+" : "") + r.percentageChange.toFixed(2) + "%",
-      startObservedAt: r.startObservedAt.toISOString(),
-      currentObservedAt: r.currentObservedAt.toISOString(),
-    };
+    for (const r of rows) {
+      const item: PriceMoverItem = {
+        clubNumber: r.clubNumber,
+        name: r.name,
+        city: r.city,
+        state: r.state,
+        fuel: { sku: fuelSku, name: r.fuelName },
+        startingPrice: formatPriceString(r.startingPrice),
+        currentPrice: formatPriceString(r.currentPrice),
+        absoluteChange: (r.absoluteChange > 0 ? "+" : "") + r.absoluteChange.toFixed(3),
+        percentageChange: (r.percentageChange > 0 ? "+" : "") + r.percentageChange.toFixed(2) + "%",
+        startObservedAt: r.startObservedAt.toISOString(),
+        currentObservedAt: r.currentObservedAt.toISOString(),
+      };
 
-    if (r.absoluteChange > 0) {
-      increases.push(item);
-    } else if (r.absoluteChange < 0) {
-      decreases.push(item);
+      if (r.absoluteChange > 0) {
+        increases.push(item);
+      } else if (r.absoluteChange < 0) {
+        decreases.push(item);
+      }
     }
-  }
 
-  // Sort decreases by largest negative change first
-  decreases.sort((a, b) => Number.parseFloat(a.absoluteChange) - Number.parseFloat(b.absoluteChange));
+    // Sort decreases by largest negative change first
+    decreases.sort((a, b) => Number.parseFloat(a.absoluteChange) - Number.parseFloat(b.absoluteChange));
 
-  return {
-    generatedAt: new Date().toISOString(),
-    fuel,
-    days,
-    increases: increases.slice(0, limit),
-    decreases: decreases.slice(0, limit),
-  };
+    return {
+      generatedAt: new Date().toISOString(),
+      fuel,
+      days,
+      increases: increases.slice(0, limit),
+      decreases: decreases.slice(0, limit),
+    };
+  });
 }

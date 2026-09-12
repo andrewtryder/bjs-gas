@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import type { StationDto } from "../lib/types";
 import { formatDate, formatPrice } from "../lib/stats";
+import { getFreshnessInfo, formatRelativeTime } from "../lib/freshness";
 import {
   filterStations,
   getAvailableStates,
@@ -35,9 +36,9 @@ export default function StationList({ stations }: { stations: StationDto[] }) {
   return (
     <div>
       <div className="discovery-filter-bar" style={{ marginBottom: "1rem" }}>
-        <div className="discovery-search-wrapper">
+        <div className="discovery-search-wrapper" role="search">
           <input
-            type="text"
+            type="search"
             className="discovery-search-input"
             placeholder="Search stations by name, city, state, or ZIP..."
             value={query}
@@ -133,10 +134,10 @@ export default function StationList({ stations }: { stations: StationDto[] }) {
           <table className="station-table">
             <thead>
               <tr>
-                <th>Station</th>
-                <th>Location</th>
-                <th>Current Fuel Prices</th>
-                <th>Last Observed</th>
+                <th scope="col">Station</th>
+                <th scope="col">Location</th>
+                <th scope="col">Current Fuel Prices</th>
+                <th scope="col">Last Observed</th>
               </tr>
             </thead>
             <tbody>
@@ -151,6 +152,7 @@ export default function StationList({ stations }: { stations: StationDto[] }) {
                         station.fuels[0]!.observedAt,
                       )
                     : null;
+                const freshness = latestObservation ? getFreshnessInfo(latestObservation) : null;
 
                 return (
                   <tr key={station.clubNumber}>
@@ -212,14 +214,25 @@ export default function StationList({ stations }: { stations: StationDto[] }) {
                       )}
                     </td>
                     <td>
-                      <span
-                        style={{
-                          fontSize: "0.875rem",
-                          color: "var(--text-secondary)",
-                        }}
-                      >
-                        {formatDate(latestObservation)}
-                      </span>
+                      <div style={{ display: "flex", flexDirection: "column", gap: "0.2rem" }}>
+                        <span
+                          style={{
+                            fontSize: "0.875rem",
+                            color: "var(--text-secondary)",
+                            fontWeight: 500,
+                          }}
+                        >
+                          {latestObservation ? formatRelativeTime(latestObservation) : "N/A"}
+                        </span>
+                        {freshness && (
+                          <span
+                            className={`inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-semibold w-fit ${freshness.badgeClass}`}
+                            title={latestObservation ? formatDate(latestObservation) : undefined}
+                          >
+                            {freshness.label}
+                          </span>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 );

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getStations } from "../lib/api";
+import { getStations, getSystemStatus, getWebBaseUrl } from "../lib/api";
 import {
   getNationalSummary,
   getNationalTrends,
@@ -11,12 +11,13 @@ import {
   type PriceMoversResponse,
 } from "../lib/analytics";
 import { formatPrice } from "../lib/stats";
+import { getFreshnessInfo } from "../lib/freshness";
 import StationList from "../components/StationList";
 import NationalTrendChart from "../components/NationalTrendChart";
 import StateComparisonTable from "../components/StateComparisonTable";
 import PriceMovers from "../components/PriceMovers";
 
-import type { StationDto } from "../lib/types";
+import type { StationDto, SystemStatusResponse } from "../lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -26,6 +27,7 @@ export default async function HomePage() {
   let trends: NationalTrendsResponse | null = null;
   let statesData: StateSummariesResponse | null = null;
   let moversData: PriceMoversResponse | null = null;
+  let systemStatus: SystemStatusResponse | null = null;
   let fetchError: string | null = null;
 
   try {
@@ -35,12 +37,14 @@ export default async function HomePage() {
       trendsRes,
       statesRes,
       moversRes,
+      statusRes,
     ] = await Promise.allSettled([
       getStations(),
       getNationalSummary("1"),
       getNationalTrends(30, "1"),
       getStateSummaries("1"),
       getPriceMovers(7, "1"),
+      getSystemStatus(),
     ]);
 
     if (stationsRes.status === "fulfilled") {
@@ -61,17 +65,62 @@ export default async function HomePage() {
     if (moversRes.status === "fulfilled") {
       moversData = moversRes.value;
     }
+    if (statusRes.status === "fulfilled") {
+      systemStatus = statusRes.value;
+    }
   } catch (err) {
     fetchError = err instanceof Error ? err.message : "Failed to load dashboard data";
   }
 
+  const latestObservedAt = systemStatus?.freshness?.latestObservedAt;
+  const freshnessInfo = latestObservedAt ? getFreshnessInfo(latestObservedAt) : null;
+
+  const websiteJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    name: "BJ's Gas Price Tracker",
+    url: getWebBaseUrl(),
+    description:
+      "Real-time fuel prices, interactive map, and historical price analytics for BJ's Wholesale Club gas stations.",
+    potentialAction: {
+      "@type": "SearchAction",
+      target: {
+        "@type": "EntryPoint",
+        urlTemplate: `${getWebBaseUrl()}/map?q={search_term_string}`,
+      },
+      "query-input": "required name=search_term_string",
+    },
+  };
+
   return (
     <div>
+      {/* Schema.org WebSite Structured Data */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteJsonLd) }}
+      />
+
       <section className="page-intro">
-        <h1 className="page-title">BJ&apos;s Wholesale Club Gas Tracker</h1>
-        <p className="page-description">
-          Real-time gas prices, historical analytics, national trends, and interactive station discovery across BJ&apos;s clubs.
-        </p>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "0.75rem" }}>
+          <div>
+            <h1 className="page-title">BJ&apos;s Wholesale Club Gas Tracker</h1>
+            <p className="page-description">
+              Real-time gas prices, historical analytics, national trends, and interactive station discovery across BJ&apos;s clubs.
+            </p>
+          </div>
+          {freshnessInfo && (
+            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginTop: "0.25rem" }}>
+              <Link
+                href="/status"
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${freshnessInfo.badgeClass}`}
+                title="View system status and collection pipeline"
+              >
+                <span className="h-1.5 w-1.5 rounded-full bg-current" aria-hidden="true" />
+                {freshnessInfo.relativeText} &bull; {freshnessInfo.label}
+              </Link>
+            </div>
+          )}
+        </div>
       </section>
 
       {fetchError && (

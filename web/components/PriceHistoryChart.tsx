@@ -182,6 +182,32 @@ export default function PriceHistoryChart({
           </LineChart>
         </ResponsiveContainer>
       </div>
+
+      {/* Screen Reader Accessible Table Fallback */}
+      <div className="sr-only">
+        <h4>Station Price History Log</h4>
+        <table>
+          <caption>Recorded price points by fuel type</caption>
+          <thead>
+            <tr>
+              <th scope="col">Time</th>
+              {activeFuels.map((fuel) => (
+                <th key={fuel} scope="col">{fuel}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {chartData.map((pt, i) => (
+              <tr key={i}>
+                <td>{pt.time}</td>
+                {activeFuels.map((fuel) => (
+                  <td key={fuel}>{pt[fuel] != null ? formatPrice(pt[fuel]) : "—"}</td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

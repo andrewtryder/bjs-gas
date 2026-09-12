@@ -212,6 +212,34 @@ export default function NationalTrendChart({ initialTrends, title, subtitle }: N
           </LineChart>
         </ResponsiveContainer>
       </div>
+
+      {/* Screen Reader Accessible Data Table Fallback */}
+      <div className="sr-only">
+        <h4>{title || "Historical Price Trends"} Data</h4>
+        <table>
+          <caption>Daily fuel prices and reporting station count</caption>
+          <thead>
+            <tr>
+              <th scope="col">Date</th>
+              <th scope="col">Median Price</th>
+              <th scope="col">Lowest Price</th>
+              <th scope="col">Highest Price</th>
+              <th scope="col">Stations Reporting</th>
+            </tr>
+          </thead>
+          <tbody>
+            {chartData.map((d) => (
+              <tr key={d.date}>
+                <td>{d.displayDate} ({d.date})</td>
+                <td>{formatPrice(d.median)}</td>
+                <td>{formatPrice(d.min)}</td>
+                <td>{formatPrice(d.max)}</td>
+                <td>{d.stations}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

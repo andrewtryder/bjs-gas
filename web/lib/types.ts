@@ -76,3 +76,31 @@ export type NearbyStationsResponse = {
   nearby: NearbyStationDto[];
 };
 
+export type SystemStatusResponse = {
+  ok: true;
+  healthy: boolean;
+  unhealthyReasons: string[];
+  lastCollection: {
+    startedAt: string;
+    finishedAt: string;
+    durationMs: number;
+    clubsConfigured: number;
+    clubsSucceeded: number;
+    clubsEmptyFuels: number;
+    clubsHardFailed: number;
+    clubsFailed: number;
+    fuelObservations: number;
+    historyChanges: number;
+    databaseQueries: number;
+    degraded: boolean;
+  } | null;
+  freshness: {
+    latestObservedAt: string | null;
+    oldestObservedAt: string | null;
+    currentPriceRows: number;
+    stationsObservedRecently: number;
+    freshWindowMinutes: number;
+  };
+  configuredGasClubs: number;
+};
+

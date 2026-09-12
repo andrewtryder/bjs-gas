@@ -91,9 +91,9 @@ export default function MapDiscoveryView({
     <div className="map-discovery-container">
       {/* Filter Control Bar */}
       <div className="discovery-filter-bar">
-        <div className="discovery-search-wrapper">
+        <div className="discovery-search-wrapper" role="search">
           <input
-            type="text"
+            type="search"
             className="discovery-search-input"
             placeholder="Search by city, state, ZIP, or club name..."
             value={searchQuery}

@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { getStation, getStationHistory, getNearbyStations, getWebBaseUrl } from "../../../lib/api";
 import { getNationalSummary, getStateSummaries } from "../../../lib/analytics";
 import { formatDate, formatPrice } from "../../../lib/stats";
+import { getFreshnessInfo, formatRelativeTime } from "../../../lib/freshness";
 import { getStateName, toStateSlug } from "../../../lib/states";
 import PriceHistoryChart from "../../../components/PriceHistoryChart";
 import Breadcrumbs from "../../../components/Breadcrumbs";
@@ -230,15 +231,23 @@ export default async function StationDetailPage({ params }: StationPageProps) {
           </div>
         ) : (
           <div className="prices-grid">
-            {station.fuels.map((fuel) => (
-              <div key={fuel.sku} className="price-card">
-                <div className="stat-label">{fuel.name}</div>
-                <div className="stat-value">{formatPrice(fuel.price)}</div>
-                <div className="stat-subtext">
-                  Updated: {formatDate(fuel.observedAt)}
+            {station.fuels.map((fuel) => {
+              const freshness = getFreshnessInfo(fuel.observedAt);
+              return (
+                <div key={fuel.sku} className="price-card">
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "0.25rem" }}>
+                    <span className="stat-label" style={{ marginBottom: 0 }}>{fuel.name}</span>
+                    <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-semibold ${freshness.badgeClass}`}>
+                      {freshness.label}
+                    </span>
+                  </div>
+                  <div className="stat-value">{formatPrice(fuel.price)}</div>
+                  <div className="stat-subtext">
+                    {formatRelativeTime(fuel.observedAt)} &bull; {formatDate(fuel.observedAt)}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </section>
@@ -258,9 +267,9 @@ export default async function StationDetailPage({ params }: StationPageProps) {
             <table className="station-table">
               <thead>
                 <tr>
-                  <th>Fuel</th>
-                  <th>Price</th>
-                  <th>Observed At (UTC)</th>
+                  <th scope="col">Fuel</th>
+                  <th scope="col">Price</th>
+                  <th scope="col">Observed At (UTC)</th>
                 </tr>
               </thead>
               <tbody>

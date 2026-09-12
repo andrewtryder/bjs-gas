@@ -45,12 +45,13 @@ export default function StateStationList({ stations, stateCode }: StateStationLi
           </p>
         </div>
 
-        <div style={{ minWidth: "240px" }}>
+        <div style={{ minWidth: "240px" }} role="search">
           <input
-            type="text"
+            type="search"
             placeholder="Filter by city or club #..."
             value={query}
             onChange={(e) => setQuery(e.target.value)}
+            aria-label="Filter stations by city or club number"
             className="input"
             style={{
               width: "100%",

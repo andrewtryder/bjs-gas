@@ -7,6 +7,7 @@ import StateStationList from "../../../components/StateStationList";
 import { getStations, getWebBaseUrl } from "../../../lib/api";
 import { getNationalTrends, getStateSummaries } from "../../../lib/analytics";
 import { getStateName, normalizeStateCode, toStateSlug } from "../../../lib/states";
+import { getFreshnessInfo } from "../../../lib/freshness";
 
 export const dynamic = "force-dynamic";
 
@@ -57,11 +58,17 @@ export default async function StateDetailPage({ params }: StatePageProps) {
   // Find state summary info
   const stateSummary = stateSummaries?.states.find((s) => s.state === stateCode);
 
-  // Calculate lowest and highest station in state
+  // Calculate lowest and highest station in state, and find latest observation
   let lowestStation: { name: string; city: string; price: number } | null = null;
   let highestStation: { name: string; city: string; price: number } | null = null;
+  let latestObservedAt: string | null = null;
 
   for (const s of stateStations) {
+    for (const f of s.fuels) {
+      if (!latestObservedAt || f.observedAt > latestObservedAt) {
+        latestObservedAt = f.observedAt;
+      }
+    }
     const regularFuel = s.fuels.find((f) => f.sku === "1");
     if (!regularFuel) continue;
     const p = Number.parseFloat(regularFuel.price);
@@ -74,6 +81,8 @@ export default async function StateDetailPage({ params }: StatePageProps) {
       highestStation = { name: s.name, city: s.city, price: p };
     }
   }
+
+  const freshnessInfo = latestObservedAt ? getFreshnessInfo(latestObservedAt) : null;
 
   return (
     <div className="state-detail-page" style={{ maxWidth: "1200px", margin: "0 auto" }}>
@@ -125,12 +134,22 @@ export default async function StateDetailPage({ params }: StatePageProps) {
               {stateCode}
             </span>
           </div>
-          <p
-            className="page-description"
-            style={{ color: "var(--text-secondary)", fontSize: "1rem", margin: 0 }}
-          >
-            Live fuel rates and club gas locations across {stateName}.
-          </p>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}>
+            <p
+              className="page-description"
+              style={{ color: "var(--text-secondary)", fontSize: "1rem", margin: 0 }}
+            >
+              Live fuel rates and club gas locations across {stateName}.
+            </p>
+            {freshnessInfo && (
+              <span
+                className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${freshnessInfo.badgeClass}`}
+                title={latestObservedAt ? `Last observed: ${new Date(latestObservedAt).toLocaleString()}` : undefined}
+              >
+                {freshnessInfo.relativeText} &bull; {freshnessInfo.label}
+              </span>
+            )}
+          </div>
         </div>
 
         <Link
