@@ -3,8 +3,10 @@ import {
   filterStations,
   getAvailableFuels,
   getAvailableStates,
+  getLatestObservation,
   getPrimaryFuel,
   getStationPrice,
+  sortStations,
   stationsToGeoJson,
 } from "../web/lib/discovery.js";
 import type { StationDto } from "../web/lib/types.js";
@@ -173,6 +175,72 @@ describe("filterStations", () => {
     expect(
       filterStations(sampleStations, { state: "MA", query: "Medford", fuelSku: "4" }),
     ).toHaveLength(0);
+  });
+
+  it("normalizes search query case and whitespace", () => {
+    expect(filterStations(sampleStations, { query: "   MEDFORD   " })).toHaveLength(1);
+    expect(filterStations(sampleStations, { query: "  ma  " })).toHaveLength(3);
+  });
+});
+
+describe("getLatestObservation", () => {
+  it("extracts latest timestamp from fuels array", () => {
+    const station = sampleStations[0]!;
+    expect(getLatestObservation(station)).toBe("2026-09-04T22:00:51.519Z");
+  });
+
+  it("returns null for empty fuels", () => {
+    const station = sampleStations[3]!;
+    expect(getLatestObservation(station)).toBeNull();
+  });
+});
+
+describe("sortStations", () => {
+  it("sorts by location A-Z by default (city, state)", () => {
+    const sorted = sortStations(sampleStations, "location-asc");
+    // Auburn MA (#901), Haverhill MA (#189), Medford MA (#1), St Johns FL (#398)
+    expect(sorted.map((s) => s.city)).toEqual(["Auburn", "Haverhill", "Medford", "St Johns"]);
+  });
+
+  it("sorts regular price low-to-high with missing prices at end", () => {
+    const sorted = sortStations(sampleStations, "price-asc");
+    // St Johns ($3.599), Haverhill ($3.799), Medford ($3.929), Auburn (null -> end)
+    expect(sorted.map((s) => s.clubNumber)).toEqual([398, 189, 1, 901]);
+  });
+
+  it("sorts regular price high-to-low with missing prices at end", () => {
+    const sorted = sortStations(sampleStations, "price-desc");
+    // Medford ($3.929), Haverhill ($3.799), St Johns ($3.599), Auburn (null -> end)
+    expect(sorted.map((s) => s.clubNumber)).toEqual([1, 189, 398, 901]);
+  });
+
+  it("sorts by selected fuel price (e.g. Premium SKU 3)", () => {
+    // Only Medford has SKU 3 ($4.729); others sort to end
+    const sorted = sortStations(sampleStations, "price-asc", "3");
+    expect(sorted[0]?.clubNumber).toBe(1);
+    expect(sorted.slice(1).map((s) => s.clubNumber)).toContain(189);
+    expect(sorted.slice(1).map((s) => s.clubNumber)).toContain(398);
+  });
+
+  it("sorts recently updated descending", () => {
+    // Modify one station to have a newer timestamp
+    const stationsWithTimes: StationDto[] = [
+      {
+        ...sampleStations[0]!,
+        fuels: [{ sku: "1", name: "U", price: "3.5", sourcePriceAtLocal: null, observedAt: "2026-09-01T00:00:00Z" }],
+      },
+      {
+        ...sampleStations[1]!,
+        fuels: [{ sku: "1", name: "U", price: "3.5", sourcePriceAtLocal: null, observedAt: "2026-09-05T00:00:00Z" }],
+      },
+      {
+        ...sampleStations[2]!,
+        fuels: [{ sku: "1", name: "U", price: "3.5", sourcePriceAtLocal: null, observedAt: "2026-09-03T00:00:00Z" }],
+      },
+      sampleStations[3]!, // No fuels -> end
+    ];
+    const sorted = sortStations(stationsWithTimes, "updated-desc");
+    expect(sorted.map((s) => s.clubNumber)).toEqual([189, 398, 1, 901]);
   });
 });
 
