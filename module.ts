@@ -1,5 +1,7 @@
 import { module } from "@prisma/composer";
 import { envSecret, rawPostgres } from "@prisma/composer-prisma-cloud";
+import { cronScheduler } from "@prisma/composer-prisma-cloud/cron";
+import { schedule } from "./src/schedule.ts";
 import apiService from "./src/service.ts";
 import webService from "./web/src/service.ts";
 
@@ -22,5 +24,10 @@ export default module("bjs-gas", ({ provision }) => {
       cartoApiKey: envSecret("CARTO_API_KEY"),
       honeybadgerApiKey: envSecret("HONEYBADGER_API_KEY"),
     },
+  });
+  provision(cronScheduler(), {
+    id: "scheduler",
+    deps: { trigger: api.trigger },
+    input: { jobs: [...schedule.jobs] },
   });
 });

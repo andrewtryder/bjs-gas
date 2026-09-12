@@ -1,7 +1,6 @@
 packages:
   - "."
   - "web"
-  - "cloudflare-trigger"
 allowBuilds:
   "@prisma/client": true
   "@prisma/engines": true
