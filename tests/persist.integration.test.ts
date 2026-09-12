@@ -7,11 +7,12 @@ const url = process.env.DATABASE_URL;
 const describeDb = url ? describe : describe.skip;
 
 describeDb("bulk persistence against Postgres", () => {
-  const prisma = new PrismaClient({ datasources: { db: { url: url! } } });
+  let prisma: PrismaClient;
   const clubNumber = 189001; // synthetic test club, unlikely to collide
   let runSeq = 0;
 
   beforeAll(async () => {
+    prisma = new PrismaClient({ datasources: { db: { url: url! } } });
     await prisma.club.upsert({
       where: { clubNumber },
       create: {

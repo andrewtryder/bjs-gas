@@ -1,8 +1,11 @@
-import { describe, expect, it, afterAll } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { PrismaClient } from "@prisma/client";
 import { haversineDistanceMiles, EARTH_RADIUS_MILES } from "../src/analytics/haversine.js";
 import { getNearbyStations } from "../src/api/stations.js";
 import { getNationalTrends } from "../src/analytics/queries.js";
+
+const url = process.env.DATABASE_URL;
+const describeDb = url ? describe : describe.skip;
 
 describe("haversineDistanceMiles utility", () => {
   it("returns 0 for identical coordinates", () => {
@@ -52,8 +55,12 @@ describe("haversineDistanceMiles utility", () => {
   });
 });
 
-describe("getNearbyStations integration", () => {
-  const prisma = new PrismaClient();
+describeDb("getNearbyStations integration", () => {
+  let prisma: PrismaClient;
+
+  beforeAll(() => {
+    prisma = new PrismaClient({ datasources: { db: { url: url! } } });
+  });
 
   afterAll(async () => {
     await prisma.$disconnect();
@@ -113,8 +120,12 @@ describe("getNearbyStations integration", () => {
   });
 });
 
-describe("State-scoped price trends", () => {
-  const prisma = new PrismaClient();
+describeDb("State-scoped price trends", () => {
+  let prisma: PrismaClient;
+
+  beforeAll(() => {
+    prisma = new PrismaClient({ datasources: { db: { url: url! } } });
+  });
 
   afterAll(async () => {
     await prisma.$disconnect();

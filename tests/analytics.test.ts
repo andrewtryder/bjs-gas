@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { PrismaClient } from "@prisma/client";
 import { calculateMedian, formatPriceString } from "../src/analytics/median.js";
 import {
@@ -235,7 +235,15 @@ const url = process.env.DATABASE_URL;
 const describeDb = url ? describe : describe.skip;
 
 describeDb("analytics queries against Postgres", () => {
-  const prisma = new PrismaClient({ datasources: { db: { url: url! } } });
+  let prisma: PrismaClient;
+
+  beforeAll(() => {
+    prisma = new PrismaClient({ datasources: { db: { url: url! } } });
+  });
+
+  afterAll(async () => {
+    await prisma.$disconnect();
+  });
 
   it("calculates national summary with valid median and bounds", async () => {
     const summary = await getNationalSummary(prisma, "1");
