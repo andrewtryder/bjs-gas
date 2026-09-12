@@ -4,7 +4,8 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "BJ's Gas Prices",
-  description: "Real-time fuel prices and price history across BJ's Wholesale Club gas stations.",
+  description:
+    "Real-time fuel prices, interactive map, and price history across BJ's Wholesale Club gas stations.",
 };
 
 export default function RootLayout({
@@ -19,14 +20,21 @@ export default function RootLayout({
           <header className="site-header">
             <div className="header-container">
               <Link href="/" className="brand-link">
-                <span className="brand-title">BJ's Gas Tracker</span>
-                <span className="brand-badge">Phase 1</span>
+                <span className="brand-title">BJ&apos;s Gas Tracker</span>
               </Link>
+              <nav className="header-nav">
+                <Link href="/" className="nav-link">
+                  Directory
+                </Link>
+                <Link href="/map" className="nav-link nav-link-highlight">
+                  Interactive Map
+                </Link>
+              </nav>
             </div>
           </header>
           <main className="site-main">{children}</main>
           <footer className="site-footer">
-            <p>BJ's Gas Price Tracker &bull; Powered by Prisma Compute</p>
+            <p>BJ&apos;s Gas Price Tracker &bull; Powered by Prisma Compute</p>
           </footer>
         </div>
       </body>

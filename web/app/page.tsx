@@ -25,17 +25,42 @@ export default async function HomePage() {
       <section className="page-intro">
         <h1 className="page-title">BJ&apos;s Wholesale Club Gas Prices</h1>
         <p className="page-description">
-          Real-time gas prices, club location tracker, and historical price monitoring across BJ&apos;s fuel stations.
+          Real-time gas prices, interactive station map, and historical price
+          monitoring across BJ&apos;s fuel stations.
         </p>
       </section>
 
       {fetchError ? (
-        <div className="card" style={{ marginBottom: "2rem", borderColor: "var(--expensive)", backgroundColor: "var(--expensive-bg)" }}>
-          <h3 style={{ color: "var(--expensive)", marginBottom: "0.25rem" }}>Unable to load station data</h3>
-          <p style={{ color: "var(--text-secondary)", fontSize: "0.9375rem" }}>{fetchError}</p>
+        <div
+          className="card"
+          style={{
+            marginBottom: "2rem",
+            borderColor: "var(--expensive)",
+            backgroundColor: "var(--expensive-bg)",
+          }}
+        >
+          <h3 style={{ color: "var(--expensive)", marginBottom: "0.25rem" }}>
+            Unable to load station data
+          </h3>
+          <p style={{ color: "var(--text-secondary)", fontSize: "0.9375rem" }}>
+            {fetchError}
+          </p>
         </div>
       ) : (
         <>
+          <section className="map-banner-card">
+            <div className="map-banner-text">
+              <h2 className="map-banner-title">Interactive Station Map</h2>
+              <p className="map-banner-desc">
+                Explore all {stations.length} locations across 20+ states with
+                interactive clustering, live fuel pricing, and state filters.
+              </p>
+            </div>
+            <Link href="/map" className="map-banner-btn">
+              Open Map View &rarr;
+            </Link>
+          </section>
+
           <section className="stats-grid">
             <div className="card">
               <div className="stat-label">Total Gas Stations</div>
@@ -62,15 +87,22 @@ export default async function HomePage() {
                 Cheapest {stats?.fuelName || "Regular"}
               </div>
               <div className="stat-value" style={{ color: "var(--cheapest)" }}>
-                {stats?.cheapestStation ? formatPrice(stats.cheapestStation.price) : "—"}
+                {stats?.cheapestStation
+                  ? formatPrice(stats.cheapestStation.price)
+                  : "—"}
               </div>
               <div className="stat-subtext">
                 {stats?.cheapestStation ? (
                   <Link
                     href={`/stations/${stats.cheapestStation.station.clubNumber}`}
-                    style={{ color: "var(--cheapest)", fontWeight: 600, textDecoration: "underline" }}
+                    style={{
+                      color: "var(--cheapest)",
+                      fontWeight: 600,
+                      textDecoration: "underline",
+                    }}
                   >
-                    {stats.cheapestStation.station.name} ({stats.cheapestStation.station.state})
+                    {stats.cheapestStation.station.name} (
+                    {stats.cheapestStation.station.state})
                   </Link>
                 ) : (
                   "No price data available"
@@ -83,15 +115,22 @@ export default async function HomePage() {
                 Highest {stats?.fuelName || "Regular"}
               </div>
               <div className="stat-value" style={{ color: "var(--expensive)" }}>
-                {stats?.mostExpensiveStation ? formatPrice(stats.mostExpensiveStation.price) : "—"}
+                {stats?.mostExpensiveStation
+                  ? formatPrice(stats.mostExpensiveStation.price)
+                  : "—"}
               </div>
               <div className="stat-subtext">
                 {stats?.mostExpensiveStation ? (
                   <Link
                     href={`/stations/${stats.mostExpensiveStation.station.clubNumber}`}
-                    style={{ color: "var(--expensive)", fontWeight: 600, textDecoration: "underline" }}
+                    style={{
+                      color: "var(--expensive)",
+                      fontWeight: 600,
+                      textDecoration: "underline",
+                    }}
                   >
-                    {stats.mostExpensiveStation.station.name} ({stats.mostExpensiveStation.station.state})
+                    {stats.mostExpensiveStation.station.name} (
+                    {stats.mostExpensiveStation.station.state})
                   </Link>
                 ) : (
                   "No price data available"

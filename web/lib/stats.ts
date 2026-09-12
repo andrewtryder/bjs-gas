@@ -1,4 +1,4 @@
-import type { FuelStats, StationDto } from "./types";
+import type { FuelStats, StationDto, StationFuel } from "./types.js";
 
 export function formatPrice(value: number | string | null | undefined): string {
   if (value === null || value === undefined) return "—";
@@ -74,7 +74,7 @@ export function calculateFuelStats(stations: StationDto[]): FuelStats | null {
   // Gather prices for target fuel
   const entries: Array<{ station: StationDto; price: number }> = [];
   for (const station of stations) {
-    const fuel = station.fuels.find((f) => f.sku === targetFuel!.sku || f.name === targetFuel!.name);
+    const fuel = station.fuels.find((f: StationFuel) => f.sku === targetFuel!.sku || f.name === targetFuel!.name);
     if (fuel) {
       const p = Number.parseFloat(fuel.price);
       if (Number.isFinite(p) && p > 0) {
