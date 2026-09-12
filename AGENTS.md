@@ -4,21 +4,27 @@ All agents and contributors working in `bjs-gas` must adhere to these establishe
 
 ## Mandatory Release Discipline
 
-Whenever changing code or deploying updates, always follow this order:
+Whenever changing code or deploying updates, always follow branch-based release discipline:
 
 ```
-implement
+implement on branch
   ↓
 test / typecheck / build
   ↓
-commit
+push branch to GitHub
   ↓
-push to GitHub
+open PR & verify GitHub Actions CI
   ↓
-deploy to Prisma Compute
+merge PR to main
+  ↓
+checkout & pull exact merged main
+  ↓
+deploy that exact main SHA to Prisma Compute
   ↓
 production smoke test
 ```
+
+This guarantees GitHub `main` always directly describes what production is running.
 
 ### Pre-Deployment Checks
 Always validate locally before deploying:
