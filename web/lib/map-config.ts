@@ -57,3 +57,12 @@ export const MAP_CONFIG = {
   style: getMapStyle(),
 };
 
+export const MAP_THEME_TOKENS = {
+  accent: "#2563eb",
+  accentHover: "#1d4ed8",
+  textPrimary: "#0f172a",
+  textMuted: "#64748b",
+  border: "#e2e8f0",
+  surface: "#ffffff",
+} as const;
+
