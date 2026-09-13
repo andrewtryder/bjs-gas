@@ -94,6 +94,24 @@ export function getAvailableStates(
 }
 
 /**
+ * Normalizes a fuel's public display label for UI controls and badges.
+ * Standardizes "Unleaded" or "Regular Unleaded" to "Regular" while preserving other names (e.g. Premium, Diesel).
+ */
+export function formatFuelDisplayName(rawName: string): string {
+  const lower = rawName.toLowerCase().trim();
+  if (lower === "unleaded" || lower === "regular unleaded" || lower === "regular") {
+    return "Regular";
+  }
+  if (lower === "premium unleaded" || lower === "premium") {
+    return "Premium";
+  }
+  if (lower === "diesel") {
+    return "Diesel";
+  }
+  return rawName;
+}
+
+/**
  * Extracts distinct fuel types found across all stations.
  */
 export function getAvailableFuels(
@@ -106,7 +124,7 @@ export function getAvailableFuels(
       if (existing) {
         existing.count += 1;
       } else {
-        map.set(f.sku, { sku: f.sku, name: f.name, count: 1 });
+        map.set(f.sku, { sku: f.sku, name: formatFuelDisplayName(f.name), count: 1 });
       }
     }
   }
@@ -354,3 +372,68 @@ export function stationsToGeoJson(
     features,
   };
 }
+
+/**
+ * Validates that a list of stations does not contain duplicate clubNumber values.
+ * Identifies duplicate clubNumber occurrences as invalid data conditions,
+ * while verifying distinct clubNumber stations (even in the same city/state) are valid.
+ */
+export function validateUniqueStations(stations: StationDto[]): {
+  isValid: boolean;
+  duplicateClubNumbers: number[];
+} {
+  const seen = new Set<number>();
+  const duplicates = new Set<number>();
+
+  for (const s of stations) {
+    if (seen.has(s.clubNumber)) {
+      duplicates.add(s.clubNumber);
+    } else {
+      seen.add(s.clubNumber);
+    }
+  }
+
+  return {
+    isValid: duplicates.size === 0,
+    duplicateClubNumbers: Array.from(duplicates),
+  };
+}
+
+/**
+ * Computes a Set of normalized "city, state" keys that appear more than once in the collection.
+ */
+export function getCityStateCollisionKeys(stations: StationDto[]): Set<string> {
+  const counts = new Map<string, number>();
+  for (const s of stations) {
+    if (s.city && s.state) {
+      const key = `${s.city.toLowerCase().trim()}, ${s.state.toLowerCase().trim()}`;
+      counts.set(key, (counts.get(key) || 0) + 1);
+    }
+  }
+
+  const collisions = new Set<string>();
+  for (const [key, count] of counts.entries()) {
+    if (count > 1) {
+      collisions.add(key);
+    }
+  }
+  return collisions;
+}
+
+/**
+ * Formats a station display title.
+ * When multiple stations share the same city and state, appends a compact qualifier `· #${clubNumber}`.
+ */
+export function formatStationTitle(
+  station: StationDto,
+  collisionKeys?: Set<string>,
+): string {
+  const base = `${station.city}, ${station.state}`;
+  if (!collisionKeys) return base;
+  const key = `${station.city.toLowerCase().trim()}, ${station.state.toLowerCase().trim()}`;
+  if (collisionKeys.has(key)) {
+    return `${base} · #${station.clubNumber}`;
+  }
+  return base;
+}
+

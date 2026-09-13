@@ -7,6 +7,7 @@ import {
   filterStations,
   sortStations,
   getAvailableFuels,
+  getCityStateCollisionKeys,
   getPrimaryFuel,
   getStationPrice,
   getLatestObservation,
@@ -26,6 +27,7 @@ export default function StateStationList({ stations, stateCode }: StateStationLi
   const [selectedSort, setSelectedSort] = useState<StationSortOption>("location-asc");
 
   const availableFuels = useMemo(() => getAvailableFuels(stations), [stations]);
+  const collisionKeys = useMemo(() => getCityStateCollisionKeys(stations), [stations]);
 
   const filteredStations = useMemo(() => {
     return filterStations(stations, {
@@ -98,41 +100,14 @@ export default function StateStationList({ stations, stateCode }: StateStationLi
             )}
           </div>
 
-          {/* Dynamic Fuel Pills */}
-          <div
-            className="directory-fuel-segments"
-            role="group"
-            aria-label="Filter stations by fuel type"
-          >
-            <button
-              type="button"
-              className={`directory-fuel-pill ${selectedFuel === "ALL" ? "active" : ""}`}
-              onClick={() => setSelectedFuel("ALL")}
-              aria-pressed={selectedFuel === "ALL"}
-            >
-              All fuels
-            </button>
-            {availableFuels.map((f) => (
-              <button
-                key={f.sku}
-                type="button"
-                className={`directory-fuel-pill ${selectedFuel === f.sku ? "active" : ""}`}
-                onClick={() => setSelectedFuel(f.sku)}
-                aria-pressed={selectedFuel === f.sku}
-              >
-                {f.name}
-              </button>
-            ))}
-          </div>
-
           {/* Sort Selector */}
-          <div className="directory-select-wrapper">
+          <div className="directory-select-field">
             <label htmlFor="state-sort-select" className="sr-only">
               Sort stations
             </label>
             <select
               id="state-sort-select"
-              className="directory-select directory-sort-select"
+              className="directory-select"
               value={selectedSort}
               onChange={(e) => setSelectedSort(e.target.value as StationSortOption)}
               aria-label="Sort stations"
@@ -145,23 +120,50 @@ export default function StateStationList({ stations, stateCode }: StateStationLi
           </div>
         </div>
 
-        {/* Status Group */}
-        <div className="directory-status-group">
-          <span className="directory-count-badge">
-            {hasActiveFilters
-              ? `${displayedStations.length} of ${stations.length} locations`
-              : `${stations.length} locations`}
-          </span>
-
-          {hasActiveFilters && (
+        {/* Secondary Toolbar: Fuel Pills & Meta summary */}
+        <div className="directory-toolbar-secondary">
+          <div
+            className="directory-fuel-group"
+            role="group"
+            aria-label="Filter stations by fuel type"
+          >
             <button
               type="button"
-              className="directory-clear-btn"
-              onClick={handleReset}
+              className={`directory-fuel-chip ${selectedFuel === "ALL" ? "active" : ""}`}
+              onClick={() => setSelectedFuel("ALL")}
+              aria-pressed={selectedFuel === "ALL"}
             >
-              Clear filters
+              All fuels
             </button>
-          )}
+            {availableFuels.map((f) => (
+              <button
+                key={f.sku}
+                type="button"
+                className={`directory-fuel-chip ${selectedFuel === f.sku ? "active" : ""}`}
+                onClick={() => setSelectedFuel(f.sku)}
+                aria-pressed={selectedFuel === f.sku}
+              >
+                {f.name}
+              </button>
+            ))}
+          </div>
+
+          <div className="directory-meta">
+            <span className="directory-count tabular-nums">
+              {displayedStations.length === stations.length
+                ? `${stations.length} locations`
+                : `${displayedStations.length} of ${stations.length} locations`}
+            </span>
+            {hasActiveFilters && (
+              <button
+                type="button"
+                className="directory-clear-btn"
+                onClick={handleReset}
+              >
+                Clear filters
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -239,17 +241,22 @@ export default function StateStationList({ stations, stateCode }: StateStationLi
 
                   return (
                     <tr key={station.clubNumber} className="directory-row">
-                      <td className="directory-cell-location">
-                        <Link
-                          href={`/stations/${station.clubNumber}`}
-                          className="directory-station-link hover:underline"
-                        >
-                          <span className="directory-station-city">
-                            {station.city}, {station.state}
-                          </span>
-                        </Link>
-                        <div className="directory-station-subtext">
-                          {station.address} &bull; <span className="directory-club-badge">#{station.clubNumber}</span>
+                      <td className="directory-cell-location col-location">
+                        <div className="station-location-block">
+                          <Link
+                            href={`/stations/${station.clubNumber}`}
+                            className="station-location-title directory-station-link hover:underline"
+                          >
+                            <span className="directory-station-city">
+                              {station.city}, {station.state}
+                            </span>
+                            {collisionKeys.has(`${station.city.toLowerCase().trim()}, ${station.state.toLowerCase().trim()}`) && (
+                              <span className="station-location-qualifier"> · #{station.clubNumber}</span>
+                            )}
+                          </Link>
+                          <div className="station-location-sub directory-station-subtext">
+                            {station.address1 || station.address} &middot; Club #{station.clubNumber}
+                          </div>
                         </div>
                       </td>
 
@@ -341,10 +348,13 @@ export default function StateStationList({ stations, stateCode }: StateStationLi
                         href={`/stations/${station.clubNumber}`}
                         className="mobile-card-title hover:underline"
                       >
-                        {station.city}, {station.state}
+                        <span>{station.city}, {station.state}</span>
+                        {collisionKeys.has(`${station.city.toLowerCase().trim()}, ${station.state.toLowerCase().trim()}`) && (
+                          <span className="station-location-qualifier"> · #{station.clubNumber}</span>
+                        )}
                       </Link>
                       <div className="mobile-card-address">
-                        {station.address} &bull; #{station.clubNumber}
+                        {station.address1 || station.address} &middot; Club #{station.clubNumber}
                       </div>
                     </div>
 

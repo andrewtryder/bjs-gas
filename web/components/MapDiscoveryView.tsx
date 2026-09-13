@@ -9,6 +9,7 @@ import {
   filterStations,
   getAvailableStates,
   getAvailableFuels,
+  getCityStateCollisionKeys,
   getStationPrice,
   getPrimaryFuel,
   getLatestObservation,
@@ -68,6 +69,7 @@ export default function MapDiscoveryView({
 
   const availableStates = useMemo(() => getAvailableStates(stations), [stations]);
   const availableFuels = useMemo(() => getAvailableFuels(stations), [stations]);
+  const collisionKeys = useMemo(() => getCityStateCollisionKeys(stations), [stations]);
 
   const filteredStations = useMemo(() => {
     return filterStations(stations, {
@@ -104,95 +106,105 @@ export default function MapDiscoveryView({
     <div className="map-discovery-v2">
       {/* Unified Filter Toolbar */}
       <div className="map-toolbar directory-toolbar" role="search">
-        {/* Search Field */}
-        <div className="directory-search-field">
-          <label htmlFor="map-station-search" className="sr-only">
-            Search gas stations on map
-          </label>
-          <span className="directory-search-icon" aria-hidden="true">
-            <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="8.5" cy="8.5" r="5.5" />
-              <line x1="12.5" y1="12.5" x2="18" y2="18" />
-            </svg>
-          </span>
-          <input
-            id="map-station-search"
-            type="search"
-            className="directory-search-input"
-            placeholder="Search city, ZIP, or club"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-          {searchQuery && (
-            <button
-              type="button"
-              className="directory-search-clear"
-              onClick={() => setSearchQuery("")}
-              aria-label="Clear search"
+        <div className="directory-toolbar-primary">
+          {/* Search Field */}
+          <div className="directory-search-field">
+            <label htmlFor="map-station-search" className="sr-only">
+              Search gas stations on map
+            </label>
+            <span className="directory-search-icon" aria-hidden="true">
+              <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="8.5" cy="8.5" r="5.5" />
+                <line x1="12.5" y1="12.5" x2="18" y2="18" />
+              </svg>
+            </span>
+            <input
+              id="map-station-search"
+              type="search"
+              className="directory-search-input"
+              placeholder="Search city, ZIP, or club"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              aria-label="Search city, ZIP, or club"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                className="directory-search-clear"
+                onClick={() => setSearchQuery("")}
+                aria-label="Clear search"
+              >
+                &times;
+              </button>
+            )}
+          </div>
+
+          {/* State Selector */}
+          <div className="directory-select-field">
+            <label htmlFor="map-state-select" className="sr-only">
+              Filter by state
+            </label>
+            <select
+              id="map-state-select"
+              className="directory-select"
+              value={selectedState}
+              onChange={(e) => setSelectedState(e.target.value)}
+              aria-label="Filter by state"
             >
-              &times;
-            </button>
-          )}
+              <option value="ALL">All states</option>
+              {availableStates.map((s) => (
+                <option key={s.state} value={s.state}>
+                  {s.state} ({s.count})
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
 
-        {/* State Selector */}
-        <div className="directory-select-wrapper">
-          <label htmlFor="map-state-select" className="sr-only">
-            Filter by state
-          </label>
-          <select
-            id="map-state-select"
-            className="directory-select"
-            value={selectedState}
-            onChange={(e) => setSelectedState(e.target.value)}
+        {/* Secondary Toolbar: Fuel Pills & Meta summary */}
+        <div className="directory-toolbar-secondary">
+          <div
+            className="directory-fuel-group"
+            role="group"
+            aria-label="Filter by fuel type"
           >
-            <option value="ALL">All states</option>
-            {availableStates.map((s) => (
-              <option key={s.state} value={s.state}>
-                {s.state} ({s.count})
-              </option>
+            <button
+              type="button"
+              className={`directory-fuel-chip ${selectedFuel === "ALL" ? "active" : ""}`}
+              onClick={() => setSelectedFuel("ALL")}
+              aria-pressed={selectedFuel === "ALL"}
+            >
+              All fuels
+            </button>
+            {availableFuels.map((f) => (
+              <button
+                key={f.sku}
+                type="button"
+                className={`directory-fuel-chip ${selectedFuel === f.sku ? "active" : ""}`}
+                onClick={() => setSelectedFuel(f.sku)}
+                aria-pressed={selectedFuel === f.sku}
+              >
+                {f.name}
+              </button>
             ))}
-          </select>
-        </div>
+          </div>
 
-        {/* Fuel Pill Toggles */}
-        <div className="directory-fuel-segments" role="group" aria-label="Filter by fuel type">
-          <button
-            type="button"
-            className={`directory-fuel-pill ${selectedFuel === "ALL" ? "active" : ""}`}
-            onClick={() => setSelectedFuel("ALL")}
-          >
-            All fuels
-          </button>
-          {availableFuels.map((f) => (
-            <button
-              key={f.sku}
-              type="button"
-              className={`directory-fuel-pill ${selectedFuel === f.sku ? "active" : ""}`}
-              onClick={() => setSelectedFuel(f.sku)}
-            >
-              {f.name}
-            </button>
-          ))}
-        </div>
-
-        {/* Status Count & Clear Action */}
-        <div className="directory-status-group">
-          <span className="directory-count-badge">
-            {hasActiveFilters
-              ? `${filteredStations.length} of ${stations.length} locations`
-              : `${stations.length} locations`}
-          </span>
-
-          {hasActiveFilters && (
-            <button
-              type="button"
-              className="directory-clear-btn"
-              onClick={handleClearFilters}
-            >
-              Clear filters
-            </button>
-          )}
+          <div className="directory-meta">
+            <span className="directory-count tabular-nums">
+              {filteredStations.length === stations.length
+                ? `${stations.length} locations`
+                : `${filteredStations.length} of ${stations.length} locations`}
+            </span>
+            {hasActiveFilters && (
+              <button
+                type="button"
+                className="directory-clear-btn"
+                onClick={handleClearFilters}
+              >
+                Clear filters
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -207,9 +219,12 @@ export default function MapDiscoveryView({
                 <div>
                   <h3 className="map-selected-title">
                     {selectedStation.city}, {selectedStation.state}
+                    {collisionKeys.has(`${selectedStation.city.toLowerCase().trim()}, ${selectedStation.state.toLowerCase().trim()}`) && (
+                      <span className="station-location-qualifier"> · #{selectedStation.clubNumber}</span>
+                    )}
                   </h3>
                   <p className="map-selected-address">
-                    {selectedStation.address} &bull; #{selectedStation.clubNumber}
+                    {selectedStation.address1 || selectedStation.address} &middot; Club #{selectedStation.clubNumber}
                   </p>
                 </div>
                 <button
@@ -291,6 +306,9 @@ export default function MapDiscoveryView({
               filteredStations.map((station) => {
                 const isSelected = selectedStation?.clubNumber === station.clubNumber;
                 const priceInfo = getStationPrice(station, selectedFuel);
+                const isCollision = collisionKeys.has(
+                  `${station.city.toLowerCase().trim()}, ${station.state.toLowerCase().trim()}`,
+                );
 
                 return (
                   <button
@@ -303,6 +321,9 @@ export default function MapDiscoveryView({
                     <div className="map-item-top-row">
                       <span className="map-item-city">
                         {station.city}, {station.state}
+                        {isCollision && (
+                          <span className="station-location-qualifier"> · #{station.clubNumber}</span>
+                        )}
                       </span>
                       <span className="map-item-price tabular-nums">
                         {priceInfo.priceFormatted}
@@ -311,7 +332,7 @@ export default function MapDiscoveryView({
 
                     <div className="map-item-sub-row">
                       <span className="map-item-address">
-                        {station.address} &bull; #{station.clubNumber}
+                        {station.address1 || station.address} &middot; Club #{station.clubNumber}
                       </span>
                       <span className="map-item-fuel-label">
                         {priceInfo.fuel ? priceInfo.fuel.name : "Regular"}
@@ -341,9 +362,12 @@ export default function MapDiscoveryView({
                 <div>
                   <h4 className="map-mobile-panel-title">
                     {selectedStation.city}, {selectedStation.state}
+                    {collisionKeys.has(`${selectedStation.city.toLowerCase().trim()}, ${selectedStation.state.toLowerCase().trim()}`) && (
+                      <span className="station-location-qualifier"> · #{selectedStation.clubNumber}</span>
+                    )}
                   </h4>
                   <p className="map-mobile-panel-address">
-                    {selectedStation.address} &bull; #{selectedStation.clubNumber}
+                    {selectedStation.address1 || selectedStation.address} &middot; Club #{selectedStation.clubNumber}
                   </p>
                 </div>
                 <button

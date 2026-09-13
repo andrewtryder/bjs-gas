@@ -7,9 +7,9 @@ import MapDiscoveryView from "../../components/MapDiscoveryView";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Interactive Gas Station Map | BJ's Gas Prices",
+  title: "BJ's Gas Station Map | BJ's Gas Prices",
   description:
-    "Explore BJ's Wholesale Club gas station locations, live fuel prices, and regional coverage across 200+ clubs.",
+    "Find BJ's gas stations and current fuel prices across the U.S. Updated hourly.",
 };
 
 interface MapPageProps {
@@ -36,10 +36,9 @@ export default async function MapPage({ searchParams }: MapPageProps) {
   return (
     <div className="map-page-wrapper">
       <div className="page-intro" style={{ marginBottom: "1.25rem" }}>
-        <h1 className="page-title">Interactive Gas Station Map</h1>
+        <h1 className="page-title">BJ&apos;s gas station map</h1>
         <p className="page-description">
-          Browse real-time fuel prices and explore BJ&apos;s Wholesale Club gas station
-          locations across 20+ states.
+          Find BJ&apos;s gas stations and current fuel prices across the U.S. Updated hourly.
         </p>
       </div>
 

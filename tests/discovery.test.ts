@@ -1,13 +1,17 @@
 import { describe, expect, it } from "vitest";
 import {
   filterStations,
+  formatFuelDisplayName,
+  formatStationTitle,
   getAvailableFuels,
   getAvailableStates,
+  getCityStateCollisionKeys,
   getLatestObservation,
   getPrimaryFuel,
   getStationPrice,
   sortStations,
   stationsToGeoJson,
+  validateUniqueStations,
 } from "../web/lib/discovery.js";
 import type { StationDto } from "../web/lib/types.js";
 
@@ -297,4 +301,192 @@ describe("MapLibre GL worker assets & configuration", () => {
     expect(componentSource).toContain('WORKER_URL = "/maplibre-gl-worker.mjs"');
   });
 });
+
+describe("validateUniqueStations", () => {
+  it("preserves multiple stations with same city/state but different clubNumber", () => {
+    const columbiaStations: StationDto[] = [
+      {
+        clubNumber: 60,
+        clubId: "0060",
+        name: "Columbia",
+        storeType: "CLUB",
+        address1: "9011 Snowden River Pkwy.",
+        address2: null,
+        address: "9011 Snowden River Pkwy.",
+        city: "Columbia",
+        state: "MD",
+        postalCode: "21046",
+        latitude: 39.18523,
+        longitude: -76.8179,
+        fuels: [{ sku: "1", name: "Unleaded", price: "3.299", sourcePriceAtLocal: null, observedAt: "2026-09-13T10:00:00.000Z" }],
+      },
+      {
+        clubNumber: 903,
+        clubId: "0903",
+        name: "Columbia Gas Station",
+        storeType: "STANDALONE_GAS",
+        address1: "6345 Dobbin Road",
+        address2: null,
+        address: "6345 Dobbin Road",
+        city: "Columbia",
+        state: "MD",
+        postalCode: "21045",
+        latitude: 39.1966,
+        longitude: -76.8203,
+        fuels: [{ sku: "1", name: "Unleaded", price: "3.259", sourcePriceAtLocal: null, observedAt: "2026-09-13T10:00:00.000Z" }],
+      },
+    ];
+
+    const result = validateUniqueStations(columbiaStations);
+    expect(result.isValid).toBe(true);
+    expect(result.duplicateClubNumbers).toEqual([]);
+  });
+
+  it("detects duplicate clubNumber values as an invalid data condition", () => {
+    const invalidList: StationDto[] = [
+      {
+        clubNumber: 60,
+        clubId: "0060",
+        name: "Columbia 1",
+        storeType: "CLUB",
+        address1: "9011 Snowden River Pkwy.",
+        address2: null,
+        address: "9011 Snowden River Pkwy.",
+        city: "Columbia",
+        state: "MD",
+        postalCode: "21046",
+        latitude: 39.18523,
+        longitude: -76.8179,
+        fuels: [],
+      },
+      {
+        clubNumber: 60,
+        clubId: "0060-dup",
+        name: "Columbia 2",
+        storeType: "CLUB",
+        address1: "Duplicate Club Row",
+        address2: null,
+        address: "Duplicate Club Row",
+        city: "Columbia",
+        state: "MD",
+        postalCode: "21046",
+        latitude: 39.18523,
+        longitude: -76.8179,
+        fuels: [],
+      },
+    ];
+
+    const result = validateUniqueStations(invalidList);
+    expect(result.isValid).toBe(false);
+    expect(result.duplicateClubNumbers).toEqual([60]);
+  });
+});
+
+describe("same-city station preservation & disambiguation", () => {
+  const columbiaFixture: StationDto[] = [
+    {
+      clubNumber: 60,
+      clubId: "0060",
+      name: "Columbia",
+      storeType: "CLUB",
+      address1: "9011 Snowden River Pkwy.",
+      address2: null,
+      address: "9011 Snowden River Pkwy.",
+      city: "Columbia",
+      state: "MD",
+      postalCode: "21046",
+      latitude: 39.18523,
+      longitude: -76.8179,
+      fuels: [
+        { sku: "1", name: "Unleaded", price: "3.299", sourcePriceAtLocal: null, observedAt: "2026-09-13T10:00:00.000Z" },
+        { sku: "3", name: "Premium", price: "3.899", sourcePriceAtLocal: null, observedAt: "2026-09-13T10:00:00.000Z" },
+      ],
+    },
+    {
+      clubNumber: 903,
+      clubId: "0903",
+      name: "Columbia Gas Station",
+      storeType: "STANDALONE_GAS",
+      address1: "6345 Dobbin Road",
+      address2: null,
+      address: "6345 Dobbin Road",
+      city: "Columbia",
+      state: "MD",
+      postalCode: "21045",
+      latitude: 39.1966,
+      longitude: -76.8203,
+      fuels: [
+        { sku: "1", name: "Unleaded", price: "3.259", sourcePriceAtLocal: null, observedAt: "2026-09-13T10:00:00.000Z" },
+        { sku: "3", name: "Premium", price: "3.859", sourcePriceAtLocal: null, observedAt: "2026-09-13T10:00:00.000Z" },
+      ],
+    },
+    {
+      clubNumber: 1,
+      clubId: "0001",
+      name: "Medford",
+      storeType: "CLUB",
+      address1: "278 Middlesex Ave.",
+      address2: null,
+      address: "278 Middlesex Ave.",
+      city: "Medford",
+      state: "MA",
+      postalCode: "02155",
+      latitude: 42.41266,
+      longitude: -71.07937,
+      fuels: [
+        { sku: "1", name: "Unleaded", price: "3.399", sourcePriceAtLocal: null, observedAt: "2026-09-13T10:00:00.000Z" },
+      ],
+    },
+  ];
+
+  it("both Columbia stations survive state and text filtering as distinct records", () => {
+    const mdFiltered = filterStations(columbiaFixture, { state: "MD" });
+    expect(mdFiltered).toHaveLength(2);
+    expect(mdFiltered.map((s) => s.clubNumber).sort()).toEqual([60, 903]);
+
+    const columbiaFiltered = filterStations(columbiaFixture, { query: "Columbia" });
+    expect(columbiaFiltered).toHaveLength(2);
+    expect(columbiaFiltered.map((s) => s.clubNumber).sort()).toEqual([60, 903]);
+  });
+
+  it("both Columbia stations survive sorting and retain authoritative clubNumber identity", () => {
+    const sortedByPrice = sortStations(columbiaFixture, "price-asc", "1");
+    // Club 903 ($3.259) < Club 60 ($3.299) < Club 1 ($3.399)
+    expect(sortedByPrice.map((s) => s.clubNumber)).toEqual([903, 60, 1]);
+  });
+
+  it("computes city/state collisions and appends compact qualifier only for colliding cities", () => {
+    const collisions = getCityStateCollisionKeys(columbiaFixture);
+    expect(collisions.has("columbia, md")).toBe(true);
+    expect(collisions.has("medford, ma")).toBe(false);
+
+    const title60 = formatStationTitle(columbiaFixture[0]!, collisions);
+    const title903 = formatStationTitle(columbiaFixture[1]!, collisions);
+    const titleMedford = formatStationTitle(columbiaFixture[2]!, collisions);
+
+    expect(title60).toBe("Columbia, MD · #60");
+    expect(title903).toBe("Columbia, MD · #903");
+    expect(titleMedford).toBe("Medford, MA");
+  });
+});
+
+describe("fuel label normalization", () => {
+  it("normalizes Unleaded and variants to Regular while preserving others", () => {
+    expect(formatFuelDisplayName("Unleaded")).toBe("Regular");
+    expect(formatFuelDisplayName("Regular Unleaded")).toBe("Regular");
+    expect(formatFuelDisplayName("regular")).toBe("Regular");
+    expect(formatFuelDisplayName("Premium Unleaded")).toBe("Premium");
+    expect(formatFuelDisplayName("Premium")).toBe("Premium");
+    expect(formatFuelDisplayName("Diesel")).toBe("Diesel");
+  });
+
+  it("getAvailableFuels uses normalized fuel display names", () => {
+    const fuels = getAvailableFuels(sampleStations);
+    const regularFuel = fuels.find((f) => f.sku === "1");
+    expect(regularFuel?.name).toBe("Regular");
+    const premiumFuel = fuels.find((f) => f.sku === "3");
+    expect(premiumFuel?.name).toBe("Premium");
+  });
+});
+
 

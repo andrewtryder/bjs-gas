@@ -9,6 +9,7 @@ import {
   filterStations,
   getAvailableStates,
   getAvailableFuels,
+  getCityStateCollisionKeys,
   getLatestObservation,
   getPrimaryFuel,
   getStationPrice,
@@ -28,6 +29,7 @@ export default function StationList({ stations }: StationListProps) {
 
   const availableStates = useMemo(() => getAvailableStates(stations), [stations]);
   const availableFuels = useMemo(() => getAvailableFuels(stations), [stations]);
+  const collisionKeys = useMemo(() => getCityStateCollisionKeys(stations), [stations]);
 
   // 1. Filter
   const filtered = useMemo(() => {
@@ -246,10 +248,13 @@ export default function StationList({ stations }: StationListProps) {
                             href={`/stations/${station.clubNumber}`}
                             className="station-location-title"
                           >
-                            {station.city}, {station.state}
+                            <span>{station.city}, {station.state}</span>
+                            {collisionKeys.has(`${station.city.toLowerCase().trim()}, ${station.state.toLowerCase().trim()}`) && (
+                              <span className="station-location-qualifier"> · #{station.clubNumber}</span>
+                            )}
                           </Link>
                           <span className="station-location-sub">
-                            {station.address1 || station.address} &bull; Club #{station.clubNumber}
+                            {station.address1 || station.address} &middot; Club #{station.clubNumber}
                           </span>
                         </div>
                       </td>
@@ -336,10 +341,13 @@ export default function StationList({ stations }: StationListProps) {
                         href={`/stations/${station.clubNumber}`}
                         className="mobile-card-title"
                       >
-                        {station.city}, {station.state}
+                        <span>{station.city}, {station.state}</span>
+                        {collisionKeys.has(`${station.city.toLowerCase().trim()}, ${station.state.toLowerCase().trim()}`) && (
+                          <span className="station-location-qualifier"> · #{station.clubNumber}</span>
+                        )}
                       </Link>
                       <div className="mobile-card-address">
-                        {station.address1 || station.address} &bull; #{station.clubNumber}
+                        {station.address1 || station.address} &middot; Club #{station.clubNumber}
                       </div>
                     </div>
 
