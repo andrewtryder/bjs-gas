@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="view-transition" content="same-origin">
+  <title>BJ's Gas Prices — National Tracker</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://code.iconify.design/iconify-icon/1.0.7/iconify-icon.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Arial:wght@100;200;300;400;500;600;700;800;900&display=swap');
+    * { font-family: 'Arial', sans-serif; }
+    html { background: #ffffff; }
+    @view-transition { navigation: auto; }
+    ::view-transition-old(root), ::view-transition-new(root) { animation: none; }
+  </style>
+</head>
+<body>
+  <div class="min-h-screen bg-white text-[#0f172a]">
+    <header class="border-b border-[#0f172a] bg-white">
+      <div class="mx-auto flex max-w-6xl items-center justify-between px-5 py-5 md:px-8">
+        <a id="brand-link" href="#top" class="text-base font-semibold tracking-tight">BJ's gas prices</a>
+        <nav class="flex gap-4 text-sm md:gap-8">
+          <a id="nav-trends-link" href="#trend" class="text-[#0f172a]">Trends</a>
+          <a id="nav-states-link" href="#states" class="text-[#0f172a]">States</a>
+          <a id="nav-stations-link" href="#stations" class="text-[#0f172a]">Stations</a>
+        </nav>
+      </div>
+    </header>
+
+    <main id="top" class="mx-auto max-w-6xl px-5 py-12 md:px-8 md:py-16">
+      <section class="border-b border-[#0f172a] pb-12">
+        <p class="mb-6 text-xs uppercase tracking-[0.18em] text-[#0f172a]">BJ's Wholesale Club fuel tracker</p>
+        <h1 class="max-w-3xl text-4xl font-semibold leading-none tracking-[-0.04em] md:text-6xl">BJ's gas prices</h1>
+        <p class="mt-6 max-w-xl text-base leading-7 text-[#0f172a]">Current BJ's gas prices, price history, and locations across the U.S. Updated hourly.</p>
+        <div class="mt-8 flex flex-wrap gap-5 text-sm">
+          <a id="hero-find-station-link" href="#stations" class="border-b border-[#2563eb] pb-1 text-[#2563eb]">Find a station</a>
+          <a id="hero-view-map-link" href="#stations" class="border-b border-[#0f172a] pb-1 text-[#0f172a]">View map</a>
+        </div>
+      </section>
+
+      <section class="mt-10 border border-[#0f172a]" aria-label="National price summary">
+        <div class="border-b border-[#0f172a] p-5 md:p-7">
+          <p class="text-xs uppercase tracking-[0.16em]">National median</p>
+          <div class="mt-3 flex flex-wrap items-baseline gap-4">
+            <p class="text-5xl font-semibold tracking-[-0.05em] text-[#2563eb] md:text-6xl">$3.999</p>
+            <p class="text-sm text-[#b91c1c]">+15¢ over 30 days</p>
+          </div>
+          <p class="mt-3 text-sm">Regular unleaded across 207 stations</p>
+        </div>
+        <div class="grid grid-cols-1 divide-y divide-[#0f172a] md:grid-cols-3 md:divide-x md:divide-y-0">
+          <div class="p-5 md:p-7"><p class="text-xs uppercase tracking-[0.12em]">Lowest price</p><p class="mt-3 text-2xl font-semibold text-[#2563eb]">$3.399</p><a id="lowest-location-link" href="#stations" class="mt-2 block text-sm text-[#2563eb]">Noblesville, IN</a></div>
+          <div class="p-5 md:p-7"><p class="text-xs uppercase tracking-[0.12em]">Highest price</p><p class="mt-3 text-2xl font-semibold text-[#2563eb]">$4.549</p><a id="highest-location-link" href="#stations" class="mt-2 block text-sm text-[#2563eb]">Massena, NY</a></div>
+          <div class="p-5 md:p-7"><p class="text-xs uppercase tracking-[0.12em]">Locations tracked</p><p class="mt-3 text-2xl font-semibold">221</p><p class="mt-2 text-sm">BJ's clubs with fuel stations</p></div>
+        </div>
+      </section>
+
+      <section id="trend" class="mt-10 border border-[#0f172a] p-5 md:p-7">
+        <div class="flex flex-col justify-between gap-6 md:flex-row md:items-start">
+          <div><p class="text-xs uppercase tracking-[0.16em]">National history</p><h2 class="mt-3 text-2xl font-semibold tracking-tight">National price trend</h2><p class="mt-2 text-sm">Daily median and range across reporting BJ's stations</p></div>
+          <div class="flex gap-5 text-sm"><button type="button" class="text-[#0f172a]">7D</button><button type="button" class="text-[#0f172a]">14D</button><button type="button" class="border-b-2 border-[#2563eb] pb-1 text-[#2563eb]">30D</button><button type="button" class="text-[#0f172a]">90D</button></div>
+        </div>
+        <div class="mt-8 flex flex-wrap items-baseline gap-4"><p class="text-3xl font-semibold text-[#2563eb]">$3.999</p><p class="text-sm text-[#b91c1c]">+15¢ over 30 days</p></div>
+        <div class="mt-8 overflow-x-auto">
+          <svg viewBox="0 0 950 280" class="h-64 min-w-[700px] w-full" role="img" aria-label="Simple national price trend line chart">
+            <g stroke="#0f172a" stroke-width="1" fill="none"><line x1="55" y1="25" x2="925" y2="25"/><line x1="55" y1="88" x2="925" y2="88"/><line x1="55" y1="151" x2="925" y2="151"/><line x1="55" y1="214" x2="925" y2="214"/><line x1="55" y1="25" x2="55" y2="214"/></g>
+            <g fill="#0f172a" font-size="12"><text x="5" y="30">$4.55</text><text x="5" y="93">$4.20</text><text x="5" y="156">$3.85</text><text x="5" y="219">$3.50</text><text x="55" y="245">Sep 02</text><text x="460" y="245">Sep 08</text><text x="865" y="245">Sep 13</text></g>
+            <path d="M55 180 C180 178 270 184 380 181 S590 187 690 182 S805 185 850 157 S895 139 925 142" fill="none" stroke="#2563eb" stroke-width="3"/>
+            <path d="M55 207 C235 205 440 211 650 205 S820 208 925 190" fill="none" stroke="#0f172a" stroke-width="1.5" stroke-dasharray="5 5"/>
+            <path d="M55 68 C260 65 500 76 700 69 S840 76 925 45" fill="none" stroke="#0f172a" stroke-width="1.5" stroke-dasharray="5 5"/>
+          </svg>
+        </div>
+        <div class="mt-5 flex flex-wrap gap-6 border-t border-[#0f172a] pt-4 text-sm"><span class="text-[#2563eb]">— Median</span><span>-- Lowest</span><span>-- Highest</span></div>
+      </section>
+
+      <section class="mt-10 grid grid-cols-1 gap-10 lg:grid-cols-[2fr_1fr]">
+        <div class="border border-[#0f172a] p-5 md:p-7">
+          <div class="flex flex-col justify-between gap-3 md:flex-row md:items-end"><div><p class="text-xs uppercase tracking-[0.16em]">Historic data</p><h2 class="mt-3 text-2xl font-semibold tracking-tight">National price history</h2></div><span class="text-sm">Sep 02 — Sep 13, 2024</span></div>
+          <div class="mt-6 overflow-x-auto"><table class="w-full min-w-[600px] border-collapse text-left text-sm"><thead class="border-b-2 border-[#0f172a] text-xs uppercase tracking-wider"><tr><th class="pb-3 pr-4">Date</th><th class="pb-3 pr-4">Median</th><th class="pb-3 pr-4">Lowest</th><th class="pb-3 pr-4">Highest</th><th class="pb-3 text-right">Reporting</th></tr></thead><tbody class="divide-y divide-[#0f172a]"><tr><td class="py-3 pr-4">Sep 13</td><td class="text-[#2563eb]">$3.999</td><td>$3.399</td><td>$4.549</td><td class="text-right">207</td></tr><tr><td class="py-3 pr-4">Sep 12</td><td class="text-[#2563eb]">$3.984</td><td>$3.399</td><td>$4.549</td><td class="text-right">207</td></tr><tr><td class="py-3 pr-4">Sep 11</td><td class="text-[#2563eb]">$3.979</td><td>$3.419</td><td>$4.529</td><td class="text-right">206</td></tr><tr><td class="py-3 pr-4">Sep 10</td><td class="text-[#2563eb]">$3.975</td><td>$3.419</td><td>$4.529</td><td class="text-right">207</td></tr><tr><td class="py-3 pr-4">Sep 09</td><td class="text-[#2563eb]">$3.975</td><td>$3.429</td><td>$4.519</td><td class="text-right">207</td></tr><tr><td class="py-3 pr-4">Sep 08</td><td class="text-[#2563eb]">$3.970</td><td>$3.429</td><td>$4.519</td><td class="text-right">205</td></tr></tbody></table></div>
+          <button type="button" class="mt-5 border-b border-[#2563eb] pb-1 text-sm text-[#2563eb]">View full date range</button>
+        </div>
+        <div class="border border-[#0f172a] p-5 md:p-7"><p class="text-xs uppercase tracking-[0.16em]">Weekly movement</p><h2 class="mt-3 text-2xl font-semibold tracking-tight">Biggest changes</h2><div class="mt-8"><p class="text-xs uppercase tracking-wider">Largest drops</p><div class="mt-4 divide-y divide-[#0f172a]"><a id="drop-one-link" href="#stations" class="flex justify-between py-3"><span>Noblesville, IN #761<br><small>$3.399 regular</small></span><span>↓ 12¢</span></a><a id="drop-two-link" href="#stations" class="flex justify-between py-3"><span>Columbus, OH #168<br><small>$3.529 regular</small></span><span>↓ 9¢</span></a><a id="drop-three-link" href="#stations" class="flex justify-between py-3"><span>Cary, NC #149<br><small>$3.679 regular</small></span><span>↓ 7¢</span></a></div></div><div class="mt-8"><p class="text-xs uppercase tracking-wider">Largest increases</p><div class="mt-4 divide-y divide-[#0f172a]"><a id="rise-one-link" href="#stations" class="flex justify-between py-3"><span>Massena, NY #122<br><small>$4.549 regular</small></span><span class="text-[#b91c1c]">↑ 18¢</span></a><a id="rise-two-link" href="#stations" class="flex justify-between py-3"><span>Manchester, NH #152<br><small>$4.319 regular</small></span><span class="text-[#b91c1c]">↑ 14¢</span></a></div></div></div>
+      </section>
+
+      <section id="stations" class="mt-10 border border-[#0f172a] p-5 md:p-7"><div class="flex flex-col justify-between gap-5 md:flex-row md:items-end"><div><p class="text-xs uppercase tracking-[0.16em]">207 locations · updated 17m ago</p><h2 class="mt-3 text-2xl font-semibold tracking-tight">Find a station</h2></div><div class="flex flex-wrap gap-4"><input aria-label="Search stations" placeholder="Search city, state, or club" class="border-b border-[#0f172a] px-0 py-2 text-sm outline-none placeholder:text-[#0f172a]"/><button type="button" class="border-b border-[#0f172a] py-2 text-sm">Filters</button></div></div><div class="mt-8 divide-y divide-[#0f172a]"><div class="grid grid-cols-1 gap-4 py-5 md:grid-cols-[2fr_1fr_1fr_auto] md:items-center"><div><b>Columbus, OH</b><p class="mt-1 text-sm">5900 N Hamilton Rd · Club #168</p></div><p class="text-2xl text-[#2563eb]">$3.529<br><small class="text-xs text-[#0f172a]">UNLEADED</small></p><p class="text-sm">Updated 17m ago</p><a id="station-columbus-map-link" href="#map" class="text-[#2563eb]">Map →</a></div><div class="grid grid-cols-1 gap-4 py-5 md:grid-cols-[2fr_1fr_1fr_auto] md:items-center"><div><b>Noblesville, IN</b><p class="mt-1 text-sm">13210 Tegler Dr · Club #761</p></div><p class="text-2xl text-[#2563eb]">$3.399<br><small class="text-xs text-[#0f172a]">UNLEADED</small></p><p class="text-sm">Updated 17m ago</p><a id="station-noblesville-map-link" href="#map" class="text-[#2563eb]">Map →</a></div><div class="grid grid-cols-1 gap-4 py-5 md:grid-cols-[2fr_1fr_1fr_auto] md:items-center"><div><b>Massena, NY</b><p class="mt-1 text-sm">329 Andrews St · Club #122</p></div><p class="text-2xl text-[#2563eb]">$4.549<br><small class="text-xs text-[#0f172a]">UNLEADED</small></p><p class="text-sm">Updated 17m ago</p><a id="station-massena-map-link" href="#map" class="text-[#2563eb]">Map →</a></div><div class="grid grid-cols-1 gap-4 py-5 md:grid-cols-[2fr_1fr_1fr_auto] md:items-center"><div><b>Cary, NC</b><p class="mt-1 text-sm">1117 Tryon Village Dr · Club #149</p></div><p class="text-2xl text-[#2563eb]">$3.679<br><small class="text-xs text-[#0f172a]">UNLEADED</small></p><p class="text-sm">Updated 17m ago</p><a id="station-cary-map-link" href="#map" class="text-[#2563eb]">Map →</a></div></div></section>
+    </main>
+
+    <footer class="border-t border-[#0f172a] bg-white"><div class="mx-auto flex max-w-6xl flex-col gap-6 px-5 py-8 md:flex-row md:items-end md:justify-between md:px-8"><div><h3 class="font-semibold">BJ's Gas Prices</h3><p class="mt-2 text-sm">Independent price tracking project. Not affiliated with BJ's Wholesale Club.</p></div><div class="flex gap-5 text-sm"><a id="footer-map-link" href="#stations">Map</a><a id="footer-states-link" href="#states">States</a><a id="footer-trends-link" href="#trend">Historic trends</a></div></div></footer>
+  </div>
+</body>
+</html>
