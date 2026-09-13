@@ -19,6 +19,7 @@ import {
 import type { BjsClub, DiscoverySummary } from "./types.js";
 import { coerceClub } from "./types.js";
 import { assertValidOrThrow, buildSummary, validateClubs } from "./validate.js";
+import { canonicalizeGasClubs, loadGasStationAliases } from "./gas-station-alias.js";
 
 const ROOT = process.cwd();
 export const DATA_DIR = path.join(ROOT, "data");
@@ -115,7 +116,9 @@ export async function writeCandidateOutputs(
 ): Promise<DiscoverySummary> {
   await ensureDataDir();
   const sorted = [...clubs].sort((a, b) => a.clubNumber - b.clubNumber);
-  const gasClubs = sorted.filter((c) => c.hasGas && c.gasStatus === "yes");
+  const aliases = loadGasStationAliases();
+  const rawGasClubs = sorted.filter((c) => c.hasGas && c.gasStatus === "yes");
+  const gasClubs = canonicalizeGasClubs(rawGasClubs, aliases);
 
   const summary = {
     ...buildSummary(sorted, DISCOVERY_METHOD, [CLUB_SEARCH_URL, STATE_TOWNS_URL]),

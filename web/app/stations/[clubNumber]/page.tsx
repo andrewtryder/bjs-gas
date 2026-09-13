@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import { getStation, getStationHistory, getNearbyStations, getWebBaseUrl } from "../../../lib/api";
 import { getNationalSummary, getStateSummaries } from "../../../lib/analytics";
 import { formatDisplayDate, formatPrice, formatPriceComparison } from "../../../lib/stats";
@@ -10,6 +10,7 @@ import { getStateName, toStateSlug } from "../../../lib/states";
 import PriceHistoryChart from "../../../components/PriceHistoryChart";
 import Breadcrumbs from "../../../components/Breadcrumbs";
 import NearbyStations from "../../../components/NearbyStations";
+import { getCanonicalGasClub, isAliasedParentClub } from "../../../lib/gas-station-aliases";
 
 export const dynamic = "force-dynamic";
 
@@ -46,6 +47,13 @@ export default async function StationDetailPage({ params }: StationPageProps) {
 
   if (!Number.isFinite(clubNumber)) {
     notFound();
+  }
+
+  // Parent warehouse clubs (e.g. #321 Hyannis) are aliased to their canonical dedicated
+  // gas station (e.g. #902 Hyannis Gas Station). Issue a permanent redirect so that
+  // legacy URLs and any inbound links are canonicalized.
+  if (isAliasedParentClub(clubNumber)) {
+    permanentRedirect(`/stations/${getCanonicalGasClub(clubNumber)}`);
   }
 
   const [stationData, historyData, nationalSummaryRes, stateSummariesRes, nearbyData] =

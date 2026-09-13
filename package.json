@@ -6,8 +6,9 @@
   "description": "BJ's gas price collector on Prisma Compute; native cron scheduler",
   "scripts": {
     "build": "pnpm run build:api && pnpm run build:web",
-    "build:api": "bun build src/server.ts --target=bun --outfile dist/server.mjs && node scripts/copy-prisma-engine.mjs && mkdir -p dist/data && cp data/gas-clubs.json data/clubs.json dist/data/",
+    "build:api": "bun build src/server.ts --target=bun --outfile dist/server.mjs && node scripts/copy-prisma-engine.mjs && mkdir -p dist/data && cp data/gas-clubs.json data/clubs.json data/gas-station-aliases.json dist/data/",
     "build:web": "pnpm --filter web run build",
+    "audit:gas-aliases": "node scripts/audit-gas-aliases.mjs",
     "discover": "tsx src/cli.ts discover",
     "discover:clubs": "tsx src/cli.ts discover:clubs",
     "discover:gas": "tsx src/cli.ts discover:gas",
