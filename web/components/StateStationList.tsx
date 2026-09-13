@@ -1,20 +1,15 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import Link from "next/link";
 import type { StationDto } from "../lib/types";
 import {
   filterStations,
   sortStations,
   getAvailableFuels,
   getCityStateCollisionKeys,
-  getPrimaryFuel,
-  getStationPrice,
-  getLatestObservation,
   type StationSortOption,
 } from "../lib/discovery";
-import { formatPrice } from "../lib/stats";
-import { getFreshnessInfo } from "../lib/freshness";
+import StationLedger from "./StationLedger";
 
 interface StateStationListProps {
   stations: StationDto[];
@@ -167,258 +162,14 @@ export default function StateStationList({ stations, stateCode }: StateStationLi
         </div>
       </div>
 
-      {/* Directory Content */}
-      {displayedStations.length === 0 ? (
-        <div className="directory-empty-card" role="status">
-          <div className="directory-empty-icon" aria-hidden="true">
-            <svg
-              width="32"
-              height="32"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <circle cx="12" cy="12" r="10" />
-              <line x1="8" y1="12" x2="16" y2="12" />
-            </svg>
-          </div>
-          <h3 className="directory-empty-title">No matching stations</h3>
-          <p className="directory-empty-desc">
-            Try another city, ZIP code, or remove a filter.
-          </p>
-          {hasActiveFilters && (
-            <button
-              type="button"
-              className="btn btn-secondary btn-sm directory-empty-action"
-              onClick={handleReset}
-            >
-              Clear filters
-            </button>
-          )}
-        </div>
-      ) : (
-        <div className="directory-view-wrapper">
-          {/* Desktop Table View */}
-          <div className="directory-table-wrapper">
-            <table className="directory-table" aria-label={`BJ's Gas Stations in ${stateCode}`}>
-              <thead>
-                <tr>
-                  <th scope="col" className="directory-col-location">
-                    Station / Location
-                  </th>
-                  <th scope="col" className="directory-col-regular">
-                    Regular
-                  </th>
-                  <th scope="col" className="directory-col-other">
-                    Other fuels
-                  </th>
-                  <th scope="col" className="directory-col-updated">
-                    Updated
-                  </th>
-                  <th scope="col" className="directory-col-actions">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {displayedStations.map((station) => {
-                  const targetPrice = getStationPrice(station, selectedFuel);
-                  const primaryFuel = getPrimaryFuel(station.fuels);
-                  const displayFuel = selectedFuel !== "ALL" ? targetPrice.fuel : primaryFuel;
-                  const displayPrice =
-                    selectedFuel !== "ALL"
-                      ? targetPrice.priceFormatted
-                      : primaryFuel
-                      ? formatPrice(primaryFuel.price)
-                      : "—";
-
-                  const otherFuels = station.fuels.filter((f) => f !== displayFuel);
-                  const latestObservation = getLatestObservation(station);
-                  const freshness = getFreshnessInfo(latestObservation);
-
-                  return (
-                    <tr key={station.clubNumber} className="directory-row">
-                      <td className="directory-cell-location col-location">
-                        <div className="station-location-block">
-                          <Link
-                            href={`/stations/${station.clubNumber}`}
-                            className="station-location-title directory-station-link hover:underline"
-                          >
-                            <span className="directory-station-city">
-                              {station.city}, {station.state}
-                            </span>
-                            {collisionKeys.has(`${station.city.toLowerCase().trim()}, ${station.state.toLowerCase().trim()}`) && (
-                              <span className="station-location-qualifier"> · #{station.clubNumber}</span>
-                            )}
-                          </Link>
-                          <div className="station-location-sub directory-station-subtext">
-                            {station.address1 || station.address} &middot; Club #{station.clubNumber}
-                          </div>
-                        </div>
-                      </td>
-
-                      <td className="directory-cell-regular">
-                        <span className="directory-primary-price tabular-nums">
-                          {displayPrice}
-                        </span>
-                      </td>
-
-                      <td className="directory-cell-other">
-                        {otherFuels.length === 0 ? (
-                          <span className="directory-none-muted">—</span>
-                        ) : (
-                          <div className="directory-other-fuels-inline">
-                            {otherFuels.map((f) => {
-                              const p = Number.parseFloat(f.price);
-                              const isAvail = Number.isFinite(p) && p > 0;
-                              const shortName = f.name.toLowerCase().includes("premium")
-                                ? "Prem"
-                                : f.name.toLowerCase().includes("diesel")
-                                ? "Dsl"
-                                : f.name;
-                              return (
-                                <span key={f.sku} className="directory-other-fuel-tag">
-                                  <span className="directory-other-fuel-name">{shortName}</span>
-                                  <span className="directory-other-fuel-price tabular-nums">
-                                    {isAvail ? formatPrice(p) : "—"}
-                                  </span>
-                                </span>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </td>
-
-                      <td className="directory-cell-updated">
-                        <span
-                          className="directory-updated-text"
-                          title={latestObservation ? `Exact time: ${new Date(latestObservation).toLocaleString()}` : undefined}
-                        >
-                          {freshness.relativeText}
-                          {freshness.level === "aging" && (
-                            <span className="directory-freshness-tag aging"> &bull; Aging</span>
-                          )}
-                          {freshness.level === "stale" && (
-                            <span className="directory-freshness-tag stale"> &bull; Stale</span>
-                          )}
-                        </span>
-                      </td>
-
-                      <td className="directory-cell-actions">
-                        <Link
-                          href={`/map?station=${station.clubNumber}`}
-                          className="directory-map-action-link hover:underline"
-                          aria-label={`View ${station.city} station on map`}
-                        >
-                          Map &rarr;
-                        </Link>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Mobile Card View */}
-          <div className="directory-cards-wrapper" aria-label={`BJ's Gas Stations in ${stateCode}`}>
-            {displayedStations.map((station) => {
-              const targetPrice = getStationPrice(station, selectedFuel);
-              const primaryFuel = getPrimaryFuel(station.fuels);
-              const displayFuel = selectedFuel !== "ALL" ? targetPrice.fuel : primaryFuel;
-              const displayPrice =
-                selectedFuel !== "ALL"
-                  ? targetPrice.priceFormatted
-                  : primaryFuel
-                  ? formatPrice(primaryFuel.price)
-                  : "—";
-
-              const otherFuels = station.fuels.filter((f) => f !== displayFuel);
-              const latestObservation = getLatestObservation(station);
-              const freshness = getFreshnessInfo(latestObservation);
-
-              return (
-                <div key={station.clubNumber} className="station-mobile-card">
-                  <div className="mobile-card-top">
-                    <div className="mobile-card-location">
-                      <Link
-                        href={`/stations/${station.clubNumber}`}
-                        className="mobile-card-title hover:underline"
-                      >
-                        <span>{station.city}, {station.state}</span>
-                        {collisionKeys.has(`${station.city.toLowerCase().trim()}, ${station.state.toLowerCase().trim()}`) && (
-                          <span className="station-location-qualifier"> · #{station.clubNumber}</span>
-                        )}
-                      </Link>
-                      <div className="mobile-card-address">
-                        {station.address1 || station.address} &middot; Club #{station.clubNumber}
-                      </div>
-                    </div>
-
-                    <div className="mobile-card-price-block">
-                      <span className="mobile-card-price tabular-nums">
-                        {displayPrice}
-                      </span>
-                      <span className="mobile-card-fuel-label">
-                        {displayFuel ? displayFuel.name : "Regular"}
-                      </span>
-                    </div>
-                  </div>
-
-                  {otherFuels.length > 0 && (
-                    <div className="mobile-card-other-fuels">
-                      {otherFuels.map((f) => (
-                        <span key={f.sku} className="other-fuel-pill tabular-nums">
-                          <span className="other-fuel-name">{f.name}</span>
-                          <span className="other-fuel-val">{formatPrice(f.price)}</span>
-                        </span>
-                      ))}
-                    </div>
-                  )}
-
-                  <div className="mobile-card-bottom">
-                    <div className="mobile-card-freshness">
-                      <span
-                        className={`freshness-text ${
-                          freshness.level === "aging"
-                            ? "text-warning"
-                            : freshness.level === "stale"
-                            ? "text-higher"
-                            : "text-muted"
-                        }`}
-                        title={latestObservation ? `Exact time: ${new Date(latestObservation).toLocaleString()}` : undefined}
-                      >
-                        {freshness.relativeText}
-                        {freshness.level === "aging" && " · Aging"}
-                        {freshness.level === "stale" && " · Stale"}
-                      </span>
-                    </div>
-
-                    <div className="mobile-card-actions">
-                      <Link
-                        href={`/stations/${station.clubNumber}`}
-                        className="btn btn-secondary btn-sm"
-                      >
-                        Details
-                      </Link>
-                      <Link
-                        href={`/map?station=${station.clubNumber}`}
-                        className="btn btn-primary btn-sm"
-                        aria-label={`View ${station.city} on map`}
-                      >
-                        Map
-                      </Link>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
+      {/* Shared Ledger Slate Station Ledger */}
+      <StationLedger
+        stations={displayedStations}
+        collisionKeys={collisionKeys}
+        selectedFuel={selectedFuel}
+        onResetFilters={hasActiveFilters ? handleReset : undefined}
+        ariaLabel={`BJ's Gas Stations in ${stateCode}`}
+      />
     </div>
   );
 }

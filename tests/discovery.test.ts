@@ -5,8 +5,10 @@ import {
   formatStationTitle,
   getAvailableFuels,
   getAvailableStates,
+  getCanonicalFuelPrices,
   getCityStateCollisionKeys,
   getLatestObservation,
+  getMobileStationRowData,
   getPrimaryFuel,
   getStationPrice,
   sortStations,
@@ -486,6 +488,135 @@ describe("fuel label normalization", () => {
     expect(regularFuel?.name).toBe("Regular");
     const premiumFuel = fuels.find((f) => f.sku === "3");
     expect(premiumFuel?.name).toBe("Premium");
+  });
+});
+
+describe("getCanonicalFuelPrices (Phase DS-3)", () => {
+  it("extracts Regular, Premium, and Diesel with accurate formatted prices", () => {
+    // Medford has Unleaded ($3.929) and Premium ($4.729)
+    const medfordPrices = getCanonicalFuelPrices(sampleStations[0]!);
+    expect(medfordPrices.regular.isAvailable).toBe(true);
+    expect(medfordPrices.regular.priceFormatted).toBe("$3.929");
+    expect(medfordPrices.premium.isAvailable).toBe(true);
+    expect(medfordPrices.premium.priceFormatted).toBe("$4.729");
+    expect(medfordPrices.diesel.isAvailable).toBe(false);
+    expect(medfordPrices.diesel.priceFormatted).toBe("—");
+
+    // Haverhill has Unleaded ($3.799) and Diesel ($4.999)
+    const haverhillPrices = getCanonicalFuelPrices(sampleStations[1]!);
+    expect(haverhillPrices.regular.isAvailable).toBe(true);
+    expect(haverhillPrices.regular.priceFormatted).toBe("$3.799");
+    expect(haverhillPrices.premium.isAvailable).toBe(false);
+    expect(haverhillPrices.premium.priceFormatted).toBe("—");
+    expect(haverhillPrices.diesel.isAvailable).toBe(true);
+    expect(haverhillPrices.diesel.priceFormatted).toBe("$4.999");
+  });
+
+  it("handles empty fuel array and missing prices gracefully with em dash placeholder", () => {
+    // Auburn has empty fuels
+    const auburnPrices = getCanonicalFuelPrices(sampleStations[3]!);
+    expect(auburnPrices.regular.isAvailable).toBe(false);
+    expect(auburnPrices.regular.priceFormatted).toBe("—");
+    expect(auburnPrices.premium.isAvailable).toBe(false);
+    expect(auburnPrices.premium.priceFormatted).toBe("—");
+    expect(auburnPrices.diesel.isAvailable).toBe(false);
+    expect(auburnPrices.diesel.priceFormatted).toBe("—");
+  });
+
+  it("treats zero or invalid prices as unavailable", () => {
+    const zeroPriceStation: StationDto = {
+      ...sampleStations[0]!,
+      clubNumber: 999,
+      fuels: [
+        { sku: "1", name: "Unleaded", price: "0.000", sourcePriceAtLocal: null, observedAt: "2026-09-04T12:00:00Z" },
+        { sku: "3", name: "Premium", price: "-1.500", sourcePriceAtLocal: null, observedAt: "2026-09-04T12:00:00Z" },
+        { sku: "4", name: "Diesel", price: "invalid", sourcePriceAtLocal: null, observedAt: "2026-09-04T12:00:00Z" },
+      ],
+    };
+    const prices = getCanonicalFuelPrices(zeroPriceStation);
+    expect(prices.regular.isAvailable).toBe(false);
+    expect(prices.regular.priceFormatted).toBe("—");
+    expect(prices.premium.isAvailable).toBe(false);
+    expect(prices.premium.priceFormatted).toBe("—");
+    expect(prices.diesel.isAvailable).toBe(false);
+    expect(prices.diesel.priceFormatted).toBe("—");
+  });
+});
+
+describe("getMobileStationRowData (Phase DS-3)", () => {
+  it("defaults to Regular as primary when selectedFuel is ALL", () => {
+    const data = getMobileStationRowData(sampleStations[0]!, "ALL");
+    expect(data.primaryFuelLabel).toBe("Regular");
+    expect(data.primaryPriceFormatted).toBe("$3.929");
+    expect(data.secondaryFuels).toEqual([
+      { label: "Premium", price: "$4.729" },
+    ]);
+  });
+
+  it("switches primary to Diesel when Diesel SKU (4) is selected", () => {
+    const data = getMobileStationRowData(sampleStations[1]!, "4");
+    expect(data.primaryFuelLabel).toBe("Diesel");
+    expect(data.primaryPriceFormatted).toBe("$4.999");
+    expect(data.secondaryFuels).toEqual([
+      { label: "Regular", price: "$3.799" },
+    ]);
+  });
+
+  it("switches primary to Premium when Premium SKU (3) is selected", () => {
+    const data = getMobileStationRowData(sampleStations[0]!, "3");
+    expect(data.primaryFuelLabel).toBe("Premium");
+    expect(data.primaryPriceFormatted).toBe("$4.729");
+    expect(data.secondaryFuels).toEqual([
+      { label: "Regular", price: "$3.929" },
+    ]);
+  });
+});
+
+describe("generic same-city collision handling (Section 31)", () => {
+  it("disambiguates any synthetic same-city pair using formatStationTitle", () => {
+    const tampaStations: StationDto[] = [
+      {
+        ...sampleStations[0]!,
+        clubNumber: 101,
+        city: "Tampa",
+        state: "FL",
+      },
+      {
+        ...sampleStations[1]!,
+        clubNumber: 202,
+        city: "Tampa",
+        state: "FL",
+      },
+      {
+        ...sampleStations[2]!,
+        clubNumber: 303,
+        city: "Orlando",
+        state: "FL",
+      },
+    ];
+
+    const collisions = getCityStateCollisionKeys(tampaStations);
+    expect(collisions.has("tampa, fl")).toBe(true);
+    expect(collisions.has("orlando, fl")).toBe(false);
+
+    expect(formatStationTitle(tampaStations[0]!, collisions)).toBe("Tampa, FL · #101");
+    expect(formatStationTitle(tampaStations[1]!, collisions)).toBe("Tampa, FL · #202");
+    expect(formatStationTitle(tampaStations[2]!, collisions)).toBe("Orlando, FL");
+  });
+});
+
+describe("selected-fuel sorting behavior (Section 20)", () => {
+  it("sorts by selected fuel price with unavailable stations sorted last", () => {
+    // Medford has Premium ($4.729)
+    // Haverhill has no Premium
+    // St Johns has no Premium
+    const sortedByPremiumAsc = sortStations(sampleStations, "price-asc", "3");
+    expect(sortedByPremiumAsc[0]!.clubNumber).toBe(1); // Medford with $4.729
+    // Haverhill, St Johns, Auburn without Premium sort to the end
+    const remainingClubNumbers = sortedByPremiumAsc.slice(1).map((s) => s.clubNumber);
+    expect(remainingClubNumbers).toContain(189);
+    expect(remainingClubNumbers).toContain(398);
+    expect(remainingClubNumbers).toContain(901);
   });
 });
 

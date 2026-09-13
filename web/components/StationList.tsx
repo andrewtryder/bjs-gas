@@ -1,21 +1,16 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import Link from "next/link";
 import type { StationDto } from "../lib/types";
-import { formatDate, formatPrice } from "../lib/stats";
-import { getFreshnessInfo } from "../lib/freshness";
 import {
   filterStations,
   getAvailableStates,
   getAvailableFuels,
   getCityStateCollisionKeys,
-  getLatestObservation,
-  getPrimaryFuel,
-  getStationPrice,
   sortStations,
   type StationSortOption,
 } from "../lib/discovery";
+import StationLedger from "./StationLedger";
 
 interface StationListProps {
   stations: StationDto[];
@@ -188,234 +183,14 @@ export default function StationList({ stations }: StationListProps) {
         </div>
       </div>
 
-      {/* Empty State */}
-      {sortedAndFiltered.length === 0 ? (
-        <div className="directory-empty-state">
-          <h3 className="directory-empty-title">No matching stations</h3>
-          <p className="directory-empty-desc">
-            Try another city, ZIP code, or remove a filter.
-          </p>
-          <button
-            type="button"
-            className="btn btn-secondary btn-sm"
-            onClick={handleReset}
-          >
-            Clear filters
-          </button>
-        </div>
-      ) : (
-        <>
-          {/* Desktop Table Presentation (Visible >= 640px) */}
-          <div className="directory-table-wrapper">
-            <table className="directory-table" aria-label="BJ's Gas Stations Directory">
-              <thead>
-                <tr>
-                  <th scope="col" className="col-location">
-                    Station / Location
-                  </th>
-                  <th scope="col" className="col-price">
-                    {selectedFuel !== "ALL"
-                      ? availableFuels.find((f) => f.sku === selectedFuel)?.name || "Price"
-                      : "Regular"}
-                  </th>
-                  <th scope="col" className="col-other-fuels">
-                    Other fuels
-                  </th>
-                  <th scope="col" className="col-updated">
-                    Updated
-                  </th>
-                  <th scope="col" className="col-actions">
-                    <span className="sr-only">Actions</span>
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {sortedAndFiltered.map((station) => {
-                  const targetPrice = getStationPrice(station, selectedFuel);
-                  const primaryFuel = getPrimaryFuel(station.fuels);
-                  const displayFuel = selectedFuel !== "ALL" ? targetPrice.fuel : primaryFuel;
-                  const displayPrice = selectedFuel !== "ALL" ? targetPrice.priceFormatted : (primaryFuel ? formatPrice(primaryFuel.price) : "—");
-                  const otherFuels = station.fuels.filter((f) => f !== displayFuel);
-
-                  const latestObs = getLatestObservation(station);
-                  const freshness = latestObs ? getFreshnessInfo(latestObs) : null;
-
-                  return (
-                    <tr key={station.clubNumber} className="directory-row">
-                      <td className="col-location">
-                        <div className="station-location-block">
-                          <Link
-                            href={`/stations/${station.clubNumber}`}
-                            className="station-location-title"
-                          >
-                            <span>{station.city}, {station.state}</span>
-                            {collisionKeys.has(`${station.city.toLowerCase().trim()}, ${station.state.toLowerCase().trim()}`) && (
-                              <span className="station-location-qualifier"> · #{station.clubNumber}</span>
-                            )}
-                          </Link>
-                          <span className="station-location-sub">
-                            {station.address1 || station.address} &middot; Club #{station.clubNumber}
-                          </span>
-                        </div>
-                      </td>
-
-                      <td className="col-price">
-                        <div className="station-primary-price tabular-nums">
-                          {displayPrice}
-                        </div>
-                        <span className="station-price-label">
-                          {displayFuel ? displayFuel.name : "Regular"}
-                        </span>
-                      </td>
-
-                      <td className="col-other-fuels">
-                        {otherFuels.length === 0 ? (
-                          <span className="text-muted">—</span>
-                        ) : (
-                          <div className="other-fuels-row">
-                            {otherFuels.map((f) => (
-                              <span key={f.sku} className="other-fuel-pill tabular-nums">
-                                <span className="other-fuel-name">{f.name}</span>
-                                <span className="other-fuel-val">{formatPrice(f.price)}</span>
-                              </span>
-                            ))}
-                          </div>
-                        )}
-                      </td>
-
-                      <td className="col-updated">
-                        {freshness ? (
-                          <span
-                            className={`freshness-text ${
-                              freshness.level === "aging"
-                                ? "text-warning"
-                                : freshness.level === "stale"
-                                ? "text-higher"
-                                : "text-muted"
-                            }`}
-                            title={latestObs ? formatDate(latestObs) : undefined}
-                          >
-                            {freshness.relativeText}
-                            {freshness.level === "aging" && " · Aging"}
-                            {freshness.level === "stale" && " · Stale"}
-                          </span>
-                        ) : (
-                          <span className="text-muted">—</span>
-                        )}
-                      </td>
-
-                      <td className="col-actions">
-                        <Link
-                          href={`/map?station=${station.clubNumber}`}
-                          className="station-map-action"
-                          title={`View ${station.city}, ${station.state} on map`}
-                          aria-label={`View ${station.city}, ${station.state} on map`}
-                        >
-                          Map &rarr;
-                        </Link>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Purpose-Built Mobile Cards (Visible < 640px) */}
-          <div className="directory-cards-wrapper" aria-label="BJ's Gas Stations">
-            {sortedAndFiltered.map((station) => {
-              const targetPrice = getStationPrice(station, selectedFuel);
-              const primaryFuel = getPrimaryFuel(station.fuels);
-              const displayFuel = selectedFuel !== "ALL" ? targetPrice.fuel : primaryFuel;
-              const displayPrice = selectedFuel !== "ALL" ? targetPrice.priceFormatted : (primaryFuel ? formatPrice(primaryFuel.price) : "—");
-              const otherFuels = station.fuels.filter((f) => f !== displayFuel);
-
-              const latestObs = getLatestObservation(station);
-              const freshness = latestObs ? getFreshnessInfo(latestObs) : null;
-
-              return (
-                <div key={station.clubNumber} className="station-mobile-card">
-                  <div className="mobile-card-top">
-                    <div className="mobile-card-location">
-                      <Link
-                        href={`/stations/${station.clubNumber}`}
-                        className="mobile-card-title"
-                      >
-                        <span>{station.city}, {station.state}</span>
-                        {collisionKeys.has(`${station.city.toLowerCase().trim()}, ${station.state.toLowerCase().trim()}`) && (
-                          <span className="station-location-qualifier"> · #{station.clubNumber}</span>
-                        )}
-                      </Link>
-                      <div className="mobile-card-address">
-                        {station.address1 || station.address} &middot; Club #{station.clubNumber}
-                      </div>
-                    </div>
-
-                    <div className="mobile-card-price-block">
-                      <span className="mobile-card-price tabular-nums">
-                        {displayPrice}
-                      </span>
-                      <span className="mobile-card-fuel-label">
-                        {displayFuel ? displayFuel.name : "Regular"}
-                      </span>
-                    </div>
-                  </div>
-
-                  {otherFuels.length > 0 && (
-                    <div className="mobile-card-other-fuels">
-                      {otherFuels.map((f) => (
-                        <span key={f.sku} className="other-fuel-pill tabular-nums">
-                          <span className="other-fuel-name">{f.name}</span>
-                          <span className="other-fuel-val">{formatPrice(f.price)}</span>
-                        </span>
-                      ))}
-                    </div>
-                  )}
-
-                  <div className="mobile-card-bottom">
-                    <div className="mobile-card-freshness">
-                      {freshness ? (
-                        <span
-                          className={`freshness-text ${
-                            freshness.level === "aging"
-                              ? "text-warning"
-                              : freshness.level === "stale"
-                              ? "text-higher"
-                              : "text-muted"
-                          }`}
-                          title={latestObs ? formatDate(latestObs) : undefined}
-                        >
-                          {freshness.relativeText}
-                          {freshness.level === "aging" && " · Aging"}
-                          {freshness.level === "stale" && " · Stale"}
-                        </span>
-                      ) : (
-                        <span className="text-muted">—</span>
-                      )}
-                    </div>
-
-                    <div className="mobile-card-actions">
-                      <Link
-                        href={`/stations/${station.clubNumber}`}
-                        className="btn btn-secondary btn-sm"
-                      >
-                        Details
-                      </Link>
-                      <Link
-                        href={`/map?station=${station.clubNumber}`}
-                        className="btn btn-secondary btn-sm"
-                        aria-label={`View ${station.city}, ${station.state} on map`}
-                      >
-                        Map
-                      </Link>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </>
-      )}
+      {/* Ledger Slate Station Ledger */}
+      <StationLedger
+        stations={sortedAndFiltered}
+        collisionKeys={collisionKeys}
+        selectedFuel={selectedFuel}
+        onResetFilters={hasActiveFilters ? handleReset : undefined}
+        ariaLabel="BJ's Gas Stations Directory"
+      />
     </div>
   );
 }
