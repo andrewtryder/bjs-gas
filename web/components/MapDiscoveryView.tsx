@@ -10,9 +10,12 @@ import {
   getAvailableStates,
   getAvailableFuels,
   getStationPrice,
+  getPrimaryFuel,
+  getLatestObservation,
   stationsToGeoJson,
 } from "../lib/discovery";
-import { formatDate, formatPrice } from "../lib/stats";
+import { formatPrice } from "../lib/stats";
+import { getFreshnessInfo } from "../lib/freshness";
 
 // Dynamically import InteractiveMap without SSR since MapLibre GL is browser-only
 const InteractiveMap = dynamic(() => import("./InteractiveMap"), {
@@ -86,45 +89,64 @@ export default function MapDiscoveryView({
     setSearchQuery("");
     setSelectedState("ALL");
     setSelectedFuel("ALL");
-    setSelectedStation(null);
   };
 
+  const hasActiveFilters = searchQuery.trim() !== "" || selectedState !== "ALL" || selectedFuel !== "ALL";
+
+  // Selected station summary details
+  const selectedStationFuel = selectedStation ? getPrimaryFuel(selectedStation.fuels) : null;
+  const selectedStationPrice = selectedStation ? getStationPrice(selectedStation, selectedFuel) : null;
+  const selectedStationFreshness = selectedStation
+    ? getFreshnessInfo(getLatestObservation(selectedStation))
+    : null;
+
   return (
-    <div className="map-discovery-container">
-      {/* Filter Control Bar */}
-      <div className="discovery-filter-bar">
-        <div className="discovery-search-wrapper" role="search">
+    <div className="map-discovery-v2">
+      {/* Unified Filter Toolbar */}
+      <div className="map-toolbar directory-toolbar" role="search">
+        {/* Search Field */}
+        <div className="directory-search-field">
+          <label htmlFor="map-station-search" className="sr-only">
+            Search gas stations on map
+          </label>
+          <span className="directory-search-icon" aria-hidden="true">
+            <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="8.5" cy="8.5" r="5.5" />
+              <line x1="12.5" y1="12.5" x2="18" y2="18" />
+            </svg>
+          </span>
           <input
+            id="map-station-search"
             type="search"
-            className="discovery-search-input"
-            placeholder="Search by city, state, ZIP, or club name..."
+            className="directory-search-input"
+            placeholder="Search city, ZIP, or club"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            aria-label="Search gas stations on map"
           />
           {searchQuery && (
             <button
               type="button"
-              className="discovery-clear-search-btn"
+              className="directory-search-clear"
               onClick={() => setSearchQuery("")}
-              aria-label="Clear search text"
+              aria-label="Clear search"
             >
               &times;
             </button>
           )}
         </div>
 
-        <div className="discovery-select-wrapper">
-          <label htmlFor="state-filter" className="discovery-select-label">
-            State:
+        {/* State Selector */}
+        <div className="directory-select-wrapper">
+          <label htmlFor="map-state-select" className="sr-only">
+            Filter by state
           </label>
           <select
-            id="state-filter"
-            className="discovery-select"
+            id="map-state-select"
+            className="directory-select"
             value={selectedState}
             onChange={(e) => setSelectedState(e.target.value)}
           >
-            <option value="ALL">All States ({stations.length})</option>
+            <option value="ALL">All states</option>
             {availableStates.map((s) => (
               <option key={s.state} value={s.state}>
                 {s.state} ({s.count})
@@ -133,20 +155,20 @@ export default function MapDiscoveryView({
           </select>
         </div>
 
-        <div className="discovery-fuel-toggles">
-          <span className="discovery-fuel-label">Fuel:</span>
+        {/* Fuel Pill Toggles */}
+        <div className="directory-fuel-segments" role="group" aria-label="Filter by fuel type">
           <button
             type="button"
-            className={`discovery-fuel-btn ${selectedFuel === "ALL" ? "active" : ""}`}
+            className={`directory-fuel-pill ${selectedFuel === "ALL" ? "active" : ""}`}
             onClick={() => setSelectedFuel("ALL")}
           >
-            All
+            All fuels
           </button>
           {availableFuels.map((f) => (
             <button
               key={f.sku}
               type="button"
-              className={`discovery-fuel-btn ${selectedFuel === f.sku ? "active" : ""}`}
+              className={`directory-fuel-pill ${selectedFuel === f.sku ? "active" : ""}`}
               onClick={() => setSelectedFuel(f.sku)}
             >
               {f.name}
@@ -154,146 +176,156 @@ export default function MapDiscoveryView({
           ))}
         </div>
 
-        <div className="discovery-summary">
-          <span className="discovery-count">
-            {filteredStations.length} of {stations.length} stations
+        {/* Status Count & Clear Action */}
+        <div className="directory-status-group">
+          <span className="directory-count-badge">
+            {hasActiveFilters
+              ? `${filteredStations.length} of ${stations.length} locations`
+              : `${stations.length} locations`}
           </span>
-          {(searchQuery || selectedState !== "ALL" || selectedFuel !== "ALL") && (
+
+          {hasActiveFilters && (
             <button
               type="button"
-              className="discovery-reset-btn"
+              className="directory-clear-btn"
               onClick={handleClearFilters}
             >
-              Reset Filters
+              Clear filters
             </button>
           )}
         </div>
       </div>
 
       {/* Main Split Layout: Sidebar + Map */}
-      <div className="map-split-view">
-        {/* Sidebar Station List & Selected Station Card */}
-        <div className="discovery-sidebar">
+      <div className="map-split-v2">
+        {/* Desktop Sidebar */}
+        <div className="map-sidebar-pane">
+          {/* Selected Station Sticky Banner */}
           {selectedStation && (
-            <div className="selected-station-card">
-              <div className="selected-card-header">
+            <div className="map-selected-banner">
+              <div className="map-selected-header">
                 <div>
-                  <span className="selected-card-badge">Selected Station</span>
-                  <h3 className="selected-card-title">{selectedStation.name}</h3>
-                  <div className="selected-card-club">
-                    Club #{selectedStation.clubNumber} &bull; {selectedStation.city},{" "}
-                    {selectedStation.state}
-                  </div>
+                  <h3 className="map-selected-title">
+                    {selectedStation.city}, {selectedStation.state}
+                  </h3>
+                  <p className="map-selected-address">
+                    {selectedStation.address} &bull; #{selectedStation.clubNumber}
+                  </p>
                 </div>
                 <button
                   type="button"
-                  className="selected-card-close-btn"
-                  onClick={() => setSelectedStation(null)}
-                  title="Close station details"
+                  className="map-selected-close-btn"
+                  onClick={() => handleSelectStation(null)}
+                  aria-label="Close selected station"
                 >
                   &times;
                 </button>
               </div>
 
-              <div className="selected-card-address">
-                {selectedStation.address}, {selectedStation.city},{" "}
-                {selectedStation.state} {selectedStation.postalCode}
+              <div className="map-selected-price-row">
+                <div className="map-selected-price tabular-nums">
+                  {selectedStationPrice?.priceFormatted}
+                </div>
+                <div className="map-selected-fuel">
+                  {selectedStationPrice?.fuel?.name || "Regular"}
+                </div>
               </div>
 
-              <div className="selected-card-fuels">
-                {selectedStation.fuels.length === 0 ? (
-                  <span className="selected-card-no-fuel">No price data</span>
-                ) : (
-                  selectedStation.fuels.map((fuel: StationFuel) => (
-                    <div key={fuel.sku} className="selected-card-fuel-pill">
-                      <span className="selected-fuel-name">{fuel.name}</span>
-                      <span className="selected-fuel-price">
-                        {formatPrice(fuel.price)}
+              {selectedStation.fuels.length > 1 && (
+                <div className="map-selected-other-fuels">
+                  {selectedStation.fuels
+                    .filter((f) => f.sku !== selectedStationFuel?.sku)
+                    .map((f: StationFuel) => (
+                      <span key={f.sku} className="map-selected-fuel-pill">
+                        {f.name} {formatPrice(f.price)}
                       </span>
-                    </div>
-                  ))
-                )}
-              </div>
+                    ))}
+                </div>
+              )}
 
-              <div className="selected-card-footer">
+              <div className="map-selected-footer">
+                {selectedStationFreshness && (
+                  <span className="map-selected-freshness">
+                    {selectedStationFreshness.relativeText}
+                  </span>
+                )}
                 <Link
                   href={`/stations/${selectedStation.clubNumber}`}
-                  className="selected-card-detail-link"
+                  className="map-selected-detail-link"
                 >
-                  View Station &amp; Price History &rarr;
+                  Details &rarr;
                 </Link>
               </div>
             </div>
           )}
 
-          <div className="sidebar-list-header">
-            <h3 className="sidebar-list-title">
-              {selectedState !== "ALL" ? `${selectedState} Stations` : "All Stations"}
-            </h3>
-            <span className="sidebar-list-count">
-              {filteredStations.length} match{filteredStations.length === 1 ? "" : "es"}
+          {/* Station List Header */}
+          <div className="map-sidebar-list-header">
+            <span className="map-sidebar-heading">
+              {selectedState !== "ALL" ? `${selectedState} stations` : "Stations"}
+            </span>
+            <span className="map-sidebar-count">
+              {filteredStations.length} locations
             </span>
           </div>
 
-          <div className="sidebar-station-list">
+          {/* Station Items List */}
+          <div className="map-sidebar-list" role="list">
             {filteredStations.length === 0 ? (
-              <div className="discovery-empty-state">
-                <p className="discovery-empty-title">No matching stations</p>
-                <p className="discovery-empty-desc">
-                  Try adjusting your search query, state, or fuel selection.
+              <div className="map-empty-state">
+                <p className="map-empty-title">No matching stations</p>
+                <p className="map-empty-desc">
+                  Try another city, ZIP code, or remove a filter.
                 </p>
-                <button
-                  type="button"
-                  className="discovery-empty-reset-btn"
-                  onClick={handleClearFilters}
-                >
-                  Clear All Filters
-                </button>
+                {hasActiveFilters && (
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    onClick={handleClearFilters}
+                  >
+                    Clear filters
+                  </button>
+                )}
               </div>
             ) : (
               filteredStations.map((station) => {
-                const isSelected =
-                  selectedStation?.clubNumber === station.clubNumber;
+                const isSelected = selectedStation?.clubNumber === station.clubNumber;
                 const priceInfo = getStationPrice(station, selectedFuel);
 
                 return (
-                  <div
+                  <button
+                    type="button"
                     key={station.clubNumber}
-                    className={`sidebar-station-item ${isSelected ? "active" : ""}`}
+                    className={`map-sidebar-item ${isSelected ? "active" : ""}`}
                     onClick={() => handleSelectStation(station)}
-                    role="button"
-                    tabIndex={0}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        handleSelectStation(station);
-                      }
-                    }}
+                    aria-pressed={isSelected}
                   >
-                    <div className="sidebar-item-content">
-                      <div className="sidebar-item-header">
-                        <span className="sidebar-item-name">{station.name}</span>
-                        <span className="sidebar-item-price">
-                          {priceInfo.priceFormatted}
-                        </span>
-                      </div>
-                      <div className="sidebar-item-location">
-                        {station.city}, {station.state} &bull; Club #{station.clubNumber}
-                      </div>
-                      {priceInfo.fuel && (
-                        <div className="sidebar-item-fuel">
-                          {priceInfo.fuel.name}
-                        </div>
-                      )}
+                    <div className="map-item-top-row">
+                      <span className="map-item-city">
+                        {station.city}, {station.state}
+                      </span>
+                      <span className="map-item-price tabular-nums">
+                        {priceInfo.priceFormatted}
+                      </span>
                     </div>
-                  </div>
+
+                    <div className="map-item-sub-row">
+                      <span className="map-item-address">
+                        {station.address} &bull; #{station.clubNumber}
+                      </span>
+                      <span className="map-item-fuel-label">
+                        {priceInfo.fuel ? priceInfo.fuel.name : "Regular"}
+                      </span>
+                    </div>
+                  </button>
                 );
               })
             )}
           </div>
         </div>
 
-        {/* Map View */}
-        <div className="discovery-map-pane">
+        {/* Map Pane */}
+        <div className="map-canvas-pane">
           <InteractiveMap
             stationsGeoJson={stationsGeoJson}
             selectedStation={selectedStation}
@@ -301,6 +333,48 @@ export default function MapDiscoveryView({
             stations={filteredStations}
             cartoApiKey={cartoApiKey}
           />
+
+          {/* Mobile Bottom Sheet / Selected Station Floating Panel */}
+          {selectedStation && (
+            <div className="map-mobile-station-panel" role="region" aria-label="Selected station details">
+              <div className="map-mobile-panel-header">
+                <div>
+                  <h4 className="map-mobile-panel-title">
+                    {selectedStation.city}, {selectedStation.state}
+                  </h4>
+                  <p className="map-mobile-panel-address">
+                    {selectedStation.address} &bull; #{selectedStation.clubNumber}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className="map-mobile-panel-close"
+                  onClick={() => handleSelectStation(null)}
+                  aria-label="Dismiss selected station"
+                >
+                  &times;
+                </button>
+              </div>
+
+              <div className="map-mobile-panel-body">
+                <div className="map-mobile-price-group">
+                  <span className="map-mobile-price tabular-nums">
+                    {selectedStationPrice?.priceFormatted}
+                  </span>
+                  <span className="map-mobile-fuel">
+                    {selectedStationPrice?.fuel?.name || "Regular"}
+                  </span>
+                </div>
+
+                <Link
+                  href={`/stations/${selectedStation.clubNumber}`}
+                  className="btn btn-primary btn-sm"
+                >
+                  Details &rarr;
+                </Link>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
