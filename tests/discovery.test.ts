@@ -13,6 +13,9 @@ import {
   getStationPrice,
   sortStations,
   stationsToGeoJson,
+  syncSelectedStationWithFilter,
+  formatMapFreshnessText,
+  formatMapPopupData,
   validateUniqueStations,
 } from "../web/lib/discovery.js";
 import type { StationDto } from "../web/lib/types.js";
@@ -619,5 +622,109 @@ describe("selected-fuel sorting behavior (Section 20)", () => {
     expect(remainingClubNumbers).toContain(901);
   });
 });
+
+describe("syncSelectedStationWithFilter (DS-4 Section 29)", () => {
+  it("preserves selected station when still present in filtered set", () => {
+    const selected = sampleStations[0]!;
+    const result = syncSelectedStationWithFilter(selected, sampleStations);
+    expect(result).toBe(selected);
+  });
+
+  it("clears selected station when excluded from filtered set", () => {
+    const selected = sampleStations[0]!; // Medford MA
+    const filteredFL = sampleStations.filter((s) => s.state === "FL");
+    const result = syncSelectedStationWithFilter(selected, filteredFL);
+    expect(result).toBeNull();
+  });
+
+  it("returns null when no station was selected", () => {
+    expect(syncSelectedStationWithFilter(null, sampleStations)).toBeNull();
+  });
+});
+
+describe("formatMapFreshnessText (DS-4 Section 10)", () => {
+  it("formats fresh timestamps without a decorative Fresh pill", () => {
+    const text = formatMapFreshnessText({
+      level: "fresh",
+      label: "Updated recently",
+      relativeText: "Updated 17m ago",
+      badgeBg: "",
+      badgeColor: "",
+      badgeBorder: "",
+      badgeClass: "",
+      ageMinutes: 17,
+    });
+    expect(text).toBe("Updated 17m ago");
+  });
+
+  it("appends · Aging for aging timestamps", () => {
+    const text = formatMapFreshnessText({
+      level: "aging",
+      label: "Aging",
+      relativeText: "Updated 4h ago",
+      badgeBg: "",
+      badgeColor: "",
+      badgeBorder: "",
+      badgeClass: "",
+      ageMinutes: 240,
+    });
+    expect(text).toBe("Updated 4h ago · Aging");
+  });
+
+  it("appends · Stale for stale timestamps", () => {
+    const text = formatMapFreshnessText({
+      level: "stale",
+      label: "Stale",
+      relativeText: "Updated 9h ago",
+      badgeBg: "",
+      badgeColor: "",
+      badgeBorder: "",
+      badgeClass: "",
+      ageMinutes: 540,
+    });
+    expect(text).toBe("Updated 9h ago · Stale");
+  });
+
+  it("handles null gracefully", () => {
+    expect(formatMapFreshnessText(null)).toBeNull();
+  });
+});
+
+describe("formatMapPopupData (DS-4 Sections 21 & 22)", () => {
+  it("formats popup data with primary regular fuel and secondary fuels", () => {
+    const station = sampleStations[0]!; // Medford: Regular $3.929, Premium $4.729
+    const data = formatMapPopupData(station, "ALL");
+    expect(data.title).toBe("Medford, MA");
+    expect(data.clubNumber).toBe(1);
+    expect(data.primaryPriceFormatted).toBe("$3.929");
+    expect(data.primaryFuelName).toBe("Regular");
+    expect(data.secondaryFuels).toEqual([
+      { name: "Premium", price: "$4.729" },
+    ]);
+  });
+
+  it("prioritizes selected fuel SKU as primary price", () => {
+    const station = sampleStations[0]!;
+    const data = formatMapPopupData(station, "3"); // Premium
+    expect(data.primaryPriceFormatted).toBe("$4.729");
+    expect(data.primaryFuelName).toBe("Premium");
+    expect(data.secondaryFuels).toEqual([
+      { name: "Regular", price: "$3.929" },
+    ]);
+  });
+
+  it("applies disambiguation qualifier when collision key matches", () => {
+    const colStation1 = { ...sampleStations[0]!, city: "Columbia", state: "MD", clubNumber: 60 };
+    const colStation2 = { ...sampleStations[0]!, city: "Columbia", state: "MD", clubNumber: 903 };
+    const collisions = new Set(["columbia, md"]);
+
+    const data1 = formatMapPopupData(colStation1, "ALL", collisions);
+    const data2 = formatMapPopupData(colStation2, "ALL", collisions);
+
+    expect(data1.title).toBe("Columbia, MD · #60");
+    expect(data2.title).toBe("Columbia, MD · #903");
+  });
+});
+
 
 
