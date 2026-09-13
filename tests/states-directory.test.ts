@@ -1,39 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { getStateName } from "../web/lib/states.js";
-
-interface StateSummaryItem {
-  state: string;
-  stationCount: number;
-  medianPrice: string;
-  minPrice: string;
-  maxPrice: string;
-}
-
-function sortStates(
-  states: StateSummaryItem[],
-  sortBy: "price-asc" | "price-desc" | "name-asc" | "stations-desc"
-): StateSummaryItem[] {
-  return [...states].sort((a, b) => {
-    const priceA = Number.parseFloat(a.medianPrice);
-    const priceB = Number.parseFloat(b.medianPrice);
-
-    switch (sortBy) {
-      case "price-asc":
-        return priceA - priceB;
-      case "price-desc":
-        return priceB - priceA;
-      case "name-asc":
-        return getStateName(a.state).localeCompare(getStateName(b.state));
-      case "stations-desc":
-        return b.stationCount - a.stationCount;
-      default:
-        return priceA - priceB;
-    }
-  });
-}
+import {
+  sortStates,
+  filterStates,
+  type StateSummaryItemLike,
+} from "../web/lib/states-view.js";
 
 describe("State Index Sorting & Comparison", () => {
-  const mockStates: StateSummaryItem[] = [
+  const mockStates: StateSummaryItemLike[] = [
     {
       state: "MA",
       stationCount: 26,
@@ -83,5 +56,19 @@ describe("State Index Sorting & Comparison", () => {
   it("sorts by station count descending (most locations)", () => {
     const sorted = sortStates(mockStates, "stations-desc");
     expect(sorted.map((s) => s.state)).toEqual(["NY", "FL", "MA", "GA"]);
+  });
+
+  it("filters states by state code or full name", () => {
+    const byCode = filterStates(mockStates, "ma");
+    expect(byCode.map((s) => s.state)).toEqual(["MA"]);
+
+    const byName = filterStates(mockStates, "florida");
+    expect(byName.map((s) => s.state)).toEqual(["FL"]);
+
+    const emptyFilter = filterStates(mockStates, "   ");
+    expect(emptyFilter.length).toBe(4);
+
+    const noMatch = filterStates(mockStates, "xyz");
+    expect(noMatch.length).toBe(0);
   });
 });

@@ -20,27 +20,27 @@ export default function GlobalError({
 
   return (
     <html lang="en">
-      <body style={{ margin: 0, padding: "2rem", fontFamily: "sans-serif", backgroundColor: "#f8fafc" }}>
+      <body style={{ margin: 0, padding: "2rem", fontFamily: "system-ui, -apple-system, sans-serif", backgroundColor: "#F8FAFC" }}>
         <div
           style={{
             maxWidth: "32rem",
             margin: "4rem auto",
             padding: "2rem",
-            background: "#ffffff",
-            borderRadius: "1rem",
-            border: "1px solid #fecdd3",
+            background: "#FFFFFF",
+            borderRadius: "12px",
+            border: "1px solid #E2E8F0",
             textAlign: "center",
-            boxShadow: "0 1px 3px rgba(0, 0, 0, 0.1)",
+            boxShadow: "0 1px 3px rgba(0, 0, 0, 0.05)",
           }}
         >
           <div
             style={{
-              width: "3rem",
-              height: "3rem",
+              width: "2.5rem",
+              height: "2.5rem",
               borderRadius: "50%",
-              backgroundColor: "#ffe4e6",
-              color: "#e11d48",
-              fontSize: "1.5rem",
+              backgroundColor: "#F1F5F9",
+              color: "#475569",
+              fontSize: "1.25rem",
               fontWeight: "bold",
               display: "flex",
               alignItems: "center",
@@ -50,21 +50,22 @@ export default function GlobalError({
           >
             !
           </div>
-          <h1 style={{ fontSize: "1.5rem", fontWeight: 700, color: "#0f172a", marginBottom: "0.5rem" }}>
+          <h1 style={{ fontSize: "1.5rem", fontWeight: 700, color: "#0F172A", marginBottom: "0.5rem" }}>
             Something went wrong
           </h1>
           <p style={{ fontSize: "0.875rem", color: "#475569", marginBottom: "1.5rem" }}>
             A critical application error occurred while loading this page.
           </p>
           <button
+            type="button"
             onClick={() => reset()}
             style={{
               display: "inline-flex",
               alignItems: "center",
               justifyContent: "center",
-              borderRadius: "0.5rem",
-              backgroundColor: "#2563eb",
-              color: "#ffffff",
+              borderRadius: "8px",
+              backgroundColor: "#2563EB",
+              color: "#FFFFFF",
               padding: "0.5rem 1rem",
               fontSize: "0.875rem",
               fontWeight: 600,

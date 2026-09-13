@@ -52,7 +52,7 @@ describe("formatNearbyPriceDelta", () => {
     expect(res.isCheaper).toBe(false);
     expect(res.isHigher).toBe(true);
     expect(res.isSame).toBe(false);
-    expect(res.text).toBe("5¢ more");
+    expect(res.text).toBe("5¢ higher");
   });
 
   it("formats zero delta as same price", () => {
