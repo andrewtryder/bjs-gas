@@ -12,11 +12,15 @@ import {
 } from "../lib/analytics";
 import { formatPrice } from "../lib/stats";
 import { getFreshnessInfo } from "../lib/freshness";
+import { calculateTrendDeltaCents } from "../lib/analytics-view";
 import StationList from "../components/StationList";
 import NationalTrendChart from "../components/NationalTrendChart";
 import StatePricePreview from "../components/StatePricePreview";
 import PriceMovers from "../components/PriceMovers";
 import SectionHeader from "../components/ui/SectionHeader";
+import StatusPill from "../components/ui/StatusPill";
+import { LinkButton } from "../components/ui/Button";
+import DeltaBadge from "../components/ui/DeltaBadge";
 
 import type { StationDto, SystemStatusResponse } from "../lib/types";
 
@@ -80,22 +84,7 @@ export default async function HomePage() {
   const freshnessInfo = latestObservedAt ? getFreshnessInfo(latestObservedAt) : null;
 
   // Derive 30-day delta from existing trends data if available
-  let delta30d: { text: string; isFavorable: boolean; isUnfavorable: boolean } | null = null;
-  if (trends && trends.points.length >= 2) {
-    const startVal = Number.parseFloat(trends.points[0]!.medianPrice);
-    const endVal = Number.parseFloat(trends.points[trends.points.length - 1]!.medianPrice);
-    if (Number.isFinite(startVal) && Number.isFinite(endVal)) {
-      const diff = endVal - startVal;
-      const cents = Math.round(diff * 100);
-      if (cents > 0) {
-        delta30d = { text: `+${cents}¢ over 30 days`, isFavorable: false, isUnfavorable: true };
-      } else if (cents < 0) {
-        delta30d = { text: `${cents}¢ over 30 days`, isFavorable: true, isUnfavorable: false };
-      } else {
-        delta30d = { text: "No change over 30 days", isFavorable: false, isUnfavorable: false };
-      }
-    }
-  }
+  const delta30dCents = calculateTrendDeltaCents(trends?.points);
 
   const websiteJsonLd = {
     "@context": "https://schema.org",
@@ -126,15 +115,21 @@ export default async function HomePage() {
       <header className="hero-section">
         <div className="hero-content">
           <div className="hero-badge-row">
-            {freshnessInfo && (
-              <Link
+            {freshnessInfo ? (
+              <StatusPill
+                level={freshnessInfo.level}
+                text={freshnessInfo.relativeText}
+                cadencePrefix={true}
                 href="/status"
-                className={`hero-freshness-pill ${freshnessInfo.badgeClass}`}
                 title="Data status"
-              >
-                <span className="status-dot-sm" aria-hidden="true" />
-                <span>Updated hourly &bull; {freshnessInfo.relativeText}</span>
-              </Link>
+              />
+            ) : (
+              <StatusPill
+                level="fresh"
+                text="Updated hourly"
+                href="/status"
+                title="Data status"
+              />
             )}
           </div>
 
@@ -144,12 +139,12 @@ export default async function HomePage() {
           </p>
 
           <div className="hero-actions">
-            <a href="#stations" className="btn btn-primary">
+            <LinkButton href="#stations" variant="primary">
               Find a station
-            </a>
-            <Link href="/map" className="btn btn-secondary">
+            </LinkButton>
+            <LinkButton href="/map" variant="secondary">
               View map
-            </Link>
+            </LinkButton>
           </div>
         </div>
       </header>
@@ -164,27 +159,17 @@ export default async function HomePage() {
       {/* National Summary Section: Price-First Hierarchy */}
       <section className="national-summary-section" aria-label="National gas price summary">
         <div className="national-median-block">
-          <span className="national-median-label">National median</span>
+          <span className="national-median-label">NATIONAL MEDIAN</span>
           <div className="national-median-value-row">
             <span className="national-median-price tabular-nums">
               {summary?.medianPrice ? formatPrice(summary.medianPrice) : "—"}
             </span>
-            {delta30d && (
-              <span
-                className={`national-median-delta ${
-                  delta30d.isFavorable
-                    ? "text-cheaper"
-                    : delta30d.isUnfavorable
-                    ? "text-higher"
-                    : "text-muted"
-                }`}
-              >
-                {delta30d.text}
-              </span>
+            {delta30dCents !== null && (
+              <DeltaBadge cents={delta30dCents} timeframe="over 30 days" size="md" />
             )}
           </div>
           <span className="national-median-fuel">
-            Regular unleaded across {summary?.stationCount ?? stations.length} stations
+            Regular across {summary?.stationCount ?? stations.length} stations
           </span>
         </div>
 
@@ -192,7 +177,7 @@ export default async function HomePage() {
         <div className="supporting-metrics-grid">
           {/* Lowest */}
           <div className="supporting-metric-item">
-            <span className="supporting-metric-label">Lowest price</span>
+            <span className="supporting-metric-label">LOWEST PRICE</span>
             <span className="supporting-metric-value tabular-nums text-cheaper">
               {summary?.min ? formatPrice(summary.min.price) : "—"}
             </span>
@@ -202,7 +187,7 @@ export default async function HomePage() {
                   href={`/stations/${summary.min.station.clubNumber}`}
                   className="supporting-metric-link"
                 >
-                  {summary.min.station.name} ({summary.min.station.state})
+                  {summary.min.station.name}, {summary.min.station.state} &middot; #{summary.min.station.clubNumber}
                 </Link>
               ) : (
                 "No price reported"
@@ -212,7 +197,7 @@ export default async function HomePage() {
 
           {/* Highest */}
           <div className="supporting-metric-item">
-            <span className="supporting-metric-label">Highest price</span>
+            <span className="supporting-metric-label">HIGHEST PRICE</span>
             <span className="supporting-metric-value tabular-nums text-higher">
               {summary?.max ? formatPrice(summary.max.price) : "—"}
             </span>
@@ -222,7 +207,7 @@ export default async function HomePage() {
                   href={`/stations/${summary.max.station.clubNumber}`}
                   className="supporting-metric-link"
                 >
-                  {summary.max.station.name} ({summary.max.station.state})
+                  {summary.max.station.name}, {summary.max.station.state} &middot; #{summary.max.station.clubNumber}
                 </Link>
               ) : (
                 "No price reported"
@@ -232,7 +217,7 @@ export default async function HomePage() {
 
           {/* Locations */}
           <div className="supporting-metric-item">
-            <span className="supporting-metric-label">Locations tracked</span>
+            <span className="supporting-metric-label">LOCATIONS TRACKED</span>
             <span className="supporting-metric-value tabular-nums">
               {stations.length}
             </span>

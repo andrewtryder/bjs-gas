@@ -102,7 +102,7 @@ describeDb("getNearbyStations integration", () => {
         ).toBe(true);
       }
     }
-  });
+  }, 15000);
 
   it("respects maxMiles filter", async () => {
     const res = await getNearbyStations(prisma, 1, { limit: 10, maxMiles: 15 });

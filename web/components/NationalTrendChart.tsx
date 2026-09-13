@@ -16,6 +16,8 @@ import { formatPrice } from "../lib/stats";
 import { getStateName } from "../lib/states";
 import SegmentedControl from "./ui/SegmentedControl";
 
+import DeltaBadge from "./ui/DeltaBadge";
+
 interface NationalTrendChartProps {
   initialTrends: NationalTrendsResponse;
   title?: string;
@@ -70,25 +72,11 @@ export default function NationalTrendChart({
     const diff = latest.median - earliest.median;
     const cents = Math.round(diff * 100);
 
-    let changeText = `No change over ${selectedDays} days`;
-    let isFavorable = false;
-    let isUnfavorable = false;
-
-    if (cents > 0) {
-      changeText = `+${cents}¢ over ${selectedDays} days`;
-      isUnfavorable = true;
-    } else if (cents < 0) {
-      changeText = `${cents}¢ over ${selectedDays} days`;
-      isFavorable = true;
-    }
-
     return {
       currentMedian: latest.median,
-      changeText,
-      isFavorable,
-      isUnfavorable,
+      cents,
     };
-  }, [chartData, selectedDays]);
+  }, [chartData]);
 
   if (!initialTrends || initialTrends.points.length === 0) {
     return (
@@ -108,31 +96,25 @@ export default function NationalTrendChart({
     : `National price trend`;
 
   const defaultSubtitle = initialTrends.state
-    ? `Daily median and price range for BJ's stations in ${getStateName(initialTrends.state)}`
-    : `Daily median and range across reporting BJ's stations`;
+    ? `Daily Regular price range for BJ's stations in ${getStateName(initialTrends.state)}`
+    : `Daily Regular price range across reporting locations.`;
 
   return (
     <div className="trend-section">
       <div className="trend-header">
         <div>
-          <h3 className="section-title">{title || defaultTitle}</h3>
+          <h2 className="section-title">{title || defaultTitle}</h2>
           <p className="section-subtitle">{subtitle || defaultSubtitle}</p>
           {trendSummary && (
             <div className="trend-stat-summary">
               <span className="trend-stat-price tabular-nums">
                 {formatPrice(trendSummary.currentMedian)}
               </span>
-              <span
-                className={`trend-stat-change ${
-                  trendSummary.isFavorable
-                    ? "text-cheaper"
-                    : trendSummary.isUnfavorable
-                    ? "text-higher"
-                    : "text-muted"
-                }`}
-              >
-                {trendSummary.changeText}
-              </span>
+              <DeltaBadge
+                cents={trendSummary.cents}
+                timeframe={`over ${selectedDays} days`}
+                size="md"
+              />
             </div>
           )}
         </div>
