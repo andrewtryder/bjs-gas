@@ -920,17 +920,24 @@ a {
 .hero-title {
   font-size: 2.5rem;
   font-weight: 800;
-  letter-spacing: -0.035em;
+  letter-spacing: -0.04em;
   line-height: 1.15;
-  color: var(--text-primary);
+  color: var(--color-text-primary);
   margin-bottom: 0.5rem;
+}
+
+@media (min-width: 768px) {
+  .hero-title {
+    font-size: 3rem;
+  }
 }
 
 .hero-subtitle {
   font-size: 1.0625rem;
-  color: var(--text-secondary);
+  color: var(--color-text-secondary);
   line-height: 1.5;
   margin-bottom: 1.5rem;
+  max-width: 580px;
 }
 
 .hero-actions {
@@ -945,29 +952,29 @@ a {
   padding: 1rem 1.25rem;
   border-radius: var(--radius-md);
   margin-bottom: 1.5rem;
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--color-border);
 }
 
 .notice-banner-error {
-  border-color: var(--higher);
-  background-color: var(--higher-bg);
+  border-color: var(--color-danger);
+  background-color: var(--color-danger-bg);
 }
 
 .notice-title {
   font-weight: 600;
-  color: var(--higher);
+  color: var(--color-danger);
   margin-bottom: 0.25rem;
 }
 
 .notice-message {
   font-size: 0.875rem;
-  color: var(--text-secondary);
+  color: var(--color-text-secondary);
 }
 
 /* National Summary Section: Price-First Hierarchy */
 .national-summary-section {
-  background-color: var(--bg-surface);
-  border: 1px solid var(--border-color);
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   padding: 1.75rem;
   margin-bottom: 2.5rem;
@@ -980,11 +987,11 @@ a {
 }
 
 .national-median-label {
-  font-size: 0.8125rem;
-  font-weight: 600;
+  font-size: 0.75rem;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--text-muted);
+  letter-spacing: 0.16em;
+  color: var(--color-text-muted);
   margin-bottom: 0.375rem;
 }
 
@@ -996,32 +1003,24 @@ a {
 }
 
 .national-median-price {
-  font-size: 3.25rem;
+  font-size: 3rem;
   font-weight: 800;
-  letter-spacing: -0.035em;
+  letter-spacing: -0.04em;
   line-height: 1;
-  color: var(--text-primary);
+  color: var(--color-text-primary);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
 }
 
-.national-median-delta {
-  font-size: 0.9375rem;
-  font-weight: 600;
-  padding: 0.2rem 0.5rem;
-  border-radius: 9999px;
-  background-color: var(--bg-subtle);
-}
-
-.national-median-delta.text-cheaper {
-  background-color: var(--cheaper-bg);
-}
-
-.national-median-delta.text-higher {
-  background-color: var(--higher-bg);
+@media (min-width: 768px) {
+  .national-median-price {
+    font-size: 3.5rem;
+  }
 }
 
 .national-median-fuel {
   font-size: 0.875rem;
-  color: var(--text-secondary);
+  color: var(--color-text-secondary);
   margin-top: 0.5rem;
 }
 
@@ -1031,7 +1030,14 @@ a {
   gap: 1.5rem;
   margin-top: 1.5rem;
   padding-top: 1.5rem;
-  border-top: 1px solid var(--border-color);
+  border-top: 1px solid var(--color-border);
+}
+
+@media (max-width: 640px) {
+  .supporting-metrics-grid {
+    grid-template-columns: 1fr;
+    gap: 1.25rem;
+  }
 }
 
 .supporting-metric-item {
@@ -1040,35 +1046,39 @@ a {
 }
 
 .supporting-metric-label {
-  font-size: 0.8125rem;
-  font-weight: 600;
-  color: var(--text-muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--color-text-muted);
   margin-bottom: 0.25rem;
 }
 
 .supporting-metric-value {
   font-size: 1.5rem;
   font-weight: 700;
-  color: var(--text-primary);
+  color: var(--color-text-primary);
   line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
 }
 
 .supporting-metric-subtext {
   font-size: 0.8125rem;
-  color: var(--text-muted);
+  color: var(--color-text-muted);
   margin-top: 0.25rem;
 }
 
 .supporting-metric-link {
-  color: var(--text-secondary);
+  color: var(--color-accent);
   font-weight: 500;
   text-decoration: none;
   transition: color 0.15s ease;
 }
 
 .supporting-metric-link:hover {
-  color: var(--accent);
   text-decoration: underline;
+  color: var(--color-accent-hover);
 }
 
 /* Sections */
@@ -1078,8 +1088,8 @@ a {
 
 /* Trend Section */
 .trend-section {
-  background-color: var(--bg-surface);
-  border: 1px solid var(--border-color);
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   padding: 1.5rem;
   box-shadow: var(--shadow-sm);
@@ -1102,9 +1112,12 @@ a {
 }
 
 .trend-stat-price {
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: var(--text-primary);
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: var(--color-text-primary);
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
 }
 
 .trend-stat-change {
@@ -1134,38 +1147,40 @@ a {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--text-muted);
+  color: var(--color-text-muted);
   font-size: 0.875rem;
 }
 
 .chart-tooltip {
   background-color: #ffffff;
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   padding: 0.75rem 1rem;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  box-shadow: var(--shadow-md);
   font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
 }
 
 .chart-tooltip-title {
   font-weight: 700;
-  color: var(--text-primary);
+  color: var(--color-text-primary);
   margin-bottom: 0.375rem;
 }
 
 .chart-tooltip-median {
-  color: var(--accent);
+  color: var(--color-accent);
   font-weight: 600;
 }
 
 .chart-tooltip-range {
-  color: var(--text-secondary);
+  color: var(--color-text-secondary);
   font-size: 0.75rem;
   margin-top: 0.2rem;
 }
 
 .chart-tooltip-count {
-  color: var(--text-muted);
+  color: var(--color-text-muted);
   font-size: 0.75rem;
   margin-top: 0.2rem;
 }
@@ -1182,8 +1197,8 @@ a {
 }
 
 .mover-column {
-  background-color: var(--bg-surface);
-  border: 1px solid var(--border-color);
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   padding: 1.25rem;
   box-shadow: var(--shadow-sm);
@@ -1193,7 +1208,7 @@ a {
 .mover-column-header {
   margin-bottom: 0.875rem;
   padding-bottom: 0.5rem;
-  border-bottom: 1px solid var(--border-color);
+  border-bottom: 1px solid var(--color-border);
 }
 
 .mover-column-title {
@@ -1217,7 +1232,7 @@ a {
   justify-content: space-between;
   padding: 0.5rem 0.625rem;
   border-radius: var(--radius-sm);
-  background-color: var(--bg-subtle);
+  background-color: var(--color-surface-subtle);
   transition: background-color 0.15s ease;
 }
 
@@ -1233,21 +1248,22 @@ a {
 .mover-station-link {
   font-weight: 600;
   font-size: 0.875rem;
-  color: var(--text-primary);
+  color: var(--color-text-primary);
   display: block;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  text-decoration: none;
 }
 
 .mover-station-link:hover {
-  color: var(--accent);
+  color: var(--color-accent);
   text-decoration: underline;
 }
 
 .mover-station-name {
   font-size: 0.75rem;
-  color: var(--text-muted);
+  color: var(--color-text-muted);
   display: block;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1265,7 +1281,9 @@ a {
 .mover-current-price {
   font-size: 0.9375rem;
   font-weight: 700;
-  color: var(--text-primary);
+  color: var(--color-text-primary);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
 }
 
 .mover-delta-badge {
@@ -1279,7 +1297,7 @@ a {
 .mover-empty-notice {
   padding: 1.5rem 1rem;
   text-align: center;
-  color: var(--text-muted);
+  color: var(--color-text-muted);
   font-size: 0.875rem;
 }
 
@@ -1296,8 +1314,8 @@ a {
 }
 
 .state-preview-column {
-  background-color: var(--bg-surface);
-  border: 1px solid var(--border-color);
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   padding: 1.25rem;
   box-shadow: var(--shadow-sm);
@@ -1310,7 +1328,7 @@ a {
   justify-content: space-between;
   margin-bottom: 0.75rem;
   padding-bottom: 0.5rem;
-  border-bottom: 1px solid var(--border-color);
+  border-bottom: 1px solid var(--color-border);
 }
 
 .state-column-title {
@@ -1321,7 +1339,7 @@ a {
 .state-column-metric-label {
   font-size: 0.75rem;
   font-weight: 600;
-  color: var(--text-muted);
+  color: var(--color-text-muted);
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
@@ -1339,7 +1357,7 @@ a {
 }
 
 .state-preview-item:hover {
-  background-color: var(--bg-subtle);
+  background-color: var(--color-surface-subtle);
 }
 
 .state-item-link {
@@ -1348,29 +1366,34 @@ a {
   justify-content: space-between;
   padding: 0.5rem 0.625rem;
   text-decoration: none;
+  color: var(--color-text-primary);
+}
+
+.state-item-link:hover .state-item-name {
+  color: var(--color-accent);
 }
 
 .state-item-name {
   font-size: 0.875rem;
   font-weight: 600;
-  color: var(--text-primary);
 }
 
 .state-item-abbr {
-  font-weight: 500;
-  color: var(--text-muted);
-  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  font-weight: 400;
 }
 
 .state-item-price {
   font-size: 0.9375rem;
   font-weight: 700;
-  color: var(--text-primary);
+  color: var(--color-text-primary);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
 }
 
 .state-preview-footer {
-  display: flex;
-  justify-content: flex-start;
+  text-align: center;
+  margin-top: 1rem;
 }
 
 /* General Cards & Grid (Preserved for existing routes) */

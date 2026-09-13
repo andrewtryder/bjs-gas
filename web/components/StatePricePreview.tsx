@@ -2,6 +2,8 @@ import Link from "next/link";
 import type { StateSummaryItem } from "../lib/analytics";
 import { formatPrice } from "../lib/stats";
 import { getStateName, toStateSlug } from "../lib/states";
+import { normalizeFuelDisplayName } from "../lib/fuels";
+import { getTopHighestStates, getTopLowestStates } from "../lib/analytics-view";
 import SectionHeader from "./ui/SectionHeader";
 
 interface StatePricePreviewProps {
@@ -17,24 +19,15 @@ export default function StatePricePreview({
     return null;
   }
 
-  // Sort states by median price ascending
-  const sortedByPrice = [...states].sort(
-    (a, b) => Number.parseFloat(a.medianPrice) - Number.parseFloat(b.medianPrice)
-  );
-
-  const lowestStates = sortedByPrice.slice(0, 5);
-  // Highest states in descending order, excluding any that appear in lowest if count permits
-  const highestCandidates = [...sortedByPrice].reverse();
-  const lowestStateCodes = new Set(lowestStates.map((s) => s.state));
-  const highestStates = highestCandidates
-    .filter((s) => states.length <= 5 || !lowestStateCodes.has(s.state))
-    .slice(0, 5);
+  const normalizedFuel = normalizeFuelDisplayName(fuelName);
+  const lowestStates = getTopLowestStates(states, 5);
+  const highestStates = getTopHighestStates(states, 5);
 
   return (
-    <section className="state-preview-section">
+    <section className="state-preview-section" aria-label="Prices by state summary">
       <SectionHeader
         title="Prices by state"
-        subtitle={`Current ${fuelName.toLowerCase()} fuel medians across ${states.length} states`}
+        subtitle={`Current ${normalizedFuel.toLowerCase()} fuel medians across ${states.length} states`}
         action={
           <Link href="/states" className="text-link-subtle">
             View all states <span aria-hidden="true">&rarr;</span>
@@ -46,9 +39,9 @@ export default function StatePricePreview({
         {/* Lowest 5 */}
         <div className="state-preview-column">
           <div className="state-column-header">
-            <span className="state-column-title" style={{ color: "var(--cheaper)" }}>
-              Lowest
-            </span>
+            <h3 className="state-column-title text-cheaper">
+              Lowest-priced states
+            </h3>
             <span className="state-column-metric-label">Median</span>
           </div>
           <ul className="state-preview-list" aria-label="States with lowest gas prices">
@@ -75,9 +68,9 @@ export default function StatePricePreview({
         {/* Highest 5 */}
         <div className="state-preview-column">
           <div className="state-column-header">
-            <span className="state-column-title" style={{ color: "var(--higher)" }}>
-              Highest
-            </span>
+            <h3 className="state-column-title text-higher">
+              Highest-priced states
+            </h3>
             <span className="state-column-metric-label">Median</span>
           </div>
           <ul className="state-preview-list" aria-label="States with highest gas prices">
