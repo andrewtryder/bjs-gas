@@ -95,7 +95,7 @@ export default async function StateDetailPage({ params }: StatePageProps) {
         ]}
       />
 
-      {/* State Hero Card */}
+      {/* State Hero Panel */}
       <div className="state-hero-card">
         <div className="state-hero-header">
           <div>
@@ -103,7 +103,7 @@ export default async function StateDetailPage({ params }: StatePageProps) {
               {stateName} gas prices
             </h1>
             <p className="state-hero-subtitle">
-              Current BJ&apos;s gas prices across {stateStations.length} {stateName} locations.
+              Current BJ&apos;s gas prices across {stateStations.length} {stateName} locations. Updated hourly.
             </p>
           </div>
 
@@ -155,7 +155,7 @@ export default async function StateDetailPage({ params }: StatePageProps) {
           <div className="state-kpi-grid">
             <div className="state-kpi-item">
               <span className="state-kpi-label">Lowest</span>
-              <span className="state-kpi-value text-cheaper tabular-nums">
+              <span className="state-kpi-value tabular-nums">
                 {lowestStation ? formatPrice(lowestStation.price) : "—"}
               </span>
               <span className="state-kpi-subtext">

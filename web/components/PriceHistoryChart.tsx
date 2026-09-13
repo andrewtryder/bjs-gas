@@ -135,10 +135,10 @@ export default function PriceHistoryChart({
     let isUnfavorable = false;
 
     if (cents > 0) {
-      changeText = `↑ ${cents}¢ in ${selectedDays} days`;
+      changeText = `↑ ${cents}¢ over ${selectedDays} days`;
       isUnfavorable = true;
     } else if (cents < 0) {
-      changeText = `↓ ${Math.abs(cents)}¢ in ${selectedDays} days`;
+      changeText = `↓ ${Math.abs(cents)}¢ over ${selectedDays} days`;
       isFavorable = true;
     }
 
@@ -152,11 +152,11 @@ export default function PriceHistoryChart({
 
   if (history.length === 0 || chartData.length < 2) {
     return (
-      <div className="card empty-state" style={{ padding: "2rem", textAlign: "center" }}>
-        <p style={{ fontWeight: 600, color: "var(--text-primary)", marginBottom: "0.25rem" }}>
+      <div className="chart-empty-state">
+        <p className="chart-empty-title">
           Not enough history yet
         </p>
-        <p style={{ color: "var(--text-muted)", fontSize: "0.875rem", margin: 0 }}>
+        <p className="chart-empty-subtitle">
           Price history will appear as more observations are collected.
         </p>
       </div>

@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: "Gas prices by state — Compare BJ's Gas Rates",
   description:
-    "Compare current BJ's Wholesale Club gas prices across all operating states. Find lowest state fuel medians, price ranges, and local station directories.",
+    "Compare current BJ's Wholesale Club gas prices across all operating states. Find lowest state fuel medians, price ranges, and local station directories. Updated hourly.",
   alternates: {
     canonical: `${getWebBaseUrl()}/states`,
   },
@@ -40,45 +40,39 @@ export default async function StatesIndexPage() {
     sortedByPrice.length > 0 ? sortedByPrice[sortedByPrice.length - 1] : null;
 
   return (
-    <div className="space-y-6" style={{ maxWidth: "1200px", margin: "0 auto" }}>
+    <div className="state-index-page">
       <Breadcrumbs items={[{ label: "Home", href: "/" }, { label: "States" }]} />
 
       {/* Page Header */}
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight text-slate-900">
+      <div className="page-header">
+        <h1 className="page-title">
           Gas prices by state
         </h1>
-        <p className="mt-1 text-slate-600">
-          Compare current BJ&apos;s Regular prices across states.
+        <p className="page-subtitle">
+          Compare current BJ&apos;s Regular prices across states. Updated hourly.
         </p>
       </div>
 
       {fetchError && (
-        <div
-          className="card"
-          style={{
-            borderColor: "var(--expensive)",
-            backgroundColor: "var(--expensive-bg)",
-          }}
-        >
-          <p style={{ color: "var(--expensive)", margin: 0 }}>{fetchError}</p>
+        <div className="state-fetch-error-card">
+          <p>{fetchError}</p>
         </div>
       )}
 
       {/* State Price Summary Highlights */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="state-summary-grid">
         {cheapestState && (
-          <div className="card" style={{ padding: "1.25rem" }}>
-            <div style={{ fontSize: "0.8125rem", color: "var(--text-secondary)", marginBottom: "0.25rem" }}>
+          <div className="state-summary-card">
+            <div className="state-summary-label">
               Cheapest State Median
             </div>
-            <div style={{ fontSize: "1.75rem", fontWeight: 800, color: "var(--cheaper)" }}>
+            <div className="state-summary-price text-cheaper tabular-nums">
               {formatPrice(cheapestState.medianPrice)}
             </div>
-            <div style={{ fontSize: "0.8125rem", color: "var(--text-secondary)", marginTop: "0.25rem" }}>
+            <div className="state-summary-meta">
               <Link
                 href={`/states/${toStateSlug(cheapestState.state)}`}
-                className="hover:underline font-semibold text-slate-900"
+                className="state-summary-link"
               >
                 {getStateName(cheapestState.state)}
               </Link>{" "}
@@ -88,17 +82,17 @@ export default async function StatesIndexPage() {
         )}
 
         {highestState && (
-          <div className="card" style={{ padding: "1.25rem" }}>
-            <div style={{ fontSize: "0.8125rem", color: "var(--text-secondary)", marginBottom: "0.25rem" }}>
+          <div className="state-summary-card">
+            <div className="state-summary-label">
               Highest State Median
             </div>
-            <div style={{ fontSize: "1.75rem", fontWeight: 800, color: "var(--expensive)" }}>
+            <div className="state-summary-price text-higher tabular-nums">
               {formatPrice(highestState.medianPrice)}
             </div>
-            <div style={{ fontSize: "0.8125rem", color: "var(--text-secondary)", marginTop: "0.25rem" }}>
+            <div className="state-summary-meta">
               <Link
                 href={`/states/${toStateSlug(highestState.state)}`}
-                className="hover:underline font-semibold text-slate-900"
+                className="state-summary-link"
               >
                 {getStateName(highestState.state)}
               </Link>{" "}
@@ -107,20 +101,20 @@ export default async function StatesIndexPage() {
           </div>
         )}
 
-        <div className="card" style={{ padding: "1.25rem" }}>
-          <div style={{ fontSize: "0.8125rem", color: "var(--text-secondary)", marginBottom: "0.25rem" }}>
+        <div className="state-summary-card">
+          <div className="state-summary-label">
             States Tracked
           </div>
-          <div style={{ fontSize: "1.75rem", fontWeight: 800, color: "var(--text)" }}>
+          <div className="state-summary-price tabular-nums">
             {totalStates}
           </div>
-          <div style={{ fontSize: "0.8125rem", color: "var(--text-secondary)", marginTop: "0.25rem" }}>
+          <div className="state-summary-meta">
             Operating BJ&apos;s gas markets
           </div>
         </div>
       </div>
 
-      {/* Directory & Comparison Table / Cards */}
+      {/* Directory & Comparison Table / Mobile Rows */}
       <StateIndexDirectory states={rawStates} />
     </div>
   );

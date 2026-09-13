@@ -13,6 +13,7 @@ const nextConfig = {
       "./stats.js": "./lib/stats.ts",
       "./types.js": "./lib/types.ts",
       "./freshness.js": "./lib/freshness.ts",
+      "./states.js": "./lib/states.ts",
     },
   },
   webpack: (config) => {

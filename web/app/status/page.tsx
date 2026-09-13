@@ -1,13 +1,13 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import Breadcrumbs from "../../components/Breadcrumbs";
 import { getSystemStatus } from "../../lib/api";
-import { getFreshnessInfo, formatRelativeTime } from "../../lib/freshness";
+import { getFreshnessInfo } from "../../lib/freshness";
+import { resolveStatusHero, formatCollectionDuration } from "../../lib/status-view";
 
 export const metadata: Metadata = {
   title: "Data status — BJ's Gas Prices",
   description:
-    "Check live data freshness and update status for BJ's Wholesale Club gas prices.",
+    "Check current data freshness and update status for BJ's Wholesale Club gas prices. Updated hourly.",
 };
 
 export const revalidate = 60; // Refresh every 60s
@@ -22,200 +22,158 @@ export default async function StatusPage() {
     fetchError = err instanceof Error ? err.message : "Failed to fetch status";
   }
 
-  const isHealthy = status?.healthy === true;
   const lastRun = status?.lastCollection;
   const freshness = status?.freshness;
   const freshnessInfo = freshness?.latestObservedAt
     ? getFreshnessInfo(freshness.latestObservedAt)
     : null;
 
-  const isDegraded = !fetchError && !isHealthy;
-  const isStale = fetchError !== null || freshnessInfo?.level === "stale";
-
-  // Standardized plain health wording
-  const statusHeading = fetchError
-    ? "Price updates are delayed"
-    : isHealthy
-    ? "Prices are up to date"
-    : "Some prices may be delayed";
-
-  const statusDescription = fetchError
-    ? "Unable to reach data status service. Station pages continue serving recently cached prices."
-    : isHealthy
-    ? `Latest price check completed ${
-        freshness?.latestObservedAt ? formatRelativeTime(freshness.latestObservedAt) : "recently"
-      }.`
-    : status?.unhealthyReasons?.join(", ") ||
-      "Some station prices have not updated on schedule.";
+  const hero = resolveStatusHero(
+    status,
+    fetchError,
+    freshness?.latestObservedAt
+  );
 
   return (
-    <div className="space-y-6" style={{ maxWidth: "1000px", margin: "0 auto" }}>
+    <div className="status-page-container">
       <Breadcrumbs items={[{ label: "Home", href: "/" }, { label: "Data status" }]} />
 
       {/* Page Title */}
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight text-slate-900">Data status</h1>
-        <p className="mt-1 text-slate-600">
+      <div className="page-header">
+        <h1 className="page-title">Data status</h1>
+        <p className="page-subtitle">
           Current tracking status and price update freshness across BJ&apos;s gas stations.
         </p>
       </div>
 
-      {/* Primary Status Banner */}
-      <div
-        className={`rounded-2xl border p-6 shadow-sm transition-all ${
-          isHealthy && !fetchError
-            ? "border-emerald-200 bg-emerald-50/60"
-            : isDegraded
-            ? "border-amber-200 bg-amber-50/60"
-            : "border-rose-200 bg-rose-50/60"
-        }`}
-      >
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center space-x-3">
-            <span className="relative flex h-4 w-4">
-              <span
-                className={`absolute inline-flex h-full w-full animate-ping rounded-full opacity-75 ${
-                  isHealthy && !fetchError
-                    ? "bg-emerald-400"
-                    : isDegraded
-                    ? "bg-amber-400"
-                    : "bg-rose-400"
-                }`}
-              />
-              <span
-                className={`relative inline-flex h-4 w-4 rounded-full ${
-                  isHealthy && !fetchError
-                    ? "bg-emerald-500"
-                    : isDegraded
-                    ? "bg-amber-500"
-                    : "bg-rose-500"
-                }`}
-              />
-            </span>
+      {/* Primary Status Hero Panel */}
+      <div className={`status-hero-banner status-${hero.level}`}>
+        <div className="status-hero-main">
+          <div className="status-hero-indicator-group">
+            <span className={`status-dot status-dot-${hero.level}`} aria-hidden="true" />
             <div>
-              <h2 className="text-xl font-semibold text-slate-900">{statusHeading}</h2>
-              <p className="text-sm text-slate-600 mt-0.5">{statusDescription}</p>
+              <h2 className="status-hero-heading">{hero.heading}</h2>
+              <p className="status-hero-desc">{hero.description}</p>
             </div>
           </div>
-          <span className="text-xs font-mono text-slate-500 self-start sm:self-auto">
+          <span className="status-hero-timestamp tabular-nums">
             Checked: {new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
           </span>
         </div>
       </div>
 
       {/* Supporting Key Metrics */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="status-metrics-grid">
         {/* Metric 1: Reporting Locations */}
-        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+        <div className="status-metric-card">
+          <div className="status-metric-label">
             Reporting locations
           </div>
-          <div className="mt-2 flex items-baseline justify-between">
-            <span className="text-2xl font-bold text-slate-900 tabular-nums">
+          <div className="status-metric-val-row">
+            <span className="status-metric-value tabular-nums">
               {freshness?.stationsObservedRecently ?? 0}
             </span>
-            <span className="text-xs font-medium text-slate-500">
+            <span className="status-metric-subtext">
               of {status?.configuredGasClubs ?? 0} stations
             </span>
           </div>
-          <p className="mt-2 text-xs text-slate-500">
+          <p className="status-metric-desc">
             Active BJ&apos;s stations reporting fuel prices.
           </p>
         </div>
 
         {/* Metric 2: Current Prices Tracked */}
-        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+        <div className="status-metric-card">
+          <div className="status-metric-label">
             Current prices
           </div>
-          <div className="mt-2 flex items-baseline justify-between">
-            <span className="text-2xl font-bold text-slate-900 tabular-nums">
+          <div className="status-metric-val-row">
+            <span className="status-metric-value tabular-nums">
               {freshness?.currentPriceRows ?? 0}
             </span>
-            <span className="text-xs font-medium text-slate-500">
+            <span className="status-metric-subtext">
               {lastRun?.historyChanges ? `+${lastRun.historyChanges} updated` : "steady"}
             </span>
           </div>
-          <p className="mt-2 text-xs text-slate-500">
+          <p className="status-metric-desc">
             Active fuel price observations across all grades.
           </p>
         </div>
 
-        {/* Metric 3: Last Update */}
-        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-            Last update
+        {/* Metric 3: Collection Duration */}
+        <div className="status-metric-card">
+          <div className="status-metric-label">
+            Collection duration
           </div>
-          <div className="mt-2 flex items-baseline justify-between">
-            <span className="text-lg font-bold text-slate-900">
-              {freshness?.latestObservedAt ? formatRelativeTime(freshness.latestObservedAt) : "Recently"}
+          <div className="status-metric-val-row">
+            <span className="status-metric-value tabular-nums">
+              {formatCollectionDuration(lastRun?.durationMs)}
             </span>
-            {lastRun && (
-              <span className="text-xs text-slate-500">
-                in {(lastRun.durationMs / 1000).toFixed(1)}s
-              </span>
-            )}
+            <span className="status-metric-subtext">
+              hourly cadence
+            </span>
           </div>
-          <p className="mt-2 text-xs text-slate-500">
-            Hourly automated refresh cadence.
+          <p className="status-metric-desc">
+            Automated hourly refresh duration.
           </p>
         </div>
       </div>
 
       {/* Technical Collection Details in Collapsible Disclosure */}
       {lastRun && (
-        <details className="price-changes-disclosure rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-          <summary className="price-changes-summary px-6 py-4 bg-slate-50 font-semibold text-sm text-slate-900 cursor-pointer">
-            Collection details
+        <details className="price-changes-disclosure status-details-card">
+          <summary className="price-changes-summary">
+            <span>Collection details</span>
+            <span className="disclosure-chevron" aria-hidden="true">&#9662;</span>
           </summary>
-          <div className="p-6 border-t border-slate-100">
-            <dl className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-4">
-              <div>
-                <dt className="text-xs font-medium text-slate-500">Configured stations</dt>
-                <dd className="mt-1 text-base font-semibold text-slate-900 tabular-nums">
+          <div className="disclosure-content">
+            <dl className="status-details-grid">
+              <div className="status-detail-item">
+                <dt className="status-detail-dt">Configured stations</dt>
+                <dd className="status-detail-dd tabular-nums">
                   {lastRun.clubsConfigured}
                 </dd>
               </div>
-              <div>
-                <dt className="text-xs font-medium text-slate-500">Successfully collected</dt>
-                <dd className="mt-1 text-base font-semibold text-emerald-600 tabular-nums">
+              <div className="status-detail-item">
+                <dt className="status-detail-dt">Successfully collected</dt>
+                <dd className="status-detail-dd text-cheaper tabular-nums">
                   {lastRun.clubsSucceeded}
                 </dd>
               </div>
-              <div>
-                <dt className="text-xs font-medium text-slate-500">Empty fuel feeds</dt>
-                <dd className="mt-1 text-base font-semibold text-slate-700 tabular-nums">
+              <div className="status-detail-item">
+                <dt className="status-detail-dt">Empty fuel feeds</dt>
+                <dd className="status-detail-dd tabular-nums">
                   {lastRun.clubsEmptyFuels}
                 </dd>
               </div>
-              <div>
-                <dt className="text-xs font-medium text-slate-500">Hard failures</dt>
-                <dd className="mt-1 text-base font-semibold text-rose-600 tabular-nums">
+              <div className="status-detail-item">
+                <dt className="status-detail-dt">Hard failures</dt>
+                <dd className="status-detail-dd text-higher tabular-nums">
                   {lastRun.clubsHardFailed}
                 </dd>
               </div>
-              <div>
-                <dt className="text-xs font-medium text-slate-500">Fuel observations</dt>
-                <dd className="mt-1 text-base font-semibold text-slate-900 tabular-nums">
+              <div className="status-detail-item">
+                <dt className="status-detail-dt">Fuel observations</dt>
+                <dd className="status-detail-dd tabular-nums">
                   {lastRun.fuelObservations}
                 </dd>
               </div>
-              <div>
-                <dt className="text-xs font-medium text-slate-500">Price changes detected</dt>
-                <dd className="mt-1 text-base font-semibold text-slate-900 tabular-nums">
+              <div className="status-detail-item">
+                <dt className="status-detail-dt">Price changes detected</dt>
+                <dd className="status-detail-dd tabular-nums">
                   {lastRun.historyChanges}
                 </dd>
               </div>
-              <div>
-                <dt className="text-xs font-medium text-slate-500">Database operations</dt>
-                <dd className="mt-1 text-base font-semibold text-slate-900 tabular-nums">
+              <div className="status-detail-item">
+                <dt className="status-detail-dt">Database operations</dt>
+                <dd className="status-detail-dd tabular-nums">
                   {lastRun.databaseQueries}
                 </dd>
               </div>
-              <div>
-                <dt className="text-xs font-medium text-slate-500">Run duration</dt>
-                <dd className="mt-1 text-base font-semibold text-slate-900 tabular-nums">
-                  {(lastRun.durationMs / 1000).toFixed(2)}s
+              <div className="status-detail-item">
+                <dt className="status-detail-dt">Run duration</dt>
+                <dd className="status-detail-dd tabular-nums">
+                  {formatCollectionDuration(lastRun.durationMs)}
                 </dd>
               </div>
             </dl>
@@ -224,28 +182,28 @@ export default async function StatusPage() {
       )}
 
       {/* Freshness Standards Information */}
-      <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-        <h2 className="text-base font-semibold text-slate-900">How price updates work</h2>
-        <p className="mt-2 text-sm text-slate-600 leading-relaxed">
+      <section className="status-info-card">
+        <h2 className="status-info-heading">How price updates work</h2>
+        <p className="status-info-body">
           Prices are checked automatically each hour across all BJ&apos;s Wholesale Club gas locations.
-          Observations are securely saved to track historical trends, calculate state medians, and compare
+          Observations are recorded to track historical trends, calculate state medians, and compare
           local station pricing.
         </p>
-        <div className="mt-4 flex flex-wrap items-center gap-4 text-xs text-slate-500 border-t border-slate-100 pt-4">
-          <span className="flex items-center gap-1.5">
-            <span className="h-2 w-2 rounded-full bg-emerald-500" />
+        <div className="status-info-footer">
+          <span className="status-legend-item">
+            <span className="status-legend-dot healthy" aria-hidden="true" />
             Updated recently: &le; 2 hours
           </span>
-          <span className="flex items-center gap-1.5">
-            <span className="h-2 w-2 rounded-full bg-amber-500" />
+          <span className="status-legend-item">
+            <span className="status-legend-dot aging" aria-hidden="true" />
             Aging: 2–6 hours
           </span>
-          <span className="flex items-center gap-1.5">
-            <span className="h-2 w-2 rounded-full bg-rose-500" />
+          <span className="status-legend-item">
+            <span className="status-legend-dot stale" aria-hidden="true" />
             Stale: &gt; 6 hours
           </span>
-          <span className="ml-auto">
-            Check frequency: Hourly
+          <span className="status-legend-frequency">
+            Cadence: Hourly
           </span>
         </div>
       </section>

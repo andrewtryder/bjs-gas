@@ -32,14 +32,14 @@ export default function NearbyStations({ nearby, targetStationName }: NearbyStat
     <section className="nearby-section" aria-labelledby="nearby-stations-heading">
       <div className="nearby-section-header">
         <h2 id="nearby-stations-heading" className="section-title">
-          Nearby BJ&apos;s Gas Stations
+          Nearby BJ&apos;s gas stations
         </h2>
         <p className="section-subtitle">
           Closest reporting fuel locations compared to {targetStationName}.
         </p>
       </div>
 
-      <div className="nearby-stations-grid">
+      <div className="nearby-stations-ledger">
         {nearby.map((station) => {
           const delta = formatNearbyPriceDelta(
             station.priceDeltaVsTarget || station.priceDeltaFormatted,
@@ -54,69 +54,62 @@ export default function NearbyStations({ nearby, targetStationName }: NearbyStat
           );
 
           return (
-            <div
-              key={station.clubNumber}
-              className={`nearby-station-card ${delta.isCheaper ? "cheaper-station" : ""}`}
-            >
-              <div className="nearby-card-top">
-                <div className="nearby-card-title-group">
-                  <Link
-                    href={`/stations/${station.clubNumber}`}
-                    className="nearby-station-name hover:underline"
-                  >
-                    <span>{station.city}, {station.state}</span>
-                    {isCollision && (
-                      <span className="station-location-qualifier"> · #{station.clubNumber}</span>
-                    )}
-                  </Link>
-                  <p className="nearby-station-address">
-                    {station.address1 || station.address} &middot; Club #{station.clubNumber}
-                  </p>
-                </div>
-                <span className="nearby-distance-badge" title="Distance from current station">
-                  {station.distanceFormatted}
-                </span>
-              </div>
-
-              <div className="nearby-card-price-row">
-                <div>
-                  <div className="nearby-price-label">Regular</div>
-                  <div className="nearby-price-value tabular-nums">
-                    {regularPriceFormatted}
-                  </div>
-                </div>
-
-                {delta.text && (
-                  <span
-                    className={`badge ${
-                      delta.isCheaper
-                        ? "badge-cheaper"
-                        : delta.isHigher
-                        ? "badge-higher"
-                        : "badge-neutral"
-                    }`}
-                  >
-                    {delta.isCheaper && <span aria-hidden="true">&darr;</span>}
-                    {delta.isHigher && <span aria-hidden="true">&uarr;</span>}
-                    {delta.text}
-                  </span>
-                )}
-              </div>
-
-              <div className="nearby-card-actions">
+            <div key={station.clubNumber} className="nearby-station-row">
+              <div className="nearby-row-left">
                 <Link
                   href={`/stations/${station.clubNumber}`}
-                  className="nearby-action-link primary hover:underline"
+                  className="nearby-row-title"
                 >
-                  Details &rarr;
+                  <span>{station.city}, {station.state}</span>
+                  {isCollision && (
+                    <span className="station-location-qualifier"> · #{station.clubNumber}</span>
+                  )}
                 </Link>
-                <Link
-                  href={`/map?station=${station.clubNumber}`}
-                  className="nearby-action-link secondary hover:underline"
-                  aria-label={`View ${station.city} station on map`}
-                >
-                  Map &nearr;
-                </Link>
+                <div className="nearby-row-meta">
+                  <span className="nearby-distance">{station.distanceFormatted}</span>
+                  <span className="nearby-meta-dot" aria-hidden="true">&bull;</span>
+                  <span className="nearby-address">{station.address1 || station.address}</span>
+                </div>
+              </div>
+
+              <div className="nearby-row-right">
+                <div className="nearby-price-block">
+                  <span className="nearby-row-price tabular-nums">
+                    {regularPriceFormatted}
+                  </span>
+                  {delta.text && (
+                    <span
+                      className={`nearby-delta-tag ${
+                        delta.isCheaper
+                          ? "text-cheaper"
+                          : delta.isHigher
+                          ? "text-higher"
+                          : "text-muted"
+                      }`}
+                    >
+                      {delta.isCheaper && <span aria-hidden="true">&darr; </span>}
+                      {delta.isHigher && <span aria-hidden="true">&uarr; </span>}
+                      {delta.text}
+                    </span>
+                  )}
+                </div>
+
+                <div className="nearby-row-actions">
+                  <Link
+                    href={`/stations/${station.clubNumber}`}
+                    className="nearby-action-link"
+                    aria-label={`View ${station.city} details`}
+                  >
+                    Details &rarr;
+                  </Link>
+                  <Link
+                    href={`/map?station=${station.clubNumber}`}
+                    className="nearby-action-map"
+                    aria-label={`View ${station.city} on map`}
+                  >
+                    Map
+                  </Link>
+                </div>
               </div>
             </div>
           );

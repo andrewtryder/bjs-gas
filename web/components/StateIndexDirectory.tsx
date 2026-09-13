@@ -5,8 +5,11 @@ import Link from "next/link";
 import type { StateSummaryItem } from "../lib/analytics";
 import { formatPrice } from "../lib/stats";
 import { getStateName, toStateSlug } from "../lib/states";
-
-export type StateSortOption = "price-asc" | "price-desc" | "name-asc" | "stations-desc";
+import {
+  sortStates,
+  filterStates,
+  type StateSortOption,
+} from "../lib/states-view";
 
 interface StateIndexDirectoryProps {
   states: StateSummaryItem[];
@@ -17,43 +20,12 @@ export default function StateIndexDirectory({ states }: StateIndexDirectoryProps
   const [searchQuery, setSearchQuery] = useState("");
 
   const filteredAndSorted = useMemo(() => {
-    let list = [...states];
-
-    // Search filter by state name or state code
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase().trim();
-      list = list.filter((item) => {
-        const fullName = getStateName(item.state).toLowerCase();
-        const code = item.state.toLowerCase();
-        return fullName.includes(q) || code.includes(q);
-      });
-    }
-
-    // Sort
-    return list.sort((a, b) => {
-      const priceA = Number.parseFloat(a.medianPrice);
-      const priceB = Number.parseFloat(b.medianPrice);
-
-      switch (selectedSort) {
-        case "price-asc":
-          return priceA - priceB;
-        case "price-desc":
-          return priceB - priceA;
-        case "name-asc": {
-          const nameA = getStateName(a.state);
-          const nameB = getStateName(b.state);
-          return nameA.localeCompare(nameB);
-        }
-        case "stations-desc":
-          return b.stationCount - a.stationCount;
-        default:
-          return priceA - priceB;
-      }
-    });
+    const filtered = filterStates(states, searchQuery);
+    return sortStates(filtered, selectedSort);
   }, [states, selectedSort, searchQuery]);
 
   return (
-    <div className="directory-container">
+    <div className="directory-container" style={{ marginTop: "2rem" }}>
       {/* Filter & Sort Toolbar */}
       <div className="directory-toolbar">
         <div className="directory-toolbar-primary">
@@ -76,10 +48,10 @@ export default function StateIndexDirectory({ states }: StateIndexDirectoryProps
             <input
               type="search"
               className="directory-search-input"
-              placeholder="Filter by state name..."
+              placeholder="Filter by state name or code..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              aria-label="Filter by state name"
+              aria-label="Filter by state name or code"
             />
             {searchQuery && (
               <button
@@ -199,7 +171,7 @@ export default function StateIndexDirectory({ states }: StateIndexDirectoryProps
                       </td>
 
                       <td style={{ textAlign: "right" }}>
-                        <span className="text-secondary text-sm font-medium">
+                        <span className="text-secondary text-sm font-medium tabular-nums">
                           {item.stationCount}
                         </span>
                       </td>
@@ -230,43 +202,30 @@ export default function StateIndexDirectory({ states }: StateIndexDirectoryProps
             </table>
           </div>
 
-          {/* Mobile Cards (Visible < 640px) */}
-          <div className="directory-cards-wrapper" aria-label="BJ's Gas Prices by State">
+          {/* Mobile Clean Rows (Visible < 640px) */}
+          <div className="state-mobile-list" aria-label="BJ's Gas Prices by State">
             {filteredAndSorted.map((item) => {
               const stateName = getStateName(item.state);
               const slug = toStateSlug(item.state);
 
               return (
-                <div key={item.state} className="station-mobile-card">
-                  <div className="mobile-card-top">
-                    <div className="mobile-card-location">
-                      <Link href={`/states/${slug}`} className="mobile-card-title">
-                        {stateName}
-                      </Link>
-                      <div className="mobile-card-address">
-                        {item.state} &bull; {item.stationCount}{" "}
-                        {item.stationCount === 1 ? "location" : "locations"}
-                      </div>
-                    </div>
-
-                    <div className="mobile-card-price-block">
-                      <span className="mobile-card-price tabular-nums">
-                        {formatPrice(item.medianPrice)}
-                      </span>
-                      <span className="mobile-card-fuel-label">Median Regular</span>
-                    </div>
+                <div key={item.state} className="state-mobile-row">
+                  <div className="state-mobile-top">
+                    <Link href={`/states/${slug}`} className="state-mobile-title">
+                      {stateName}
+                    </Link>
+                    <span className="state-mobile-price tabular-nums">
+                      {formatPrice(item.medianPrice)}
+                    </span>
                   </div>
 
-                  <div className="mobile-card-middle">
-                    <div className="mobile-card-row">
-                      <span className="mobile-card-label">Price range</span>
-                      <span className="text-secondary text-sm font-medium tabular-nums">
-                        {formatPrice(item.minPrice)} – {formatPrice(item.maxPrice)}
-                      </span>
-                    </div>
+                  <div className="state-mobile-sub">
+                    <span>{item.stationCount} {item.stationCount === 1 ? "location" : "locations"}</span>
+                    <span className="state-mobile-dot">&bull;</span>
+                    <span className="tabular-nums">{formatPrice(item.minPrice)} – {formatPrice(item.maxPrice)}</span>
                   </div>
 
-                  <div className="mobile-card-bottom">
+                  <div className="state-mobile-actions">
                     <Link
                       href={`/map?state=${item.state}`}
                       className="station-map-action text-sm"

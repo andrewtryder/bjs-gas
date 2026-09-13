@@ -5,7 +5,7 @@ import { getStation, getStationHistory, getNearbyStations, getWebBaseUrl } from 
 import { getNationalSummary, getStateSummaries } from "../../../lib/analytics";
 import { formatDisplayDate, formatPrice, formatPriceComparison } from "../../../lib/stats";
 import { getFreshnessInfo } from "../../../lib/freshness";
-import { getPrimaryFuel } from "../../../lib/discovery";
+import { getPrimaryFuel, formatFuelDisplayName } from "../../../lib/discovery";
 import { getStateName, toStateSlug } from "../../../lib/states";
 import PriceHistoryChart from "../../../components/PriceHistoryChart";
 import Breadcrumbs from "../../../components/Breadcrumbs";
@@ -33,7 +33,7 @@ export async function generateMetadata({ params }: StationPageProps): Promise<Me
 
   return {
     title: `BJ's Gas in ${station.city}, ${station.state} — Current Fuel Prices & History`,
-    description: `Live fuel prices for BJ's Wholesale Club in ${station.city}, ${station.state}. Compare regular unleaded rates, station price trends, and nearby club prices.`,
+    description: `Current fuel prices for BJ's Wholesale Club in ${station.city}, ${station.state}. Compare regular unleaded rates, station price trends, and nearby club prices. Updated hourly.`,
     alternates: {
       canonical: `${getWebBaseUrl()}/stations/${station.clubNumber}`,
     },
@@ -147,19 +147,17 @@ export default async function StationDetailPage({ params }: StationPageProps) {
         ]}
       />
 
-      {/* Hero Card */}
+      {/* Hero Panel */}
       <div className="station-hero-card">
         <div className="station-hero-header">
           <div>
             <h1 className="station-hero-city">
               {station.city}, {station.state}
+              <span className="station-hero-club-qualifier"> &bull; #{station.clubNumber}</span>
             </h1>
             <p className="station-hero-address">
-              BJ&apos;s &bull; {station.address}
+              {station.address}
             </p>
-            <div className="station-hero-meta">
-              Club #{station.clubNumber}
-            </div>
           </div>
 
           <div className="station-hero-actions">
@@ -194,14 +192,14 @@ export default async function StationDetailPage({ params }: StationPageProps) {
           </div>
         </div>
 
-        {/* Primary Regular Price Hero */}
+        {/* Primary Fuel Price Hero */}
         <div className="station-price-hero">
           <div className="station-primary-price-group">
             <div className="station-primary-price tabular-nums">
               {isPrimaryValid ? formatPrice(primaryPriceNum) : "—"}
             </div>
             <div className="station-primary-fuel-label">
-              {primaryFuel ? primaryFuel.name : "Regular Unleaded"}
+              {formatFuelDisplayName(primaryFuel?.name || "Regular")}
             </div>
           </div>
 
@@ -219,8 +217,8 @@ export default async function StationDetailPage({ params }: StationPageProps) {
                         : "badge-neutral"
                     }`}
                   >
-                    {stateComparison.isCheaper && <span aria-hidden="true">&darr;</span>}
-                    {stateComparison.isHigher && <span aria-hidden="true">&uarr;</span>}
+                    {stateComparison.isCheaper && <span aria-hidden="true">&darr; </span>}
+                    {stateComparison.isHigher && <span aria-hidden="true">&uarr; </span>}
                     {stateComparison.text}
                   </span>
                 )}
@@ -234,8 +232,8 @@ export default async function StationDetailPage({ params }: StationPageProps) {
                         : "badge-neutral"
                     }`}
                   >
-                    {nationalComparison.isCheaper && <span aria-hidden="true">&darr;</span>}
-                    {nationalComparison.isHigher && <span aria-hidden="true">&uarr;</span>}
+                    {nationalComparison.isCheaper && <span aria-hidden="true">&darr; </span>}
+                    {nationalComparison.isHigher && <span aria-hidden="true">&uarr; </span>}
                     {nationalComparison.text}
                   </span>
                 )}
@@ -267,7 +265,9 @@ export default async function StationDetailPage({ params }: StationPageProps) {
                 const isAvailable = Number.isFinite(fuelPrice) && fuelPrice > 0;
                 return (
                   <div key={fuel.sku} className="secondary-fuel-pill">
-                    <span className="secondary-fuel-name">{fuel.name}</span>
+                    <span className="secondary-fuel-name">
+                      {formatFuelDisplayName(fuel.name)}
+                    </span>
                     <span className="secondary-fuel-price tabular-nums">
                       {isAvailable ? formatPrice(fuelPrice) : "—"}
                     </span>
@@ -284,7 +284,7 @@ export default async function StationDetailPage({ params }: StationPageProps) {
         <h2 className="section-title">Price history</h2>
         <PriceHistoryChart
           history={history}
-          defaultFuelName={primaryFuel?.name || "Unleaded"}
+          defaultFuelName={primaryFuel ? formatFuelDisplayName(primaryFuel.name) : "Regular"}
         />
       </section>
 
@@ -296,7 +296,7 @@ export default async function StationDetailPage({ params }: StationPageProps) {
         <section className="station-section" style={{ marginTop: "2rem" }}>
           <details className="price-changes-disclosure">
             <summary className="price-changes-summary">
-              <span>All price changes ({history.length})</span>
+              <span>View all price changes ({history.length})</span>
               <span className="disclosure-chevron" aria-hidden="true">&#9662;</span>
             </summary>
             <div className="disclosure-content">
@@ -312,11 +312,13 @@ export default async function StationDetailPage({ params }: StationPageProps) {
                   <tbody>
                     {history.map((item, index) => (
                       <tr key={`${item.fuelSku}-${item.observedAt}-${index}`}>
-                        <td style={{ fontWeight: 600 }}>{item.fuelName}</td>
+                        <td style={{ fontWeight: 600 }}>
+                          {formatFuelDisplayName(item.fuelName)}
+                        </td>
                         <td className="tabular-nums" style={{ fontWeight: 700 }}>
                           {formatPrice(item.price)}
                         </td>
-                        <td style={{ color: "var(--text-secondary)", fontSize: "0.875rem" }}>
+                        <td style={{ color: "var(--color-text-secondary)", fontSize: "0.875rem" }}>
                           {formatDisplayDate(item.observedAt)}
                         </td>
                       </tr>

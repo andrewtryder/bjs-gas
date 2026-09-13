@@ -150,7 +150,7 @@ export function formatNearbyPriceDelta(
     };
   } else {
     return {
-      text: `${cents}¢ more`,
+      text: `${cents}¢ higher`,
       isCheaper: false,
       isHigher: true,
       isSame: false,
