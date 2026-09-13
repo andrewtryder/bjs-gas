@@ -57,7 +57,7 @@ export default function NearbyStations({ nearby, targetStationName }: NearbyStat
 
               <div className="nearby-card-price-row">
                 <div>
-                  <div className="nearby-price-label">Regular Unleaded</div>
+                  <div className="nearby-price-label">Regular</div>
                   <div className="nearby-price-value tabular-nums">
                     {regularPriceFormatted}
                   </div>

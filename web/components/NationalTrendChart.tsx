@@ -92,8 +92,13 @@ export default function NationalTrendChart({
 
   if (!initialTrends || initialTrends.points.length === 0) {
     return (
-      <div className="empty-state">
-        <p>No historical trend data available yet.</p>
+      <div className="card empty-state" style={{ padding: "2rem", textAlign: "center" }}>
+        <p style={{ fontWeight: 600, color: "var(--text-primary)", marginBottom: "0.25rem" }}>
+          Not enough history yet
+        </p>
+        <p style={{ color: "var(--text-muted)", fontSize: "0.875rem", margin: 0 }}>
+          Price trends will appear as more observations are collected.
+        </p>
       </div>
     );
   }

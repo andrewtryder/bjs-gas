@@ -60,7 +60,7 @@ export default function RootLayout({
                 <Link
                   href="/status"
                   className="nav-link nav-status-link"
-                  title="Data collection & pipeline status"
+                  title="Data status"
                 >
                   <span className="status-dot status-dot-healthy" aria-hidden="true" />
                   <span>Data status</span>

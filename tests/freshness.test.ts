@@ -24,7 +24,7 @@ describe("Data Freshness Model", () => {
     const timestamp = new Date(now.getTime() - 180 * 60_000).toISOString();
     const info = getFreshnessInfo(timestamp, now);
     expect(info.level).toBe("aging");
-    expect(info.label).toBe("Data from earlier today");
+    expect(info.label).toBe("Aging");
     expect(info.relativeText).toBe("Updated 3h ago");
   });
 
@@ -33,6 +33,7 @@ describe("Data Freshness Model", () => {
     const timestamp = new Date(now.getTime() - 8 * 60 * 60_000).toISOString();
     const info = getFreshnessInfo(timestamp, now);
     expect(info.level).toBe("stale");
+    expect(info.label).toBe("Stale");
     expect(info.relativeText).toBe("Updated 8h ago");
   });
 
@@ -41,13 +42,13 @@ describe("Data Freshness Model", () => {
     const timestamp = new Date(now.getTime() - 48 * 60 * 60_000).toISOString();
     const info = getFreshnessInfo(timestamp, now);
     expect(info.level).toBe("stale");
-    expect(info.relativeText).toBe("Last observed 2d ago");
+    expect(info.relativeText).toBe("Updated 2d ago");
   });
 
   it("handles null/undefined gracefully", () => {
     const infoNull = getFreshnessInfo(null, now);
     expect(infoNull.level).toBe("stale");
-    expect(infoNull.relativeText).toBe("Observation time unknown");
+    expect(infoNull.relativeText).toBe("Update time unknown");
 
     const infoUndef = getFreshnessInfo(undefined, now);
     expect(infoUndef.level).toBe("stale");
@@ -57,6 +58,6 @@ describe("Data Freshness Model", () => {
     expect(formatRelativeTime(0)).toBe("Just updated");
     expect(formatRelativeTime(45)).toBe("Updated 45m ago");
     expect(formatRelativeTime(90)).toBe("Updated 1h ago");
-    expect(formatRelativeTime(1440)).toBe("Last observed 1d ago");
+    expect(formatRelativeTime(1440)).toBe("Updated 1d ago");
   });
 });

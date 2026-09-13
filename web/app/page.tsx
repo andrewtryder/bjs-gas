@@ -130,7 +130,7 @@ export default async function HomePage() {
               <Link
                 href="/status"
                 className={`hero-freshness-pill ${freshnessInfo.badgeClass}`}
-                title="Data collection and pipeline status"
+                title="Data status"
               >
                 <span className="status-dot-sm" aria-hidden="true" />
                 <span>Updated hourly &bull; {freshnessInfo.relativeText}</span>
