@@ -7,6 +7,7 @@ import StateStationList from "../../../components/StateStationList";
 import { getStations, getWebBaseUrl } from "../../../lib/api";
 import { getNationalTrends, getStateSummaries } from "../../../lib/analytics";
 import { getStateName, normalizeStateCode, toStateSlug } from "../../../lib/states";
+import { formatPrice } from "../../../lib/stats";
 import { getFreshnessInfo } from "../../../lib/freshness";
 
 export const dynamic = "force-dynamic";
@@ -21,8 +22,8 @@ export async function generateMetadata({ params }: StatePageProps): Promise<Meta
   const stateName = getStateName(stateCode);
 
   return {
-    title: `BJ's Gas Prices in ${stateName} (${stateCode}) — Current Rates & Locations`,
-    description: `Compare current regular fuel prices across BJ's Wholesale Club gas stations in ${stateName}. View live state medians, lowest prices, and local club station directories.`,
+    title: `${stateName} Gas Prices — Current BJ's Rates & Locations`,
+    description: `Current BJ's gas prices across ${stateName} locations. Compare state medians, lowest gas rates, and find local club stations. Updated hourly.`,
     alternates: {
       canonical: `${getWebBaseUrl()}/states/${toStateSlug(stateCode)}`,
     },
@@ -82,10 +83,10 @@ export default async function StateDetailPage({ params }: StatePageProps) {
     }
   }
 
-  const freshnessInfo = latestObservedAt ? getFreshnessInfo(latestObservedAt) : null;
+  const freshness = getFreshnessInfo(latestObservedAt);
 
   return (
-    <div className="state-detail-page" style={{ maxWidth: "1200px", margin: "0 auto" }}>
+    <div className="state-detail-page">
       <Breadcrumbs
         items={[
           { label: "Home", href: "/" },
@@ -94,153 +95,91 @@ export default async function StateDetailPage({ params }: StatePageProps) {
         ]}
       />
 
-      <div
-        className="page-intro"
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "flex-start",
-          flexWrap: "wrap",
-          gap: "1rem",
-          marginBottom: "1.5rem",
-        }}
-      >
-        <div>
-          <div
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: "0.5rem",
-              marginBottom: "0.25rem",
-            }}
-          >
-            <h1
-              className="page-title"
-              style={{ fontSize: "2rem", fontWeight: 800, margin: 0 }}
-            >
-              BJ&apos;s Gas Prices in {stateName}
+      {/* State Hero Card */}
+      <div className="state-hero-card">
+        <div className="state-hero-header">
+          <div>
+            <h1 className="state-hero-title">
+              {stateName} gas prices
             </h1>
-            <span
-              style={{
-                fontSize: "0.875rem",
-                fontWeight: 700,
-                color: "var(--primary)",
-                backgroundColor: "rgba(59, 130, 246, 0.1)",
-                border: "1px solid rgba(59, 130, 246, 0.25)",
-                padding: "0.2rem 0.5rem",
-                borderRadius: "9999px",
-              }}
-            >
-              {stateCode}
-            </span>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}>
-            <p
-              className="page-description"
-              style={{ color: "var(--text-secondary)", fontSize: "1rem", margin: 0 }}
-            >
-              Live fuel rates and club gas locations across {stateName}.
+            <p className="state-hero-subtitle">
+              Current BJ&apos;s gas prices across {stateStations.length} {stateName} locations.
             </p>
-            {freshnessInfo && (
-              <span
-                className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${freshnessInfo.badgeClass}`}
-                title={latestObservedAt ? `Last observed: ${new Date(latestObservedAt).toLocaleString()}` : undefined}
-              >
-                {freshnessInfo.relativeText} &bull; {freshnessInfo.label}
+          </div>
+
+          <Link
+            href={`/map?state=${stateCode}`}
+            className="btn btn-primary"
+          >
+            <span>🗺️</span> View {stateName} on map
+          </Link>
+        </div>
+
+        {/* State Median & Overview Grid */}
+        <div className="state-hero-metrics">
+          <div className="state-median-block">
+            <div className="state-median-price tabular-nums">
+              {stateSummary?.medianPrice ? `$${stateSummary.medianPrice}` : "—"}
+            </div>
+            <div className="state-median-label">State median (Regular)</div>
+            <div
+              className="state-median-freshness"
+              title={latestObservedAt ? `Exact time: ${new Date(latestObservedAt).toLocaleString()}` : undefined}
+            >
+              {freshness.relativeText}
+              {freshness.level === "aging" && (
+                <span className="directory-freshness-tag aging"> &bull; Aging</span>
+              )}
+              {freshness.level === "stale" && (
+                <span className="directory-freshness-tag stale"> &bull; Stale</span>
+              )}
+            </div>
+          </div>
+
+          <div className="state-kpi-grid">
+            <div className="state-kpi-item">
+              <span className="state-kpi-label">Lowest</span>
+              <span className="state-kpi-value text-cheaper tabular-nums">
+                {lowestStation ? formatPrice(lowestStation.price) : "—"}
               </span>
-            )}
-          </div>
-        </div>
+              <span className="state-kpi-subtext">
+                {lowestStation ? lowestStation.city : "None"}
+              </span>
+            </div>
 
-        <Link
-          href={`/map?state=${stateCode}`}
-          className="filter-btn active"
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: "0.5rem",
-            padding: "0.6rem 1.2rem",
-            fontSize: "0.875rem",
-            fontWeight: 600,
-            textDecoration: "none",
-          }}
-        >
-          <span>🗺️</span> View on Map
-        </Link>
-      </div>
+            <div className="state-kpi-item">
+              <span className="state-kpi-label">Highest</span>
+              <span className="state-kpi-value tabular-nums">
+                {highestStation ? formatPrice(highestStation.price) : "—"}
+              </span>
+              <span className="state-kpi-subtext">
+                {highestStation ? highestStation.city : "None"}
+              </span>
+            </div>
 
-      {/* Overview KPI Cards */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-          gap: "1rem",
-          marginBottom: "2rem",
-        }}
-      >
-        <div className="card" style={{ padding: "1.25rem" }}>
-          <div style={{ fontSize: "0.8125rem", color: "var(--text-secondary)", marginBottom: "0.25rem" }}>
-            State Median (Regular)
-          </div>
-          <div style={{ fontSize: "1.875rem", fontWeight: 800, color: "var(--text)" }}>
-            {stateSummary ? `$${stateSummary.medianPrice}` : "N/A"}
-          </div>
-          <div style={{ fontSize: "0.75rem", color: "var(--text-secondary)", marginTop: "0.25rem" }}>
-            Calculated across {stateStations.length} locations
-          </div>
-        </div>
-
-        {lowestStation && (
-          <div className="card" style={{ padding: "1.25rem" }}>
-            <div style={{ fontSize: "0.8125rem", color: "var(--text-secondary)", marginBottom: "0.25rem" }}>
-              Lowest in {stateCode}
+            <div className="state-kpi-item">
+              <span className="state-kpi-label">Locations</span>
+              <span className="state-kpi-value tabular-nums">
+                {stateStations.length}
+              </span>
+              <span className="state-kpi-subtext">Active stations</span>
             </div>
-            <div style={{ fontSize: "1.875rem", fontWeight: 800, color: "var(--cheaper)" }}>
-              ${lowestStation.price.toFixed(3)}
-            </div>
-            <div style={{ fontSize: "0.75rem", color: "var(--text-secondary)", marginTop: "0.25rem" }}>
-              {lowestStation.name} ({lowestStation.city})
-            </div>
-          </div>
-        )}
-
-        {highestStation && (
-          <div className="card" style={{ padding: "1.25rem" }}>
-            <div style={{ fontSize: "0.8125rem", color: "var(--text-secondary)", marginBottom: "0.25rem" }}>
-              Highest in {stateCode}
-            </div>
-            <div style={{ fontSize: "1.875rem", fontWeight: 800, color: "var(--expensive)" }}>
-              ${highestStation.price.toFixed(3)}
-            </div>
-            <div style={{ fontSize: "0.75rem", color: "var(--text-secondary)", marginTop: "0.25rem" }}>
-              {highestStation.name} ({highestStation.city})
-            </div>
-          </div>
-        )}
-
-        <div className="card" style={{ padding: "1.25rem" }}>
-          <div style={{ fontSize: "0.8125rem", color: "var(--text-secondary)", marginBottom: "0.25rem" }}>
-            Reporting Gas Stations
-          </div>
-          <div style={{ fontSize: "1.875rem", fontWeight: 800, color: "var(--text)" }}>
-            {stateStations.length}
-          </div>
-          <div style={{ fontSize: "0.75rem", color: "var(--text-secondary)", marginTop: "0.25rem" }}>
-            Active BJ&apos;s fuel stations
           </div>
         </div>
       </div>
 
       {/* State Trend Chart */}
       {stateTrends && stateTrends.points.length > 0 && (
-        <NationalTrendChart
-          initialTrends={stateTrends}
-          title={`${stateName} Unleaded Price Trend`}
-          subtitle={`Daily median and price bounds for BJ's Wholesale Club gas stations in ${stateName}`}
-        />
+        <section className="state-chart-section" style={{ marginTop: "2rem" }}>
+          <NationalTrendChart
+            initialTrends={stateTrends}
+            title={`${stateName} price trend`}
+            subtitle={`Daily median and price bounds for BJ's gas stations in ${stateName}`}
+          />
+        </section>
       )}
 
-      {/* Searchable Station List */}
+      {/* Searchable Station Directory */}
       <StateStationList stations={stateStations} stateCode={stateCode} />
     </div>
   );

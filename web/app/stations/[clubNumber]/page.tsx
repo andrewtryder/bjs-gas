@@ -3,8 +3,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getStation, getStationHistory, getNearbyStations, getWebBaseUrl } from "../../../lib/api";
 import { getNationalSummary, getStateSummaries } from "../../../lib/analytics";
-import { formatDate, formatPrice } from "../../../lib/stats";
-import { getFreshnessInfo, formatRelativeTime } from "../../../lib/freshness";
+import { formatDisplayDate, formatPrice, formatPriceComparison } from "../../../lib/stats";
+import { getFreshnessInfo } from "../../../lib/freshness";
+import { getPrimaryFuel } from "../../../lib/discovery";
 import { getStateName, toStateSlug } from "../../../lib/states";
 import PriceHistoryChart from "../../../components/PriceHistoryChart";
 import Breadcrumbs from "../../../components/Breadcrumbs";
@@ -31,8 +32,8 @@ export async function generateMetadata({ params }: StationPageProps): Promise<Me
   }
 
   return {
-    title: `BJ's Gas Price in ${station.city}, ${station.state} — Current & Historical Rates`,
-    description: `Live fuel prices for BJ's Wholesale Club #${station.clubNumber} in ${station.city}, ${station.state}. Compare regular unleaded rates, station price history, and nearby club prices.`,
+    title: `BJ's Gas in ${station.city}, ${station.state} — Current Fuel Prices & History`,
+    description: `Live fuel prices for BJ's Wholesale Club in ${station.city}, ${station.state}. Compare regular unleaded rates, station price trends, and nearby club prices.`,
     alternates: {
       canonical: `${getWebBaseUrl()}/stations/${station.clubNumber}`,
     },
@@ -69,41 +70,47 @@ export default async function StationDetailPage({ params }: StationPageProps) {
   const stateSummaries = stateSummariesRes.status === "fulfilled" ? stateSummariesRes.value : null;
   const nearby = nearbyData.status === "fulfilled" && nearbyData.value ? nearbyData.value.nearby : [];
 
-  // Regular fuel comparison
-  const regularFuel = station.fuels.find((f) => f.sku === "1");
-  const regularPrice = regularFuel ? Number.parseFloat(regularFuel.price) : null;
+  // Identify canonical primary fuel
+  const primaryFuel = getPrimaryFuel(station.fuels);
+  const primaryPriceNum = primaryFuel ? Number.parseFloat(primaryFuel.price) : null;
+  const isPrimaryValid = primaryPriceNum !== null && Number.isFinite(primaryPriceNum) && primaryPriceNum > 0;
 
-  let nationalDiffStr: string | null = null;
-  let nationalIsCheaper = false;
-  if (regularPrice !== null && nationalSummary?.medianPrice) {
-    const natMed = Number.parseFloat(nationalSummary.medianPrice);
-    if (Number.isFinite(natMed)) {
-      const diff = regularPrice - natMed;
-      nationalIsCheaper = diff <= 0;
-      nationalDiffStr = (diff >= 0 ? "+" : "") + diff.toFixed(3);
-    }
-  }
+  // Secondary fuels
+  const secondaryFuels = station.fuels.filter((f) => f.sku !== primaryFuel?.sku);
 
-  let stateDiffStr: string | null = null;
-  let stateIsCheaper = false;
-  const stateData = stateSummaries?.states.find((s) => s.state === station.state);
-  if (regularPrice !== null && stateData?.medianPrice) {
-    const stMed = Number.parseFloat(stateData.medianPrice);
-    if (Number.isFinite(stMed)) {
-      const diff = regularPrice - stMed;
-      stateIsCheaper = diff <= 0;
-      stateDiffStr = (diff >= 0 ? "+" : "") + diff.toFixed(3);
-    }
-  }
-
+  // Comparisons
   const stateName = getStateName(station.state);
   const stateSlug = toStateSlug(station.state);
+
+  let stateComparison = null;
+  const stateData = stateSummaries?.states.find((s) => s.state === station.state);
+  if (isPrimaryValid && stateData?.medianPrice) {
+    const stMed = Number.parseFloat(stateData.medianPrice);
+    if (Number.isFinite(stMed)) {
+      stateComparison = formatPriceComparison(primaryPriceNum!, stMed, `${stateName} median`);
+    }
+  }
+
+  let nationalComparison = null;
+  if (isPrimaryValid && nationalSummary?.medianPrice) {
+    const natMed = Number.parseFloat(nationalSummary.medianPrice);
+    if (Number.isFinite(natMed)) {
+      nationalComparison = formatPriceComparison(primaryPriceNum!, natMed, "national median");
+    }
+  }
+
+  // Freshness
+  const latestObservation = station.fuels.reduce((latest: string | null, f) => {
+    if (!latest) return f.observedAt;
+    return new Date(f.observedAt).getTime() > new Date(latest).getTime() ? f.observedAt : latest;
+  }, null);
+  const freshness = getFreshnessInfo(latestObservation);
 
   // Structured Data (JSON-LD)
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "GasStation",
-    name: `BJ's Gas - ${station.name}`,
+    name: `BJ's Gas - ${station.city}, ${station.state}`,
     address: {
       "@type": "PostalAddress",
       streetAddress: station.address,
@@ -124,7 +131,7 @@ export default async function StationDetailPage({ params }: StationPageProps) {
   };
 
   return (
-    <div style={{ maxWidth: "1200px", margin: "0 auto" }}>
+    <div className="station-page-wrapper">
       {/* JSON-LD for SEO */}
       <script
         type="application/ld+json"
@@ -136,155 +143,173 @@ export default async function StationDetailPage({ params }: StationPageProps) {
           { label: "Home", href: "/" },
           { label: "States", href: "/states" },
           { label: stateName, href: `/states/${stateSlug}` },
-          { label: station.name },
+          { label: `${station.city}, ${station.state}` },
         ]}
       />
 
-      <div className="station-header" style={{ marginBottom: "2rem" }}>
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "flex-start",
-            flexWrap: "wrap",
-            gap: "1rem",
-            marginBottom: "0.5rem",
-          }}
-        >
+      {/* Hero Card */}
+      <div className="station-hero-card">
+        <div className="station-hero-header">
           <div>
-            <h1 className="page-title" style={{ margin: "0 0 0.25rem" }}>
-              {station.name}
+            <h1 className="station-hero-city">
+              {station.city}, {station.state}
             </h1>
-            <p className="detail-address" style={{ margin: "0 0 0.25rem" }}>
-              {station.address} &bull; {station.city}, {station.state} {station.postalCode}
+            <p className="station-hero-address">
+              BJ&apos;s &bull; {station.address}
             </p>
-            <div style={{ fontSize: "0.875rem", color: "var(--text-muted)" }}>
-              Club #{station.clubNumber} &bull; {station.storeType || "Standard Club"}
+            <div className="station-hero-meta">
+              Club #{station.clubNumber}
             </div>
           </div>
 
-          <Link
-            href={`/map?station=${station.clubNumber}`}
-            className="filter-btn active"
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: "0.5rem",
-              padding: "0.5rem 1rem",
-              fontSize: "0.875rem",
-              fontWeight: 600,
-              textDecoration: "none",
-            }}
-          >
-            <span>🗺️</span> View on Map
-          </Link>
+          <div className="station-hero-actions">
+            <Link
+              href={`/map?station=${station.clubNumber}`}
+              className="btn btn-primary"
+            >
+              <span>🗺️</span> View on map
+            </Link>
+            <Link
+              href={`/states/${stateSlug}`}
+              className="btn btn-secondary"
+            >
+              Browse {stateName}
+            </Link>
+          </div>
         </div>
 
-        {/* Analytics Context Badges */}
-        {(nationalDiffStr || stateDiffStr) && (
-          <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", marginTop: "0.75rem" }}>
-            {nationalDiffStr && (
-              <span
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  fontSize: "0.75rem",
-                  fontWeight: 600,
-                  padding: "0.25rem 0.6rem",
-                  borderRadius: "var(--radius-sm)",
-                  backgroundColor: nationalIsCheaper ? "var(--cheapest-bg)" : "var(--expensive-bg)",
-                  color: nationalIsCheaper ? "var(--cheapest)" : "var(--expensive)",
-                  border: "1px solid var(--border-color)",
-                }}
-              >
-                {nationalDiffStr} vs National Median
-              </span>
+        {/* Primary Regular Price Hero */}
+        <div className="station-price-hero">
+          <div className="station-primary-price-group">
+            <div className="station-primary-price tabular-nums">
+              {isPrimaryValid ? formatPrice(primaryPriceNum) : "—"}
+            </div>
+            <div className="station-primary-fuel-label">
+              {primaryFuel ? primaryFuel.name : "Regular Unleaded"}
+            </div>
+          </div>
+
+          {/* Comparisons & Freshness */}
+          <div className="station-hero-insights">
+            {(stateComparison || nationalComparison) && (
+              <div className="station-comparisons-list">
+                {stateComparison && (
+                  <span
+                    className={`badge ${
+                      stateComparison.isCheaper
+                        ? "badge-cheaper"
+                        : stateComparison.isHigher
+                        ? "badge-higher"
+                        : "badge-neutral"
+                    }`}
+                  >
+                    {stateComparison.isCheaper && <span aria-hidden="true">&darr;</span>}
+                    {stateComparison.isHigher && <span aria-hidden="true">&uarr;</span>}
+                    {stateComparison.text}
+                  </span>
+                )}
+                {nationalComparison && (
+                  <span
+                    className={`badge ${
+                      nationalComparison.isCheaper
+                        ? "badge-cheaper"
+                        : nationalComparison.isHigher
+                        ? "badge-higher"
+                        : "badge-neutral"
+                    }`}
+                  >
+                    {nationalComparison.isCheaper && <span aria-hidden="true">&darr;</span>}
+                    {nationalComparison.isHigher && <span aria-hidden="true">&uarr;</span>}
+                    {nationalComparison.text}
+                  </span>
+                )}
+              </div>
             )}
-            {stateDiffStr && (
-              <span
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  fontSize: "0.75rem",
-                  fontWeight: 600,
-                  padding: "0.25rem 0.6rem",
-                  borderRadius: "var(--radius-sm)",
-                  backgroundColor: stateIsCheaper ? "var(--cheapest-bg)" : "var(--expensive-bg)",
-                  color: stateIsCheaper ? "var(--cheapest)" : "var(--expensive)",
-                  border: "1px solid var(--border-color)",
-                }}
-              >
-                {stateDiffStr} vs {station.state} Median
-              </span>
-            )}
+
+            <div
+              className="station-freshness-text"
+              title={latestObservation ? `Exact timestamp: ${new Date(latestObservation).toLocaleString()}` : undefined}
+            >
+              {freshness.relativeText}
+              {freshness.level === "aging" && (
+                <span className="directory-freshness-tag aging"> &bull; Aging</span>
+              )}
+              {freshness.level === "stale" && (
+                <span className="directory-freshness-tag stale"> &bull; Stale</span>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Secondary Fuels Grid */}
+        {secondaryFuels.length > 0 && (
+          <div className="station-secondary-fuels-section">
+            <div className="secondary-fuels-title">Other fuels</div>
+            <div className="secondary-fuels-grid">
+              {secondaryFuels.map((fuel) => {
+                const fuelPrice = Number.parseFloat(fuel.price);
+                const isAvailable = Number.isFinite(fuelPrice) && fuelPrice > 0;
+                return (
+                  <div key={fuel.sku} className="secondary-fuel-pill">
+                    <span className="secondary-fuel-name">{fuel.name}</span>
+                    <span className="secondary-fuel-price tabular-nums">
+                      {isAvailable ? formatPrice(fuelPrice) : "—"}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         )}
       </div>
 
-      <section style={{ marginBottom: "2.5rem" }}>
-        <h2 className="section-title">Current Fuel Prices</h2>
-        {station.fuels.length === 0 ? (
-          <div className="card">
-            <p style={{ color: "var(--text-muted)" }}>
-              No current prices reported for this station.
-            </p>
-          </div>
-        ) : (
-          <div className="prices-grid">
-            {station.fuels.map((fuel) => {
-              const freshness = getFreshnessInfo(fuel.observedAt);
-              return (
-                <div key={fuel.sku} className="price-card">
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "0.25rem" }}>
-                    <span className="stat-label" style={{ marginBottom: 0 }}>{fuel.name}</span>
-                    <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-semibold ${freshness.badgeClass}`}>
-                      {freshness.label}
-                    </span>
-                  </div>
-                  <div className="stat-value">{formatPrice(fuel.price)}</div>
-                  <div className="stat-subtext">
-                    {formatRelativeTime(fuel.observedAt)} &bull; {formatDate(fuel.observedAt)}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </section>
-
-      <section className="chart-section" style={{ marginBottom: "2.5rem" }}>
-        <h2 className="section-title">Historical Price Trends</h2>
-        <PriceHistoryChart history={history} />
+      {/* Price History Section */}
+      <section className="station-section" style={{ marginTop: "2rem" }}>
+        <h2 className="section-title">Price history</h2>
+        <PriceHistoryChart
+          history={history}
+          defaultFuelName={primaryFuel?.name || "Unleaded"}
+        />
       </section>
 
       {/* Nearby Stations Section */}
-      <NearbyStations nearby={nearby} targetStationName={station.name} />
+      <NearbyStations nearby={nearby} targetStationName={`${station.city}, ${station.state}`} />
 
+      {/* Raw Price Change History Disclosure */}
       {history.length > 0 && (
-        <section className="history-section" style={{ marginTop: "2.5rem" }}>
-          <h2 className="section-title">Price Change History Log</h2>
-          <div className="table-container">
-            <table className="station-table">
-              <thead>
-                <tr>
-                  <th scope="col">Fuel</th>
-                  <th scope="col">Price</th>
-                  <th scope="col">Observed At (UTC)</th>
-                </tr>
-              </thead>
-              <tbody>
-                {history.map((item, index) => (
-                  <tr key={`${item.fuelSku}-${item.observedAt}-${index}`}>
-                    <td style={{ fontWeight: 600 }}>{item.fuelName}</td>
-                    <td style={{ fontWeight: 700 }}>{formatPrice(item.price)}</td>
-                    <td style={{ color: "var(--text-secondary)", fontSize: "0.875rem" }}>
-                      {formatDate(item.observedAt)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+        <section className="station-section" style={{ marginTop: "2rem" }}>
+          <details className="price-changes-disclosure">
+            <summary className="price-changes-summary">
+              <span>All price changes ({history.length})</span>
+              <span className="disclosure-chevron" aria-hidden="true">&#9662;</span>
+            </summary>
+            <div className="disclosure-content">
+              <div className="table-container">
+                <table className="station-table directory-table">
+                  <thead>
+                    <tr>
+                      <th scope="col">Fuel</th>
+                      <th scope="col">Price</th>
+                      <th scope="col">Date &amp; Time</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {history.map((item, index) => (
+                      <tr key={`${item.fuelSku}-${item.observedAt}-${index}`}>
+                        <td style={{ fontWeight: 600 }}>{item.fuelName}</td>
+                        <td className="tabular-nums" style={{ fontWeight: 700 }}>
+                          {formatPrice(item.price)}
+                        </td>
+                        <td style={{ color: "var(--text-secondary)", fontSize: "0.875rem" }}>
+                          {formatDisplayDate(item.observedAt)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </details>
         </section>
       )}
     </div>

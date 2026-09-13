@@ -63,44 +63,41 @@ export default function InteractiveMap({
         popupRef.current = null;
       }
 
-      let fuelsHtml = "";
-      if (station && station.fuels.length > 0) {
-        fuelsHtml = `
-          <div class="map-popup-fuels">
-            ${station.fuels
-              .map(
-                (f: StationFuel) => `
-              <div class="map-popup-fuel-item">
-                <span class="map-popup-fuel-name">${escapeHtml(f.name)}</span>
-                <span class="map-popup-fuel-price">${escapeHtml(formatPrice(f.price))}</span>
-              </div>
-            `,
-              )
-              .join("")}
-          </div>
-        `;
-      } else {
-        fuelsHtml = `
-          <div class="map-popup-fuels">
-            <div class="map-popup-fuel-item">
-              <span class="map-popup-fuel-name">${escapeHtml(props.fuelName)}</span>
-              <span class="map-popup-fuel-price">${escapeHtml(props.priceFormatted)}</span>
+      // Identify secondary fuels
+      let secondaryFuelsHtml = "";
+      if (station && station.fuels.length > 1) {
+        const otherFuels = station.fuels.filter((f: StationFuel) => f.name !== props.fuelName);
+        if (otherFuels.length > 0) {
+          secondaryFuelsHtml = `
+            <div class="map-popup-secondary-fuels">
+              ${otherFuels
+                .map(
+                  (f: StationFuel) => `
+                <span class="map-popup-secondary-item">
+                  ${escapeHtml(f.name)} ${escapeHtml(formatPrice(f.price))}
+                </span>
+              `,
+                )
+                .join("")}
             </div>
-          </div>
-        `;
+          `;
+        }
       }
 
       const html = `
         <div class="map-popup-card">
           <div class="map-popup-header">
-            <h4 class="map-popup-title">${escapeHtml(props.name)}</h4>
-            <span class="map-popup-club">Club #${props.clubNumber}</span>
+            <h4 class="map-popup-title">${escapeHtml(props.city)}, ${escapeHtml(props.state)}</h4>
+            <span class="map-popup-club">#${props.clubNumber}</span>
           </div>
-          <p class="map-popup-address">${escapeHtml(props.address)}, ${escapeHtml(props.city)}, ${escapeHtml(props.state)} ${escapeHtml(props.postalCode)}</p>
-          ${fuelsHtml}
+          <div class="map-popup-price-row">
+            <span class="map-popup-primary-price">${escapeHtml(props.priceFormatted)}</span>
+            <span class="map-popup-primary-fuel">${escapeHtml(props.fuelName || "Regular")}</span>
+          </div>
+          ${secondaryFuelsHtml}
           <div class="map-popup-footer">
             <a href="/stations/${props.clubNumber}" class="map-popup-link">
-              Station Details &amp; History &rarr;
+              View station &rarr;
             </a>
           </div>
         </div>

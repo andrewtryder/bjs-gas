@@ -27,6 +27,138 @@ export function formatDate(isoString: string | null | undefined): string {
   }
 }
 
+export function formatDisplayDate(isoString: string | null | undefined): string {
+  if (!isoString) return "—";
+  try {
+    const d = new Date(isoString);
+    if (Number.isNaN(d.getTime())) return isoString;
+    return d.toLocaleString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    });
+  } catch {
+    return isoString;
+  }
+}
+
+export interface PriceComparison {
+  text: string;
+  deltaCents: number;
+  diff: number;
+  isCheaper: boolean;
+  isHigher: boolean;
+  isSame: boolean;
+  badgeClass: string;
+}
+
+export function formatPriceComparison(
+  stationPrice: number,
+  referencePrice: number,
+  referenceLabel: string,
+): PriceComparison {
+  const diff = stationPrice - referencePrice;
+  if (Math.abs(diff) < 0.005) {
+    return {
+      text: `About the same as ${referenceLabel}`,
+      deltaCents: 0,
+      diff,
+      isCheaper: false,
+      isHigher: false,
+      isSame: true,
+      badgeClass: "badge-comparison-same",
+    };
+  }
+
+  const cents = Math.round(Math.abs(diff) * 100);
+  if (diff < 0) {
+    return {
+      text: `${cents}¢ below ${referenceLabel}`,
+      deltaCents: -cents,
+      diff,
+      isCheaper: true,
+      isHigher: false,
+      isSame: false,
+      badgeClass: "badge-comparison-cheaper",
+    };
+  } else {
+    return {
+      text: `${cents}¢ above ${referenceLabel}`,
+      deltaCents: cents,
+      diff,
+      isCheaper: false,
+      isHigher: true,
+      isSame: false,
+      badgeClass: "badge-comparison-higher",
+    };
+  }
+}
+
+export interface NearbyPriceDelta {
+  text: string;
+  isCheaper: boolean;
+  isHigher: boolean;
+  isSame: boolean;
+  badgeClass: string;
+}
+
+export function formatNearbyPriceDelta(
+  deltaStrOrNum: string | number | null | undefined,
+): NearbyPriceDelta {
+  if (deltaStrOrNum === null || deltaStrOrNum === undefined) {
+    return {
+      text: "",
+      isCheaper: false,
+      isHigher: false,
+      isSame: false,
+      badgeClass: "",
+    };
+  }
+
+  const num =
+    typeof deltaStrOrNum === "number" ? deltaStrOrNum : Number.parseFloat(deltaStrOrNum);
+  if (!Number.isFinite(num)) {
+    return {
+      text: "",
+      isCheaper: false,
+      isHigher: false,
+      isSame: false,
+      badgeClass: "",
+    };
+  }
+
+  if (Math.abs(num) < 0.005) {
+    return {
+      text: "Same price",
+      isCheaper: false,
+      isHigher: false,
+      isSame: true,
+      badgeClass: "badge-nearby-same",
+    };
+  }
+
+  const cents = Math.round(Math.abs(num) * 100);
+  if (num < 0) {
+    return {
+      text: `${cents}¢ cheaper`,
+      isCheaper: true,
+      isHigher: false,
+      isSame: false,
+      badgeClass: "badge-nearby-cheaper",
+    };
+  } else {
+    return {
+      text: `${cents}¢ more`,
+      isCheaper: false,
+      isHigher: true,
+      isSame: false,
+      badgeClass: "badge-nearby-higher",
+    };
+  }
+}
+
 export function calculateFuelStats(stations: StationDto[]): FuelStats | null {
   if (!stations || stations.length === 0) return null;
 
