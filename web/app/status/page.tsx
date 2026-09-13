@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Breadcrumbs from "../../components/Breadcrumbs";
 import { getSystemStatus } from "../../lib/api";
-import { getFreshnessInfo } from "../../lib/freshness";
+import { getFreshnessInfo, formatRelativeTime } from "../../lib/freshness";
 import { resolveStatusHero, formatCollectionDuration } from "../../lib/status-view";
 
 export const metadata: Metadata = {
@@ -57,7 +57,7 @@ export default async function StatusPage() {
             </div>
           </div>
           <span className="status-hero-timestamp tabular-nums">
-            Checked: {new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
+            Last update: {freshness?.latestObservedAt ? formatRelativeTime(freshness.latestObservedAt) : "recently"}
           </span>
         </div>
       </div>

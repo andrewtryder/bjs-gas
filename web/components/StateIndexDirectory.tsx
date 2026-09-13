@@ -159,19 +159,19 @@ export default function StateIndexDirectory({ states }: StateIndexDirectoryProps
                       </td>
 
                       <td className="col-price">
-                        <span className="station-price-primary tabular-nums">
+                        <span className="state-table-median tabular-nums">
                           {formatPrice(item.medianPrice)}
                         </span>
                       </td>
 
                       <td>
-                        <span className="text-secondary text-sm tabular-nums">
+                        <span className="state-table-range tabular-nums">
                           {formatPrice(item.minPrice)} – {formatPrice(item.maxPrice)}
                         </span>
                       </td>
 
                       <td style={{ textAlign: "right" }}>
-                        <span className="text-secondary text-sm font-medium tabular-nums">
+                        <span className="state-table-count tabular-nums">
                           {item.stationCount}
                         </span>
                       </td>
@@ -228,7 +228,7 @@ export default function StateIndexDirectory({ states }: StateIndexDirectoryProps
                   <div className="state-mobile-actions">
                     <Link
                       href={`/map?state=${item.state}`}
-                      className="station-map-action text-sm"
+                      className="station-map-action"
                       aria-label={`View ${stateName} on map`}
                     >
                       Map &rarr;

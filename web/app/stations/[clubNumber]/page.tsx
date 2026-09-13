@@ -33,7 +33,7 @@ export async function generateMetadata({ params }: StationPageProps): Promise<Me
 
   return {
     title: `BJ's Gas in ${station.city}, ${station.state} — Current Fuel Prices & History`,
-    description: `Current fuel prices for BJ's Wholesale Club in ${station.city}, ${station.state}. Compare regular unleaded rates, station price trends, and nearby club prices. Updated hourly.`,
+    description: `Current fuel prices for BJ's Wholesale Club in ${station.city}, ${station.state}. Compare Regular gas prices, station price trends, and nearby club prices. Updated hourly.`,
     alternates: {
       canonical: `${getWebBaseUrl()}/stations/${station.clubNumber}`,
     },
@@ -301,7 +301,7 @@ export default async function StationDetailPage({ params }: StationPageProps) {
             </summary>
             <div className="disclosure-content">
               <div className="table-container">
-                <table className="station-table directory-table">
+                <table className="directory-table">
                   <thead>
                     <tr>
                       <th scope="col">Fuel</th>

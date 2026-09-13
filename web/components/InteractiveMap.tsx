@@ -10,7 +10,7 @@ if (typeof window !== "undefined" && maplibregl.config) {
   maplibregl.config.WORKER_URL = "/maplibre-gl-worker.mjs";
 }
 
-import { MAP_CONFIG, getMapStyle } from "../lib/map-config";
+import { MAP_CONFIG, MAP_THEME_TOKENS, getMapStyle } from "../lib/map-config";
 import type {
   StationDto,
 } from "../lib/types";
@@ -175,11 +175,11 @@ export default function InteractiveMap({
           "circle-color": [
             "step",
             ["get", "point_count"],
-            "#2563eb",
+            MAP_THEME_TOKENS.accent,
             5,
-            "#1d4ed8",
+            MAP_THEME_TOKENS.accentHover,
             15,
-            "#0f172a",
+            MAP_THEME_TOKENS.textPrimary,
           ],
           "circle-radius": [
             "step",
@@ -191,7 +191,7 @@ export default function InteractiveMap({
             30,
           ],
           "circle-stroke-width": 2.5,
-          "circle-stroke-color": "#ffffff",
+          "circle-stroke-color": MAP_THEME_TOKENS.surface,
         },
       });
 
@@ -207,7 +207,7 @@ export default function InteractiveMap({
           "text-size": 13,
         },
         paint: {
-          "text-color": "#ffffff",
+          "text-color": MAP_THEME_TOKENS.surface,
         },
       });
 
@@ -221,7 +221,7 @@ export default function InteractiveMap({
           "circle-color": "transparent",
           "circle-radius": 14,
           "circle-stroke-width": 3,
-          "circle-stroke-color": "#2563eb",
+          "circle-stroke-color": MAP_THEME_TOKENS.accent,
         },
       });
 
@@ -232,10 +232,10 @@ export default function InteractiveMap({
         source: "stations",
         filter: ["!", ["has", "point_count"]],
         paint: {
-          "circle-color": "#2563eb",
+          "circle-color": MAP_THEME_TOKENS.accent,
           "circle-radius": 8,
           "circle-stroke-width": 2.5,
-          "circle-stroke-color": "#ffffff",
+          "circle-stroke-color": MAP_THEME_TOKENS.surface,
         },
       });
 
@@ -254,8 +254,8 @@ export default function InteractiveMap({
           "text-allow-overlap": false,
         },
         paint: {
-          "text-color": "#0f172a",
-          "text-halo-color": "#ffffff",
+          "text-color": MAP_THEME_TOKENS.textPrimary,
+          "text-halo-color": MAP_THEME_TOKENS.surface,
           "text-halo-width": 2,
         },
       });

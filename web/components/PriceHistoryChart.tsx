@@ -12,6 +12,7 @@ import {
 } from "recharts";
 import type { FuelPriceHistoryItem } from "../lib/types";
 import { formatPrice } from "../lib/stats";
+import { normalizeFuelDisplayName } from "../lib/fuels";
 import SegmentedControl from "./ui/SegmentedControl";
 
 interface PriceHistoryChartProps {
@@ -25,7 +26,7 @@ export default function PriceHistoryChart({
 }: PriceHistoryChartProps) {
   const [mounted, setMounted] = useState(false);
   const [selectedDays, setSelectedDays] = useState<number>(30);
-  const [selectedFuel, setSelectedFuel] = useState<string>("Unleaded");
+  const [selectedFuel, setSelectedFuel] = useState<string>("Regular");
 
   useEffect(() => {
     setMounted(true);
@@ -205,7 +206,7 @@ export default function PriceHistoryChart({
                   className={`fuel-pill-btn ${selectedFuel === name ? "active" : ""}`}
                   onClick={() => setSelectedFuel(name)}
                 >
-                  {name}
+                  {normalizeFuelDisplayName(name)}
                 </button>
               ))}
             </div>

@@ -326,7 +326,7 @@ export default function MapDiscoveryView({
           </div>
 
           {/* Station Items List (DS-4 Section 12-16) */}
-          <div className="map-sidebar-list" role="list">
+          <div className="map-sidebar-list">
             {filteredStations.length === 0 ? (
               <div className="map-empty-state">
                 <p className="map-empty-title">No matching stations</p>
