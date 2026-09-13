@@ -12,6 +12,7 @@ const nextConfig = {
       "../src/service.js": "../src/service.ts",
       "./stats.js": "./lib/stats.ts",
       "./types.js": "./lib/types.ts",
+      "./freshness.js": "./lib/freshness.ts",
     },
   },
   webpack: (config) => {

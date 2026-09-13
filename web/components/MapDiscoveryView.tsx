@@ -4,19 +4,23 @@ import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 
-import type { StationDto, StationFuel } from "../lib/types";
+import type { StationDto } from "../lib/types";
 import {
   filterStations,
   getAvailableStates,
   getAvailableFuels,
   getCityStateCollisionKeys,
   getStationPrice,
-  getPrimaryFuel,
+  getCanonicalFuelPrices,
+  formatStationTitle,
+  formatFuelDisplayName,
+  formatMapFreshnessText,
+  syncSelectedStationWithFilter,
   getLatestObservation,
   stationsToGeoJson,
 } from "../lib/discovery";
-import { formatPrice } from "../lib/stats";
 import { getFreshnessInfo } from "../lib/freshness";
+import { STATE_NAMES } from "../lib/states";
 
 // Dynamically import InteractiveMap without SSR since MapLibre GL is browser-only
 const InteractiveMap = dynamic(() => import("./InteractiveMap"), {
@@ -79,6 +83,11 @@ export default function MapDiscoveryView({
     });
   }, [stations, searchQuery, selectedState, selectedFuel]);
 
+  // Synchronize selected station when filtered set changes (DS-4 Section 29)
+  useEffect(() => {
+    setSelectedStation((current) => syncSelectedStationWithFilter(current, filteredStations));
+  }, [filteredStations]);
+
   const stationsGeoJson = useMemo(() => {
     return stationsToGeoJson(filteredStations, selectedFuel);
   }, [filteredStations, selectedFuel]);
@@ -96,11 +105,47 @@ export default function MapDiscoveryView({
   const hasActiveFilters = searchQuery.trim() !== "" || selectedState !== "ALL" || selectedFuel !== "ALL";
 
   // Selected station summary details
-  const selectedStationFuel = selectedStation ? getPrimaryFuel(selectedStation.fuels) : null;
   const selectedStationPrice = selectedStation ? getStationPrice(selectedStation, selectedFuel) : null;
+  const selectedCanonicalPrices = selectedStation ? getCanonicalFuelPrices(selectedStation) : null;
   const selectedStationFreshness = selectedStation
     ? getFreshnessInfo(getLatestObservation(selectedStation))
     : null;
+  const selectedStationFreshnessText = formatMapFreshnessText(selectedStationFreshness);
+
+  // Secondary fuels for selected station panel (DS-4 Section 9)
+  const selectedStationSecondaryFuels = useMemo(() => {
+    if (!selectedStation || !selectedCanonicalPrices) return [];
+    const targetSku = selectedFuel.trim().toLowerCase();
+    const fuels: Array<{ label: string; priceFormatted: string }> = [];
+
+    if (targetSku === "4" || targetSku === "diesel") {
+      if (selectedCanonicalPrices.regular.isAvailable) {
+        fuels.push({ label: "Regular", priceFormatted: selectedCanonicalPrices.regular.priceFormatted });
+      }
+      if (selectedCanonicalPrices.premium.isAvailable) {
+        fuels.push({ label: "Premium", priceFormatted: selectedCanonicalPrices.premium.priceFormatted });
+      }
+    } else if (targetSku === "3" || targetSku === "premium") {
+      if (selectedCanonicalPrices.regular.isAvailable) {
+        fuels.push({ label: "Regular", priceFormatted: selectedCanonicalPrices.regular.priceFormatted });
+      }
+      if (selectedCanonicalPrices.diesel.isAvailable) {
+        fuels.push({ label: "Diesel", priceFormatted: selectedCanonicalPrices.diesel.priceFormatted });
+      }
+    } else {
+      if (selectedCanonicalPrices.premium.isAvailable) {
+        fuels.push({ label: "Premium", priceFormatted: selectedCanonicalPrices.premium.priceFormatted });
+      }
+      if (selectedCanonicalPrices.diesel.isAvailable) {
+        fuels.push({ label: "Diesel", priceFormatted: selectedCanonicalPrices.diesel.priceFormatted });
+      }
+    }
+    return fuels;
+  }, [selectedStation, selectedCanonicalPrices, selectedFuel]);
+
+  const sidebarHeading = selectedState !== "ALL"
+    ? `${STATE_NAMES[selectedState] || selectedState} stations`
+    : "Stations";
 
   return (
     <div className="map-discovery-v2">
@@ -212,79 +257,75 @@ export default function MapDiscoveryView({
       <div className="map-split-v2">
         {/* Desktop Sidebar */}
         <div className="map-sidebar-pane">
-          {/* Selected Station Sticky Banner */}
+          {/* Selected Station Panel (Desktop - DS-4 Section 7) */}
           {selectedStation && (
-            <div className="map-selected-banner">
+            <div className="map-selected-panel">
               <div className="map-selected-header">
-                <div>
+                <div className="map-selected-location">
                   <h3 className="map-selected-title">
-                    {selectedStation.city}, {selectedStation.state}
-                    {collisionKeys.has(`${selectedStation.city.toLowerCase().trim()}, ${selectedStation.state.toLowerCase().trim()}`) && (
-                      <span className="station-location-qualifier"> · #{selectedStation.clubNumber}</span>
-                    )}
+                    {formatStationTitle(selectedStation, collisionKeys)}
                   </h3>
                   <p className="map-selected-address">
-                    {selectedStation.address1 || selectedStation.address} &middot; Club #{selectedStation.clubNumber}
+                    {selectedStation.address1 || selectedStation.address}
                   </p>
                 </div>
                 <button
                   type="button"
                   className="map-selected-close-btn"
                   onClick={() => handleSelectStation(null)}
-                  aria-label="Close selected station"
+                  aria-label="Dismiss selected station"
                 >
                   &times;
                 </button>
               </div>
 
-              <div className="map-selected-price-row">
+              <div className="map-selected-price-block">
                 <div className="map-selected-price tabular-nums">
                   {selectedStationPrice?.priceFormatted}
                 </div>
-                <div className="map-selected-fuel">
-                  {selectedStationPrice?.fuel?.name || "Regular"}
+                <div className="map-selected-fuel-label">
+                  {selectedStationPrice?.fuel ? formatFuelDisplayName(selectedStationPrice.fuel.name) : "Regular"}
                 </div>
               </div>
 
-              {selectedStation.fuels.length > 1 && (
-                <div className="map-selected-other-fuels">
-                  {selectedStation.fuels
-                    .filter((f) => f.sku !== selectedStationFuel?.sku)
-                    .map((f: StationFuel) => (
-                      <span key={f.sku} className="map-selected-fuel-pill">
-                        {f.name} {formatPrice(f.price)}
-                      </span>
-                    ))}
+              {selectedStationSecondaryFuels.length > 0 && (
+                <div className="map-selected-secondary-fuels">
+                  {selectedStationSecondaryFuels.map((f) => (
+                    <span key={f.label} className="map-selected-secondary-fuel">
+                      <span className="map-selected-sec-label">{f.label}</span>{" "}
+                      <span className="map-selected-sec-price tabular-nums">{f.priceFormatted}</span>
+                    </span>
+                  ))}
                 </div>
               )}
 
               <div className="map-selected-footer">
-                {selectedStationFreshness && (
-                  <span className="map-selected-freshness">
-                    {selectedStationFreshness.relativeText}
+                {selectedStationFreshnessText && (
+                  <span className={`map-selected-freshness freshness-${selectedStationFreshness?.level || "fresh"}`}>
+                    {selectedStationFreshnessText}
                   </span>
                 )}
                 <Link
                   href={`/stations/${selectedStation.clubNumber}`}
                   className="map-selected-detail-link"
                 >
-                  Details &rarr;
+                  View club details &rarr;
                 </Link>
               </div>
             </div>
           )}
 
-          {/* Station List Header */}
+          {/* Station List Header (DS-4 Section 33) */}
           <div className="map-sidebar-list-header">
-            <span className="map-sidebar-heading">
-              {selectedState !== "ALL" ? `${selectedState} stations` : "Stations"}
-            </span>
-            <span className="map-sidebar-count">
-              {filteredStations.length} locations
+            <span className="map-sidebar-heading">{sidebarHeading}</span>
+            <span className="map-sidebar-count tabular-nums">
+              {filteredStations.length === stations.length
+                ? `${stations.length} locations`
+                : `${filteredStations.length} of ${stations.length} locations`}
             </span>
           </div>
 
-          {/* Station Items List */}
+          {/* Station Items List (DS-4 Section 12-16) */}
           <div className="map-sidebar-list" role="list">
             {filteredStations.length === 0 ? (
               <div className="map-empty-state">
@@ -306,9 +347,6 @@ export default function MapDiscoveryView({
               filteredStations.map((station) => {
                 const isSelected = selectedStation?.clubNumber === station.clubNumber;
                 const priceInfo = getStationPrice(station, selectedFuel);
-                const isCollision = collisionKeys.has(
-                  `${station.city.toLowerCase().trim()}, ${station.state.toLowerCase().trim()}`,
-                );
 
                 return (
                   <button
@@ -320,10 +358,7 @@ export default function MapDiscoveryView({
                   >
                     <div className="map-item-top-row">
                       <span className="map-item-city">
-                        {station.city}, {station.state}
-                        {isCollision && (
-                          <span className="station-location-qualifier"> · #{station.clubNumber}</span>
-                        )}
+                        {formatStationTitle(station, collisionKeys)}
                       </span>
                       <span className="map-item-price tabular-nums">
                         {priceInfo.priceFormatted}
@@ -332,10 +367,10 @@ export default function MapDiscoveryView({
 
                     <div className="map-item-sub-row">
                       <span className="map-item-address">
-                        {station.address1 || station.address} &middot; Club #{station.clubNumber}
+                        {station.address1 || station.address}
                       </span>
                       <span className="map-item-fuel-label">
-                        {priceInfo.fuel ? priceInfo.fuel.name : "Regular"}
+                        {priceInfo.fuel ? formatFuelDisplayName(priceInfo.fuel.name) : "Regular"}
                       </span>
                     </div>
                   </button>
@@ -352,22 +387,21 @@ export default function MapDiscoveryView({
             selectedStation={selectedStation}
             onSelectStation={handleSelectStation}
             stations={filteredStations}
+            selectedFuel={selectedFuel}
+            collisionKeys={collisionKeys}
             cartoApiKey={cartoApiKey}
           />
 
-          {/* Mobile Bottom Sheet / Selected Station Floating Panel */}
+          {/* Mobile Bottom Sheet / Selected Station Floating Panel (DS-4 Section 18-19) */}
           {selectedStation && (
             <div className="map-mobile-station-panel" role="region" aria-label="Selected station details">
               <div className="map-mobile-panel-header">
-                <div>
+                <div className="map-mobile-panel-info">
                   <h4 className="map-mobile-panel-title">
-                    {selectedStation.city}, {selectedStation.state}
-                    {collisionKeys.has(`${selectedStation.city.toLowerCase().trim()}, ${selectedStation.state.toLowerCase().trim()}`) && (
-                      <span className="station-location-qualifier"> · #{selectedStation.clubNumber}</span>
-                    )}
+                    {formatStationTitle(selectedStation, collisionKeys)}
                   </h4>
                   <p className="map-mobile-panel-address">
-                    {selectedStation.address1 || selectedStation.address} &middot; Club #{selectedStation.clubNumber}
+                    {selectedStation.address1 || selectedStation.address}
                   </p>
                 </div>
                 <button
@@ -386,15 +420,15 @@ export default function MapDiscoveryView({
                     {selectedStationPrice?.priceFormatted}
                   </span>
                   <span className="map-mobile-fuel">
-                    {selectedStationPrice?.fuel?.name || "Regular"}
+                    {selectedStationPrice?.fuel ? formatFuelDisplayName(selectedStationPrice.fuel.name) : "Regular"}
                   </span>
                 </div>
 
                 <Link
                   href={`/stations/${selectedStation.clubNumber}`}
-                  className="btn btn-primary btn-sm"
+                  className="map-mobile-detail-link"
                 >
-                  Details &rarr;
+                  View club details &rarr;
                 </Link>
               </div>
             </div>
@@ -404,3 +438,4 @@ export default function MapDiscoveryView({
     </div>
   );
 }
+

@@ -11,14 +11,13 @@ if (typeof window !== "undefined" && maplibregl.config) {
 }
 
 import { MAP_CONFIG, getMapStyle } from "../lib/map-config";
-import { formatPrice } from "../lib/stats";
 import type {
   StationDto,
-  StationFuel,
 } from "../lib/types";
-import type {
-  StationGeoJsonCollection,
-  StationGeoJsonProperties,
+import {
+  type StationGeoJsonCollection,
+  type StationGeoJsonProperties,
+  formatMapPopupData,
 } from "../lib/discovery";
 
 function escapeHtml(str: string): string {
@@ -35,6 +34,8 @@ interface InteractiveMapProps {
   selectedStation: StationDto | null;
   onSelectStation: (station: StationDto | null) => void;
   stations: StationDto[];
+  selectedFuel?: string;
+  collisionKeys?: Set<string>;
   cartoApiKey?: string | null;
 }
 
@@ -43,6 +44,8 @@ export default function InteractiveMap({
   selectedStation,
   onSelectStation,
   stations,
+  selectedFuel = "ALL",
+  collisionKeys,
   cartoApiKey,
 }: InteractiveMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -63,41 +66,49 @@ export default function InteractiveMap({
         popupRef.current = null;
       }
 
-      // Identify secondary fuels
+      const popupData = station
+        ? formatMapPopupData(station, selectedFuel, collisionKeys)
+        : {
+            title: props.city ? `${props.city}, ${props.state} · #${props.clubNumber}` : `#${props.clubNumber}`,
+            clubNumber: Number(props.clubNumber),
+            primaryPriceFormatted: props.priceFormatted,
+            primaryFuelName: props.fuelName || "Regular",
+            secondaryFuels: [],
+            freshnessText: null,
+          };
+
       let secondaryFuelsHtml = "";
-      if (station && station.fuels.length > 1) {
-        const otherFuels = station.fuels.filter((f: StationFuel) => f.name !== props.fuelName);
-        if (otherFuels.length > 0) {
-          secondaryFuelsHtml = `
-            <div class="map-popup-secondary-fuels">
-              ${otherFuels
-                .map(
-                  (f: StationFuel) => `
-                <span class="map-popup-secondary-item">
-                  ${escapeHtml(f.name)} ${escapeHtml(formatPrice(f.price))}
-                </span>
-              `,
-                )
-                .join("")}
-            </div>
-          `;
-        }
+      if (popupData.secondaryFuels.length > 0) {
+        secondaryFuelsHtml = `
+          <div class="map-popup-secondary-fuels">
+            ${popupData.secondaryFuels
+              .map(
+                (f) => `
+              <span class="map-popup-secondary-item">
+                <span class="map-popup-sec-name">${escapeHtml(f.name)}</span>
+                <span class="map-popup-sec-price tabular-nums">${escapeHtml(f.price)}</span>
+              </span>
+            `,
+              )
+              .join("")}
+          </div>
+        `;
       }
 
       const html = `
         <div class="map-popup-card">
           <div class="map-popup-header">
-            <h4 class="map-popup-title">${escapeHtml(props.city)}, ${escapeHtml(props.state)}</h4>
-            <span class="map-popup-club">#${props.clubNumber}</span>
+            <h4 class="map-popup-title">${escapeHtml(popupData.title)}</h4>
           </div>
           <div class="map-popup-price-row">
-            <span class="map-popup-primary-price">${escapeHtml(props.priceFormatted)}</span>
-            <span class="map-popup-primary-fuel">${escapeHtml(props.fuelName || "Regular")}</span>
+            <span class="map-popup-primary-price tabular-nums">${escapeHtml(popupData.primaryPriceFormatted)}</span>
+            <span class="map-popup-primary-fuel">${escapeHtml(popupData.primaryFuelName)}</span>
           </div>
           ${secondaryFuelsHtml}
+          ${popupData.freshnessText ? `<div class="map-popup-freshness">${escapeHtml(popupData.freshnessText)}</div>` : ""}
           <div class="map-popup-footer">
-            <a href="/stations/${props.clubNumber}" class="map-popup-link">
-              View station &rarr;
+            <a href="/stations/${popupData.clubNumber}" class="map-popup-link">
+              View club details &rarr;
             </a>
           </div>
         </div>
@@ -115,7 +126,7 @@ export default function InteractiveMap({
 
       popupRef.current = popup;
     },
-    [],
+    [selectedFuel, collisionKeys],
   );
 
   // Initialize MapLibre instance
@@ -197,6 +208,20 @@ export default function InteractiveMap({
         },
         paint: {
           "text-color": "#ffffff",
+        },
+      });
+
+      // Selected station highlight ring (DS-4 Section 24)
+      map.addLayer({
+        id: "selected-station-ring",
+        type: "circle",
+        source: "stations",
+        filter: ["==", ["get", "clubNumber"], selectedStation ? selectedStation.clubNumber : -1],
+        paint: {
+          "circle-color": "transparent",
+          "circle-radius": 14,
+          "circle-stroke-width": 3,
+          "circle-stroke-color": "#2563eb",
         },
       });
 
@@ -320,9 +345,18 @@ export default function InteractiveMap({
       setMapLoaded(true);
     });
 
+    // Window resize observer (DS-4 Section 20)
+    const handleResize = () => {
+      if (mapRef.current) {
+        mapRef.current.resize();
+      }
+    };
+    window.addEventListener("resize", handleResize);
+
     mapRef.current = map;
 
     return () => {
+      window.removeEventListener("resize", handleResize);
       if (popupRef.current) {
         popupRef.current.remove();
         popupRef.current = null;
@@ -344,30 +378,47 @@ export default function InteractiveMap({
     }
   }, [stationsGeoJson, mapLoaded]);
 
-  // React to selectedStation changes (fly-to and popup)
+  // React to selectedStation changes (highlight ring, fly-to, and popup)
   useEffect(() => {
     if (!mapRef.current || !mapLoaded) return;
 
-    if (selectedStation) {
-      const { latitude: lat, longitude: lng } = selectedStation;
-      if (
-        lat !== null &&
-        lng !== null &&
-        Number.isFinite(lat) &&
-        Number.isFinite(lng)
-      ) {
-        mapRef.current.flyTo({
-          center: [lng, lat],
-          zoom: Math.max(mapRef.current.getZoom(), 12),
-          essential: true,
-        });
+    if (!selectedStation) {
+      if (popupRef.current) {
+        popupRef.current.remove();
+        popupRef.current = null;
+      }
+      if (mapRef.current.getLayer("selected-station-ring")) {
+        mapRef.current.setFilter("selected-station-ring", ["==", ["get", "clubNumber"], -1]);
+      }
+      return;
+    }
 
-        const feature = stationsGeoJson.features.find(
-          (f) => f.properties.clubNumber === selectedStation.clubNumber,
-        );
-        if (feature) {
-          showStationPopup([lng, lat], feature.properties, selectedStation);
-        }
+    if (mapRef.current.getLayer("selected-station-ring")) {
+      mapRef.current.setFilter("selected-station-ring", [
+        "==",
+        ["get", "clubNumber"],
+        selectedStation.clubNumber,
+      ]);
+    }
+
+    const { latitude: lat, longitude: lng } = selectedStation;
+    if (
+      lat !== null &&
+      lng !== null &&
+      Number.isFinite(lat) &&
+      Number.isFinite(lng)
+    ) {
+      mapRef.current.flyTo({
+        center: [lng, lat],
+        zoom: Math.max(mapRef.current.getZoom(), 12),
+        essential: true,
+      });
+
+      const feature = stationsGeoJson.features.find(
+        (f) => f.properties.clubNumber === selectedStation.clubNumber,
+      );
+      if (feature) {
+        showStationPopup([lng, lat], feature.properties, selectedStation);
       }
     }
   }, [selectedStation, mapLoaded, stationsGeoJson, showStationPopup]);
@@ -403,3 +454,4 @@ export default function InteractiveMap({
     </div>
   );
 }
+

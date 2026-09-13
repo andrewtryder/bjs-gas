@@ -1,5 +1,6 @@
 import type { StationDto, StationFuel } from "./types.js";
 import { formatPrice } from "./stats.js";
+import { getFreshnessInfo, type FreshnessInfo } from "./freshness.js";
 
 /**
  * Deterministically identifies the primary/regular gasoline fuel item from a station's fuels array.
@@ -568,4 +569,110 @@ export function getMobileStationRowData(
     secondaryFuels: secondary,
   };
 }
+
+/**
+ * Synchronizes selected station with the currently filtered station list.
+ * If the selected station is no longer present in the filtered set, returns null.
+ */
+export function syncSelectedStationWithFilter(
+  selectedStation: StationDto | null,
+  filteredStations: StationDto[],
+): StationDto | null {
+  if (!selectedStation) return null;
+  const exists = filteredStations.some((s) => s.clubNumber === selectedStation.clubNumber);
+  return exists ? selectedStation : null;
+}
+
+/**
+ * Formats station freshness text according to Ledger Slate rules:
+ * - Fresh (<= 2h): "Updated 17m ago"
+ * - Aging (2-6h): "Updated 4h ago · Aging"
+ * - Stale (> 6h): "Updated 9h ago · Stale"
+ * No decorative healthy "Fresh" badge.
+ */
+export function formatMapFreshnessText(freshness: FreshnessInfo | null): string | null {
+  if (!freshness) return null;
+  if (freshness.level === "aging") {
+    return `${freshness.relativeText} · Aging`;
+  }
+  if (freshness.level === "stale") {
+    return `${freshness.relativeText} · Stale`;
+  }
+  return freshness.relativeText;
+}
+
+export interface MapPopupFuelItem {
+  name: string;
+  price: string;
+}
+
+export interface MapPopupData {
+  title: string;
+  clubNumber: number;
+  primaryPriceFormatted: string;
+  primaryFuelName: string;
+  secondaryFuels: MapPopupFuelItem[];
+  freshnessText: string | null;
+}
+
+/**
+ * Generates structured, normalized popup card data for MapLibre map popups.
+ */
+export function formatMapPopupData(
+  station: StationDto,
+  selectedFuelSku: string = "ALL",
+  collisionKeys?: Set<string>,
+  now: Date = new Date(),
+): MapPopupData {
+  const title = formatStationTitle(station, collisionKeys);
+  const canonicalPrices = getCanonicalFuelPrices(station);
+  const targetSku = selectedFuelSku.trim().toLowerCase();
+
+  let primaryPriceFormatted = "—";
+  let primaryFuelName = "Regular";
+  const secondaryFuels: MapPopupFuelItem[] = [];
+
+  if (targetSku === "4" || targetSku === "diesel") {
+    primaryFuelName = "Diesel";
+    primaryPriceFormatted = canonicalPrices.diesel.priceFormatted;
+    if (canonicalPrices.regular.isAvailable) {
+      secondaryFuels.push({ name: "Regular", price: canonicalPrices.regular.priceFormatted });
+    }
+    if (canonicalPrices.premium.isAvailable) {
+      secondaryFuels.push({ name: "Premium", price: canonicalPrices.premium.priceFormatted });
+    }
+  } else if (targetSku === "3" || targetSku === "premium") {
+    primaryFuelName = "Premium";
+    primaryPriceFormatted = canonicalPrices.premium.priceFormatted;
+    if (canonicalPrices.regular.isAvailable) {
+      secondaryFuels.push({ name: "Regular", price: canonicalPrices.regular.priceFormatted });
+    }
+    if (canonicalPrices.diesel.isAvailable) {
+      secondaryFuels.push({ name: "Diesel", price: canonicalPrices.diesel.priceFormatted });
+    }
+  } else {
+    primaryFuelName = "Regular";
+    primaryPriceFormatted = canonicalPrices.regular.priceFormatted;
+    if (canonicalPrices.premium.isAvailable) {
+      secondaryFuels.push({ name: "Premium", price: canonicalPrices.premium.priceFormatted });
+    }
+    if (canonicalPrices.diesel.isAvailable) {
+      secondaryFuels.push({ name: "Diesel", price: canonicalPrices.diesel.priceFormatted });
+    }
+  }
+
+  const latestObs = getLatestObservation(station);
+  const freshnessInfo = latestObs ? getFreshnessInfo(latestObs, now) : null;
+  const freshnessText = formatMapFreshnessText(freshnessInfo);
+
+  return {
+    title,
+    clubNumber: station.clubNumber,
+    primaryPriceFormatted,
+    primaryFuelName,
+    secondaryFuels,
+    freshnessText,
+  };
+}
+
 
