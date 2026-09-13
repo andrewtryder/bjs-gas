@@ -51,7 +51,13 @@ export default function InteractiveMap({
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const popupRef = useRef<maplibregl.Popup | null>(null);
+  const suppressNextSelectionCameraRef = useRef(false);
+  const selectedStationRef = useRef(selectedStation);
   const [mapLoaded, setMapLoaded] = useState(false);
+
+  useEffect(() => {
+    selectedStationRef.current = selectedStation;
+  }, [selectedStation]);
 
   const showStationPopup = useCallback(
     (
@@ -320,6 +326,12 @@ export default function InteractiveMap({
           stations.find((s) => s.clubNumber === Number(props.clubNumber)) ||
           null;
 
+        const isAlreadySelected =
+          station && selectedStationRef.current?.clubNumber === station.clubNumber;
+        if (!isAlreadySelected) {
+          suppressNextSelectionCameraRef.current = true;
+        }
+
         onSelectStation(station);
         showStationPopup(coords, props, station);
       };
@@ -399,6 +411,11 @@ export default function InteractiveMap({
         ["get", "clubNumber"],
         selectedStation.clubNumber,
       ]);
+    }
+
+    if (suppressNextSelectionCameraRef.current) {
+      suppressNextSelectionCameraRef.current = false;
+      return;
     }
 
     const { latitude: lat, longitude: lng } = selectedStation;

@@ -7,6 +7,7 @@ export type FetchFuelOptions = {
   timeoutMs?: number;
   maxAttempts?: number;
   fetchImpl?: typeof fetch | undefined;
+  feedClubNumber?: number | undefined;
 };
 
 export type FetchFuelSuccess = {
@@ -62,8 +63,9 @@ export async function fetchClubFuel(
     attempt += 1;
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
+    const urlClubNumber = options.feedClubNumber ?? clubNumber;
     try {
-      const response = await fetchImpl(FUEL_URL(clubNumber), {
+      const response = await fetchImpl(FUEL_URL(urlClubNumber), {
         method: "GET",
         headers: { accept: "application/json" },
         signal: controller.signal,

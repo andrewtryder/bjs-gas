@@ -10,6 +10,7 @@ import {
   type FuelObservation,
 } from "./fuel/types.js";
 import { persistFuelObservations } from "./persist.js";
+import { getUpstreamFuelFeedClub, loadGasStationAliases } from "./gas-station-alias.js";
 import gasClubsJson from "../data/gas-clubs.json" with { type: "json" };
 
 export const DEFAULT_CONCURRENCY = 5;
@@ -79,10 +80,15 @@ export async function runCollection(options: CollectOptions = {}): Promise<Colle
   const clubs = loadGasClubs(options.dataDir);
   const concurrency = options.concurrency ?? DEFAULT_CONCURRENCY;
 
+  const aliases = loadGasStationAliases(options.dataDir);
+
   try {
     const results = await mapPool(clubs, concurrency, async (club) => {
-      const fuelOpts =
-        options.fetchImpl !== undefined ? { fetchImpl: options.fetchImpl } : {};
+      const feedClubNumber = getUpstreamFuelFeedClub(club.clubNumber, aliases);
+      const fuelOpts = {
+        ...(options.fetchImpl !== undefined ? { fetchImpl: options.fetchImpl } : {}),
+        ...(feedClubNumber !== club.clubNumber ? { feedClubNumber } : {}),
+      };
       const result = await fetchClubFuel(club.clubNumber, observedAt, fuelOpts);
       return { clubNumber: club.clubNumber, result };
     });

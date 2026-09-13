@@ -15,6 +15,7 @@ import { fetchClubFuel } from "./fuel/client.js";
 import { importClubsBulk } from "./persist.js";
 import { runSitemapCanary } from "./sitemap-canary.js";
 import { coerceClub, type BjsClub } from "./types.js";
+import { isAliasedParentClub, loadGasStationAliases } from "./gas-station-alias.js";
 
 function parseArgs(argv: string[]) {
   const flags = new Set(argv.filter((a) => a.startsWith("--")));
@@ -34,6 +35,7 @@ async function importClubs(allowStaleCandidate: boolean): Promise<void> {
   const clubs = (JSON.parse(readFileSync(file, "utf8")) as unknown[]).map((c) =>
     coerceClub(c as Parameters<typeof coerceClub>[0]),
   ) as BjsClub[];
+  const aliases = loadGasStationAliases();
   const prisma = getPrisma();
   const result = await importClubsBulk(
     prisma,
@@ -49,7 +51,10 @@ async function importClubs(allowStaleCandidate: boolean): Promise<void> {
       latitude: c.latitude ?? null,
       longitude: c.longitude ?? null,
       phone: c.phone ?? null,
-      hasGas: c.hasGas,
+      // Aliased parent warehouse clubs (e.g. #321 Hyannis) cede their gas identity
+      // to the canonical dedicated gas station (e.g. #902 Hyannis Gas Station).
+      // The physical fuel dispensers are at the dedicated station address.
+      hasGas: c.hasGas && !isAliasedParentClub(c.clubNumber, aliases),
       storeType: c.storeType ?? null,
       gasClassification: c.gasClassification ?? null,
       services: c.services ?? [],

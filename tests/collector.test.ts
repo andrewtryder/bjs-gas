@@ -276,9 +276,9 @@ describe("auth + health API", () => {
           startedAt,
           finishedAt,
           durationMs: 8000,
-          clubsConfigured: 221,
+          clubsConfigured: 214, // 221 minus 7 aliased parent warehouse clubs
           clubsSucceeded: 206,
-          clubsEmptyFuels: 15,
+          clubsEmptyFuels: 8,
           clubsHardFailed: 0,
           fuelObservations: 505,
           historyChanges: 0,
@@ -309,7 +309,7 @@ describe("auth + health API", () => {
     expect(body.ok).toBe(true);
     expect(body.healthy).toBe(true);
     expect(body.lastCollection?.clubsHardFailed).toBe(0);
-    expect(body.lastCollection?.clubsEmptyFuels).toBe(15);
+    expect(body.lastCollection?.clubsEmptyFuels).toBe(8);
     expect(body.freshness.stationsObservedRecently).toBe(206);
   });
 });
@@ -319,11 +319,11 @@ describe("status healthy evaluation", () => {
     startedAt: "2026-09-02T14:00:00.000Z",
     finishedAt: "2026-09-02T14:00:08.000Z",
     durationMs: 8000,
-    clubsConfigured: 221,
+    clubsConfigured: 214, // 221 minus 7 aliased parent warehouse clubs
     clubsSucceeded: 206,
-    clubsEmptyFuels: 15,
+    clubsEmptyFuels: 8,
     clubsHardFailed: 0,
-    clubsFailed: 15,
+    clubsFailed: 8,
     fuelObservations: 505,
     historyChanges: 0,
     databaseQueries: 1,
@@ -341,7 +341,7 @@ describe("status healthy evaluation", () => {
 
   it("marks healthy for a fresh successful run", () => {
     const result = evaluateHealthy({
-      configuredGasClubs: 221,
+      configuredGasClubs: 214,
       lastCollection: baseRun,
       freshness,
       now: new Date("2026-09-02T14:30:00.000Z"),
@@ -352,7 +352,7 @@ describe("status healthy evaluation", () => {
 
   it("marks unhealthy when last collection is stale", () => {
     const result = evaluateHealthy({
-      configuredGasClubs: 221,
+      configuredGasClubs: 214,
       lastCollection: baseRun,
       freshness,
       now: new Date("2026-09-02T16:00:00.000Z"),
