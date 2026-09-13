@@ -1494,10 +1494,18 @@ a {
   text-decoration: underline;
 }
 
+.station-location-qualifier {
+  font-weight: 500;
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+}
+
 .station-location-sub {
-  font-size: 0.75rem;
-  color: var(--text-muted);
-  margin-top: 0.125rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  margin-top: 0.1875rem;
+  line-height: 1.35;
 }
 
 .col-price {
@@ -1623,9 +1631,11 @@ a {
 }
 
 .mobile-card-address {
-  font-size: 0.75rem;
-  color: var(--text-muted);
-  margin-top: 0.125rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  margin-top: 0.1875rem;
+  line-height: 1.35;
 }
 
 .mobile-card-price-block {
@@ -2514,7 +2524,8 @@ select:focus-visible {
 
 .nearby-station-address {
   font-size: 0.8125rem;
-  color: var(--text-muted);
+  font-weight: 500;
+  color: var(--text-secondary);
   margin-top: 0.2rem;
 }
 
@@ -2757,7 +2768,8 @@ select:focus-visible {
   display: flex;
   justify-content: space-between;
   font-size: 0.8125rem;
-  color: var(--text-muted);
+  font-weight: 500;
+  color: var(--text-secondary);
   margin-top: 0.2rem;
 }
 
@@ -2766,6 +2778,7 @@ select:focus-visible {
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 220px;
+  color: var(--text-secondary);
 }
 
 .map-item-fuel-label {
