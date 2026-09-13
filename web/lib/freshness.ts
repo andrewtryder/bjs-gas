@@ -29,7 +29,7 @@ export function getFreshnessInfo(
     return {
       level: "stale",
       label: "Unknown",
-      relativeText: "Observation time unknown",
+      relativeText: "Update time unknown",
       badgeBg: "rgba(239, 68, 68, 0.1)",
       badgeColor: "var(--expensive)",
       badgeBorder: "rgba(239, 68, 68, 0.25)",
@@ -51,21 +51,21 @@ export function getFreshnessInfo(
 
   if (ageMinutes <= 120) {
     level = "fresh";
-    label = "Live / Current";
+    label = "Updated recently";
     badgeBg = "var(--cheaper-bg)";
     badgeColor = "var(--cheaper)";
     badgeBorder = "rgba(34, 197, 94, 0.25)";
     badgeClass = "badge-fresh";
   } else if (ageMinutes <= 360) {
     level = "aging";
-    label = "Data from earlier today";
+    label = "Aging";
     badgeBg = "rgba(234, 179, 8, 0.1)";
     badgeColor = "#eab308";
     badgeBorder = "rgba(234, 179, 8, 0.25)";
     badgeClass = "badge-aging";
   } else {
     level = "stale";
-    label = "Stale observation";
+    label = "Stale";
     badgeBg = "var(--expensive-bg)";
     badgeColor = "var(--expensive)";
     badgeBorder = "rgba(239, 68, 68, 0.25)";
@@ -110,5 +110,5 @@ export function formatRelativeTime(
     return `Updated ${hours}h ago`;
   }
   const days = Math.floor(hours / 24);
-  return `Last observed ${days}d ago`;
+  return `Updated ${days}d ago`;
 }

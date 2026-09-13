@@ -7,29 +7,23 @@ export default function NotFound() {
         404
       </div>
       <h1 className="text-2xl font-bold text-slate-900 mb-2">
-        Page Not Found
+        Page not found
       </h1>
       <p className="text-sm text-slate-600 mb-6">
-        The gas station, state page, or resource you requested could not be located. It may have moved or does not currently offer fuel service.
+        We couldn&apos;t find that station or page.
       </p>
       <div className="flex flex-col gap-2.5 sm:flex-row sm:justify-center">
         <Link
           href="/"
-          className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 transition-colors"
+          className="btn btn-primary"
         >
-          &larr; Overview
-        </Link>
-        <Link
-          href="/states"
-          className="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
-        >
-          Browse States
+          Find a station
         </Link>
         <Link
           href="/map"
-          className="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+          className="btn btn-secondary"
         >
-          View Map
+          View map
         </Link>
       </div>
     </div>
