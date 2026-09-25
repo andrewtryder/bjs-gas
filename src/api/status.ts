@@ -1,5 +1,11 @@
 import type { PrismaClient } from "@prisma/client";
-import { loadGasClubs } from "../collector.js";
+import {
+  COLLECTION_EXPECTED_MAX_MS,
+  getCollectionLockState,
+  isUsableCollectionRun,
+  loadGasClubs,
+  type CollectionLockState,
+} from "../collector.js";
 import type { ClubFailure } from "../fuel/types.js";
 
 export const FRESH_WINDOW_MINUTES = 90;
@@ -10,6 +16,8 @@ export type StatusFreshness = {
   oldestObservedAt: string | null;
   currentPriceRows: number;
   stationsObservedRecently: number;
+  /** stationsObservedRecently / configuredGasClubs, 0 when none configured. */
+  freshStationRatio: number;
   freshWindowMinutes: number;
 };
 
@@ -27,13 +35,23 @@ export type StatusLastCollection = {
   databaseQueries: number;
   degraded: boolean;
   failures: ClubFailure[];
+  usable: boolean;
 };
 
 export type StatusPayload = {
   ok: true;
   healthy: boolean;
   unhealthyReasons: string[];
+  /** Most recent persisted attempt (success or failure). */
+  lastAttemptedCollection: StatusLastCollection | null;
+  /** Most recent usable attempt (observations > 0, not aborted). */
+  lastSuccessfulCollection: StatusLastCollection | null;
+  /**
+   * Backward-compatible alias: prefers lastSuccessfulCollection, else lastAttempted.
+   * Prefer the explicit fields for new clients.
+   */
   lastCollection: StatusLastCollection | null;
+  collectionLock: CollectionLockState;
   freshness: StatusFreshness;
   configuredGasClubs: number;
 };
@@ -44,58 +62,138 @@ function asIso(value: Date | string | null | undefined): string | null {
   return new Date(value).toISOString();
 }
 
+function toStatusRun(latestRun: {
+  startedAt: Date;
+  finishedAt: Date;
+  durationMs: number;
+  clubsConfigured: number;
+  clubsSucceeded: number;
+  clubsEmptyFuels: number;
+  clubsHardFailed: number;
+  fuelObservations: number;
+  historyChanges: number;
+  databaseQueries: number;
+  degraded: boolean;
+  failures: unknown;
+}): StatusLastCollection {
+  const failures = (latestRun.failures ?? []) as ClubFailure[];
+  const run: StatusLastCollection = {
+    startedAt: latestRun.startedAt.toISOString(),
+    finishedAt: latestRun.finishedAt.toISOString(),
+    durationMs: latestRun.durationMs,
+    clubsConfigured: latestRun.clubsConfigured,
+    clubsSucceeded: latestRun.clubsSucceeded,
+    clubsEmptyFuels: latestRun.clubsEmptyFuels,
+    clubsHardFailed: latestRun.clubsHardFailed,
+    clubsFailed: latestRun.clubsHardFailed + latestRun.clubsEmptyFuels,
+    fuelObservations: latestRun.fuelObservations,
+    historyChanges: latestRun.historyChanges,
+    databaseQueries: latestRun.databaseQueries,
+    degraded: latestRun.degraded,
+    failures,
+    usable: false,
+  };
+  run.usable = isUsableCollectionRun(run);
+  return run;
+}
+
 export function evaluateHealthy(input: {
   configuredGasClubs: number;
-  lastCollection: StatusLastCollection | null;
+  lastAttemptedCollection: StatusLastCollection | null;
+  lastSuccessfulCollection: StatusLastCollection | null;
   freshness: StatusFreshness;
+  collectionLock?: CollectionLockState;
   now?: Date;
 }): { healthy: boolean; unhealthyReasons: string[] } {
   const now = input.now ?? new Date();
   const reasons: string[] = [];
-  const run = input.lastCollection;
+  const attempted = input.lastAttemptedCollection;
+  const successful = input.lastSuccessfulCollection;
 
-  if (!run) {
+  // A normal active collect (seconds) is expected — not unhealthy.
+  // Only flag when the lock has been held far longer than a healthy run.
+  if (input.collectionLock?.stale) {
+    reasons.push("collection_lock_stale");
+  } else if (input.collectionLock?.overExpectedDuration) {
+    reasons.push("collection_over_expected_duration");
+  }
+
+  if (!attempted && !successful) {
     reasons.push("no_collection_run");
     return { healthy: false, unhealthyReasons: reasons };
   }
 
-  const ageMs = now.getTime() - new Date(run.finishedAt).getTime();
-  if (ageMs > FRESH_WINDOW_MINUTES * 60_000) {
-    reasons.push("last_collection_stale");
-  }
-
-  if (run.clubsConfigured !== input.configuredGasClubs) {
-    reasons.push("configured_clubs_mismatch");
-  }
-
-  if (run.clubsConfigured > 0) {
-    const hardRatio = run.clubsHardFailed / run.clubsConfigured;
-    if (hardRatio >= HARD_FAILURE_UNHEALTHY_RATIO) {
-      reasons.push("hard_failure_ratio_high");
+  // Staleness is based on the last usable collection, not a failed/aborted attempt.
+  const freshnessAnchor = successful ?? attempted;
+  if (freshnessAnchor) {
+    const ageMs = now.getTime() - new Date(freshnessAnchor.finishedAt).getTime();
+    if (!successful || ageMs > FRESH_WINDOW_MINUTES * 60_000) {
+      reasons.push("last_collection_stale");
     }
   }
 
-  if (run.databaseQueries !== 1) {
-    reasons.push("unexpected_database_queries");
+  // Latest attempt failure semantics (does not require the whole fleet to look bad).
+  if (attempted) {
+    if (attempted.clubsConfigured !== input.configuredGasClubs) {
+      reasons.push("configured_clubs_mismatch");
+    }
+
+    if (attempted.fuelObservations === 0) {
+      reasons.push("zero_fuel_observations");
+    }
+
+    if (attempted.clubsConfigured > 0) {
+      const hardRatio = attempted.clubsHardFailed / attempted.clubsConfigured;
+      if (hardRatio >= HARD_FAILURE_UNHEALTHY_RATIO) {
+        reasons.push("hard_failure_ratio_high");
+      }
+    }
+
+    if (attempted.databaseQueries !== 1) {
+      reasons.push("unexpected_database_queries");
+    }
+
+    if (attempted.usable && attempted.clubsSucceeded > 0) {
+      const freshRatio =
+        input.freshness.stationsObservedRecently / attempted.clubsSucceeded;
+      if (freshRatio < 0.8) {
+        reasons.push("fresh_stations_below_majority");
+      }
+    } else if (
+      attempted.clubsConfigured > 0 &&
+      attempted.clubsSucceeded === 0 &&
+      attempted.fuelObservations === 0
+    ) {
+      reasons.push("no_clubs_succeeded");
+    }
   }
 
-  // Majority of stations that produced prices this run should still look fresh.
-  if (run.clubsSucceeded > 0) {
-    const freshRatio = input.freshness.stationsObservedRecently / run.clubsSucceeded;
-    if (freshRatio < 0.8) {
-      reasons.push("fresh_stations_below_majority");
+  // Observation age is authoritative for "are prices actually fresh?"
+  // Empty-fuel clubs may retain old observedAt; judge fleet freshness via ratio,
+  // not oldestObservedAt alone.
+  if (input.freshness.latestObservedAt) {
+    const obsAgeMs =
+      now.getTime() - new Date(input.freshness.latestObservedAt).getTime();
+    if (obsAgeMs > FRESH_WINDOW_MINUTES * 60_000) {
+      if (!reasons.includes("last_collection_stale")) {
+        reasons.push("latest_observation_stale");
+      }
     }
   }
 
   return { healthy: reasons.length === 0, unhealthyReasons: reasons };
 }
 
+export { COLLECTION_EXPECTED_MAX_MS };
+
 export async function getCollectionStatus(prisma: PrismaClient): Promise<StatusPayload> {
   const configuredGasClubs = loadGasClubs().length;
+  const collectionLock = getCollectionLockState();
 
-  const [latestRun, freshnessRows] = await Promise.all([
-    prisma.collectionRun.findFirst({
+  const [latestRuns, freshnessRows] = await Promise.all([
+    prisma.collectionRun.findMany({
       orderBy: { finishedAt: "desc" },
+      take: 20,
     }),
     prisma.$queryRaw<
       Array<{
@@ -117,45 +215,38 @@ export async function getCollectionStatus(prisma: PrismaClient): Promise<StatusP
   ]);
 
   const fres = freshnessRows[0];
+  const stationsObservedRecently = Number(fres?.stations_recent ?? 0n);
   const freshness: StatusFreshness = {
     latestObservedAt: asIso(fres?.latest ?? null),
     oldestObservedAt: asIso(fres?.oldest ?? null),
     currentPriceRows: Number(fres?.rows ?? 0n),
-    stationsObservedRecently: Number(fres?.stations_recent ?? 0n),
+    stationsObservedRecently,
+    freshStationRatio:
+      configuredGasClubs === 0 ? 0 : stationsObservedRecently / configuredGasClubs,
     freshWindowMinutes: FRESH_WINDOW_MINUTES,
   };
 
-  let lastCollection: StatusLastCollection | null = null;
-  if (latestRun) {
-    const failures = (latestRun.failures ?? []) as ClubFailure[];
-    lastCollection = {
-      startedAt: latestRun.startedAt.toISOString(),
-      finishedAt: latestRun.finishedAt.toISOString(),
-      durationMs: latestRun.durationMs,
-      clubsConfigured: latestRun.clubsConfigured,
-      clubsSucceeded: latestRun.clubsSucceeded,
-      clubsEmptyFuels: latestRun.clubsEmptyFuels,
-      clubsHardFailed: latestRun.clubsHardFailed,
-      clubsFailed: latestRun.clubsHardFailed + latestRun.clubsEmptyFuels,
-      fuelObservations: latestRun.fuelObservations,
-      historyChanges: latestRun.historyChanges,
-      databaseQueries: latestRun.databaseQueries,
-      degraded: latestRun.degraded,
-      failures,
-    };
-  }
+  const mapped = latestRuns.map(toStatusRun);
+  const lastAttemptedCollection = mapped[0] ?? null;
+  const lastSuccessfulCollection = mapped.find((r) => r.usable) ?? null;
+  const lastCollection = lastSuccessfulCollection ?? lastAttemptedCollection;
 
   const { healthy, unhealthyReasons } = evaluateHealthy({
     configuredGasClubs,
-    lastCollection,
+    lastAttemptedCollection,
+    lastSuccessfulCollection,
     freshness,
+    collectionLock,
   });
 
   return {
     ok: true,
     healthy,
     unhealthyReasons,
+    lastAttemptedCollection,
+    lastSuccessfulCollection,
     lastCollection,
+    collectionLock,
     freshness,
     configuredGasClubs,
   };

@@ -1,7 +1,12 @@
 import { Hono } from "hono";
 import type { PrismaClient } from "@prisma/client";
 import { authorizeCollector } from "./auth.js";
-import { isCollectionInProgress, loadGasClubs, runCollection } from "./collector.js";
+import {
+  getCollectionLockState,
+  isCollectionInProgress,
+  loadGasClubs,
+  runCollection,
+} from "./collector.js";
 import { getNearbyStations, getStationHistory, getStationWithPrices, listStationsWithPrices } from "./api/stations.js";
 import { getCollectionStatus } from "./api/status.js";
 import { createAnalyticsRouter } from "./api/analytics.js";
@@ -10,6 +15,14 @@ import { reportApiError } from "./honeybadger.js";
 
 export const SERVICE_NAME = "bjs-gas-api";
 export const SERVICE_VERSION = "0.1.0";
+/** Injected at `bun build` via --define; falls back for local/dev. */
+export const BUILD_REVISION =
+  typeof process !== "undefined" && process.env.BUILD_REVISION
+    ? process.env.BUILD_REVISION
+    : "dev";
+/** Injected at build time; true when worktree differed from HEAD at build. */
+export const BUILD_DIRTY =
+  typeof process !== "undefined" && process.env.BUILD_DIRTY === "true";
 
 export type AppEnv = {
   prisma: PrismaClient;
@@ -36,12 +49,24 @@ export function createApp(env: AppEnv): Hono {
 
   app.get("/health", (c) => {
     const gasClubs = loadGasClubs();
+    const lock = getCollectionLockState();
+    c.header("Cache-Control", "no-store");
     return c.json({
       ok: true,
       service: SERVICE_NAME,
       configuredGasClubs: gasClubs.length,
       time: new Date().toISOString(),
       version: SERVICE_VERSION,
+      revision: BUILD_REVISION,
+      dirty: BUILD_DIRTY || BUILD_REVISION.endsWith("-dirty"),
+      collectionInProgress: lock.inProgress,
+      collectionLock: {
+        inProgress: lock.inProgress,
+        startedAt: lock.startedAt,
+        ageSeconds: lock.ageSeconds,
+        overExpectedDuration: lock.overExpectedDuration,
+        stale: lock.stale,
+      },
     });
   });
 
@@ -100,13 +125,15 @@ export function createApp(env: AppEnv): Hono {
 
   app.get("/api/v1/status", async (c) => {
     const payload = await getCollectionStatus(env.prisma);
-    c.header("Cache-Control", "public, max-age=60, s-maxage=60");
+    // Status must stay highly fresh while diagnosing collector/scheduler health.
+    c.header("Cache-Control", "public, max-age=15, s-maxage=15, stale-while-revalidate=30");
     return c.json(payload);
   });
 
   app.get("/api/v1/stations", async (c) => {
     const payload = await listStationsWithPrices(env.prisma);
-    c.header("Cache-Control", "public, max-age=300, s-maxage=600");
+    // Hourly collector → ~5 minute CDN cache is safe; avoid longer stale windows.
+    c.header("Cache-Control", "public, max-age=60, s-maxage=300, stale-while-revalidate=60");
     return c.json(payload);
   });
 
@@ -117,7 +144,7 @@ export function createApp(env: AppEnv): Hono {
     }
     const station = await getStationWithPrices(env.prisma, clubNumber);
     if (!station) return c.json({ error: "not_found" }, 404);
-    c.header("Cache-Control", "public, max-age=300, s-maxage=600");
+    c.header("Cache-Control", "public, max-age=60, s-maxage=300, stale-while-revalidate=60");
     return c.json({ generatedAt: new Date().toISOString(), station });
   });
 
@@ -133,7 +160,7 @@ export function createApp(env: AppEnv): Hono {
     const history = await getStationHistory(env.prisma, clubNumber, {
       limit: Number.isFinite(limit) ? limit : 100,
     });
-    c.header("Cache-Control", "public, max-age=120, s-maxage=300");
+    c.header("Cache-Control", "public, max-age=120, s-maxage=300, stale-while-revalidate=120");
     return c.json({ clubNumber, history });
   });
 
@@ -154,7 +181,7 @@ export function createApp(env: AppEnv): Hono {
 
     if (!result) return c.json({ error: "not_found" }, 404);
 
-    c.header("Cache-Control", "public, max-age=300, s-maxage=600");
+    c.header("Cache-Control", "public, max-age=60, s-maxage=300, stale-while-revalidate=60");
     return c.json({
       generatedAt: new Date().toISOString(),
       clubNumber,

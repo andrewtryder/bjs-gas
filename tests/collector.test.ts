@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { authorizeCollector } from "../src/auth.js";
 import { createApp } from "../src/app.js";
 import { evaluateHealthy } from "../src/api/status.js";
@@ -270,22 +270,23 @@ describe("auth + health API", () => {
   it("status endpoint is public and returns health payload", async () => {
     const finishedAt = new Date();
     const startedAt = new Date(finishedAt.getTime() - 8000);
+    const run = {
+      startedAt,
+      finishedAt,
+      durationMs: 8000,
+      clubsConfigured: 214,
+      clubsSucceeded: 206,
+      clubsEmptyFuels: 8,
+      clubsHardFailed: 0,
+      fuelObservations: 505,
+      historyChanges: 0,
+      databaseQueries: 1,
+      degraded: false,
+      failures: [],
+    };
     const statusPrisma = {
       collectionRun: {
-        findFirst: vi.fn(async () => ({
-          startedAt,
-          finishedAt,
-          durationMs: 8000,
-          clubsConfigured: 214, // 221 minus 7 aliased parent warehouse clubs
-          clubsSucceeded: 206,
-          clubsEmptyFuels: 8,
-          clubsHardFailed: 0,
-          fuelObservations: 505,
-          historyChanges: 0,
-          databaseQueries: 1,
-          degraded: false,
-          failures: [],
-        })),
+        findMany: vi.fn(async () => [run]),
       },
       $queryRaw: vi.fn(async () => [
         {
@@ -303,14 +304,18 @@ describe("auth + health API", () => {
     const body = (await res.json()) as {
       ok: boolean;
       healthy: boolean;
-      lastCollection: { clubsHardFailed: number; clubsEmptyFuels: number } | null;
+      lastCollection: { clubsHardFailed: number; clubsEmptyFuels: number; usable?: boolean } | null;
+      lastSuccessfulCollection: { usable?: boolean } | null;
       freshness: { stationsObservedRecently: number };
+      collectionLock: { inProgress: boolean };
     };
     expect(body.ok).toBe(true);
     expect(body.healthy).toBe(true);
     expect(body.lastCollection?.clubsHardFailed).toBe(0);
     expect(body.lastCollection?.clubsEmptyFuels).toBe(8);
+    expect(body.lastSuccessfulCollection?.usable).toBe(true);
     expect(body.freshness.stationsObservedRecently).toBe(206);
+    expect(body.collectionLock.inProgress).toBe(false);
   });
 });
 
@@ -319,7 +324,7 @@ describe("status healthy evaluation", () => {
     startedAt: "2026-09-02T14:00:00.000Z",
     finishedAt: "2026-09-02T14:00:08.000Z",
     durationMs: 8000,
-    clubsConfigured: 214, // 221 minus 7 aliased parent warehouse clubs
+    clubsConfigured: 214,
     clubsSucceeded: 206,
     clubsEmptyFuels: 8,
     clubsHardFailed: 0,
@@ -329,6 +334,7 @@ describe("status healthy evaluation", () => {
     databaseQueries: 1,
     degraded: false,
     failures: [],
+    usable: true,
   };
 
   const freshness = {
@@ -336,14 +342,36 @@ describe("status healthy evaluation", () => {
     oldestObservedAt: "2026-09-02T14:00:00.000Z",
     currentPriceRows: 505,
     stationsObservedRecently: 206,
+    freshStationRatio: 206 / 214,
     freshWindowMinutes: 90,
   };
 
   it("marks healthy for a fresh successful run", () => {
     const result = evaluateHealthy({
       configuredGasClubs: 214,
-      lastCollection: baseRun,
+      lastAttemptedCollection: baseRun,
+      lastSuccessfulCollection: baseRun,
       freshness,
+      now: new Date("2026-09-02T14:30:00.000Z"),
+    });
+    expect(result.healthy).toBe(true);
+    expect(result.unhealthyReasons).toEqual([]);
+  });
+
+  it("does not mark unhealthy merely because a normal collection is in progress", () => {
+    const result = evaluateHealthy({
+      configuredGasClubs: 214,
+      lastAttemptedCollection: baseRun,
+      lastSuccessfulCollection: baseRun,
+      freshness,
+      collectionLock: {
+        inProgress: true,
+        startedAt: "2026-09-02T14:29:40.000Z",
+        ageMs: 20_000,
+        ageSeconds: 20,
+        overExpectedDuration: false,
+        stale: false,
+      },
       now: new Date("2026-09-02T14:30:00.000Z"),
     });
     expect(result.healthy).toBe(true);
@@ -353,12 +381,325 @@ describe("status healthy evaluation", () => {
   it("marks unhealthy when last collection is stale", () => {
     const result = evaluateHealthy({
       configuredGasClubs: 214,
-      lastCollection: baseRun,
+      lastAttemptedCollection: baseRun,
+      lastSuccessfulCollection: baseRun,
       freshness,
       now: new Date("2026-09-02T16:00:00.000Z"),
     });
     expect(result.healthy).toBe(false);
     expect(result.unhealthyReasons).toContain("last_collection_stale");
+  });
+
+  it("marks unhealthy on zero fuel observations", () => {
+    const failed = {
+      ...baseRun,
+      clubsSucceeded: 0,
+      clubsEmptyFuels: 214,
+      clubsHardFailed: 0,
+      clubsFailed: 214,
+      fuelObservations: 0,
+      degraded: true,
+      usable: false,
+    };
+    const result = evaluateHealthy({
+      configuredGasClubs: 214,
+      lastAttemptedCollection: failed,
+      lastSuccessfulCollection: null,
+      freshness: {
+        ...freshness,
+        stationsObservedRecently: 0,
+        freshStationRatio: 0,
+        latestObservedAt: null,
+      },
+      now: new Date("2026-09-02T14:30:00.000Z"),
+    });
+    expect(result.healthy).toBe(false);
+    expect(result.unhealthyReasons).toContain("zero_fuel_observations");
+    expect(result.unhealthyReasons).toContain("no_clubs_succeeded");
+  });
+
+  it("marks unhealthy on excessive hard failures", () => {
+    const result = evaluateHealthy({
+      configuredGasClubs: 214,
+      lastAttemptedCollection: {
+        ...baseRun,
+        clubsSucceeded: 100,
+        clubsEmptyFuels: 0,
+        clubsHardFailed: 114,
+        clubsFailed: 114,
+        fuelObservations: 200,
+        degraded: true,
+      },
+      lastSuccessfulCollection: {
+        ...baseRun,
+        clubsSucceeded: 100,
+        clubsEmptyFuels: 0,
+        clubsHardFailed: 114,
+        clubsFailed: 114,
+        fuelObservations: 200,
+        degraded: true,
+      },
+      freshness: {
+        ...freshness,
+        stationsObservedRecently: 100,
+        freshStationRatio: 100 / 214,
+      },
+      now: new Date("2026-09-02T14:30:00.000Z"),
+    });
+    expect(result.healthy).toBe(false);
+    expect(result.unhealthyReasons).toContain("hard_failure_ratio_high");
+  });
+
+  it("marks unhealthy when collection exceeds expected duration", () => {
+    const result = evaluateHealthy({
+      configuredGasClubs: 214,
+      lastAttemptedCollection: baseRun,
+      lastSuccessfulCollection: baseRun,
+      freshness,
+      collectionLock: {
+        inProgress: true,
+        startedAt: "2026-09-02T14:20:00.000Z",
+        ageMs: 10 * 60_000,
+        ageSeconds: 600,
+        overExpectedDuration: true,
+        stale: false,
+      },
+      now: new Date("2026-09-02T14:30:00.000Z"),
+    });
+    expect(result.healthy).toBe(false);
+    expect(result.unhealthyReasons).toContain("collection_over_expected_duration");
+    expect(result.unhealthyReasons).not.toContain("collection_in_progress");
+  });
+});
+
+describe("collection lock semantics", () => {
+  afterEach(async () => {
+    const { __setCollectionLockForTests } = await import("../src/collector.js");
+    __setCollectionLockForTests(null);
+  });
+
+  it("reports over-expected and stale without auto-clearing the lock", async () => {
+    const {
+      COLLECTION_EXPECTED_MAX_MS,
+      COLLECTION_LOCK_STALE_MS,
+      getCollectionLockState,
+      isCollectionInProgress,
+      __setCollectionLockForTests,
+    } = await import("../src/collector.js");
+
+    __setCollectionLockForTests(Date.now() - COLLECTION_EXPECTED_MAX_MS - 1_000);
+    const longRunning = getCollectionLockState();
+    expect(longRunning.inProgress).toBe(true);
+    expect(longRunning.overExpectedDuration).toBe(true);
+    expect(longRunning.stale).toBe(false);
+    expect(isCollectionInProgress()).toBe(true);
+
+    __setCollectionLockForTests(Date.now() - COLLECTION_LOCK_STALE_MS - 1_000);
+    const stale = getCollectionLockState();
+    expect(stale.inProgress).toBe(true);
+    expect(stale.stale).toBe(true);
+    expect(isCollectionInProgress()).toBe(true);
+
+    __setCollectionLockForTests(Date.now() - 1_000);
+    const active = getCollectionLockState();
+    expect(active.inProgress).toBe(true);
+    expect(active.overExpectedDuration).toBe(false);
+    expect(active.stale).toBe(false);
+
+    __setCollectionLockForTests(null);
+    expect(isCollectionInProgress()).toBe(false);
+  });
+
+  it("rejects concurrent collections and releases lock after completion", async () => {
+    const { runCollection, isCollectionInProgress } = await import("../src/collector.js");
+    const fetchImpl = vi.fn(async () => {
+      await new Promise((r) => setTimeout(r, 80));
+      return new Response(
+        JSON.stringify({
+          response: {
+            fuelPriceResponse: {
+              data: [
+                {
+                  sku: "1",
+                  name: "Unleaded",
+                  price: 3.919,
+                  priceDateTime: "2026-09-02T12:00:00",
+                },
+              ],
+            },
+          },
+        }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      );
+    });
+
+    const first = runCollection({
+      dryRun: true,
+      dataDir: "tests/fixtures/tiny-data",
+      concurrency: 1,
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+    });
+
+    await new Promise((r) => setTimeout(r, 10));
+    expect(isCollectionInProgress()).toBe(true);
+
+    await expect(
+      runCollection({
+        dryRun: true,
+        dataDir: "tests/fixtures/tiny-data",
+        fetchImpl: fetchImpl as unknown as typeof fetch,
+      }),
+    ).rejects.toMatchObject({ code: "COLLECTION_IN_PROGRESS" });
+
+    await first;
+    expect(isCollectionInProgress()).toBe(false);
+  });
+});
+
+describe("collection abort propagation", () => {
+  afterEach(async () => {
+    const { __setCollectionLockForTests } = await import("../src/collector.js");
+    __setCollectionLockForTests(null);
+  });
+
+  it("aborts in-flight fetchClubFuel when parent signal aborts", async () => {
+    const { fetchClubFuel } = await import("../src/fuel/client.js");
+    const parent = new AbortController();
+    let sawAbort = false;
+    const fetchImpl = vi.fn((_url: string, init?: RequestInit) => {
+      return new Promise<Response>((_resolve, reject) => {
+        const signal = init?.signal;
+        if (!signal) {
+          reject(new Error("missing signal"));
+          return;
+        }
+        signal.addEventListener(
+          "abort",
+          () => {
+            sawAbort = true;
+            reject(new DOMException("The operation was aborted.", "AbortError"));
+          },
+          { once: true },
+        );
+      });
+    });
+
+    const pending = fetchClubFuel(189, "2026-09-02T14:00:00.000Z", {
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+      signal: parent.signal,
+      maxAttempts: 3,
+      timeoutMs: 30_000,
+    });
+
+    await new Promise((r) => setTimeout(r, 10));
+    parent.abort(new Error("collection_aborted"));
+
+    await expect(pending).rejects.toMatchObject({ code: "COLLECTION_ABORTED" });
+    expect(sawAbort).toBe(true);
+  });
+
+  it("runCollection deadline aborts underlying fetches and releases the lock", async () => {
+    const { runCollection, isCollectionInProgress, __setCollectionLockForTests } =
+      await import("../src/collector.js");
+    __setCollectionLockForTests(null);
+
+    let abortedFetches = 0;
+    const fetchImpl = vi.fn((_url: string, init?: RequestInit) => {
+      return new Promise<Response>((_resolve, reject) => {
+        const signal = init?.signal;
+        if (!signal) {
+          reject(new Error("missing signal"));
+          return;
+        }
+        const onAbort = () => {
+          abortedFetches += 1;
+          reject(new DOMException("The operation was aborted.", "AbortError"));
+        };
+        if (signal.aborted) {
+          onAbort();
+          return;
+        }
+        signal.addEventListener("abort", onAbort, { once: true });
+      });
+    });
+
+    await expect(
+      runCollection({
+        dryRun: true,
+        dataDir: "tests/fixtures/tiny-data",
+        concurrency: 1,
+        timeoutMs: 40,
+        fetchImpl: fetchImpl as unknown as typeof fetch,
+      }),
+    ).rejects.toMatchObject({ code: "COLLECTION_ABORTED" });
+
+    expect(abortedFetches).toBeGreaterThan(0);
+    expect(isCollectionInProgress()).toBe(false);
+  });
+});
+
+describe("schedule definition", () => {
+  it("defines hourly collect job for Prisma cronScheduler", async () => {
+    const { schedule } = await import("../src/schedule.js");
+    expect(schedule.jobs).toEqual([{ jobId: "collect", every: "60m" }]);
+  });
+});
+
+describe("API cache headers", () => {
+  it("keeps status highly fresh and stations moderately cached", async () => {
+    const finishedAt = new Date();
+    const startedAt = new Date(finishedAt.getTime() - 8000);
+    const run = {
+      startedAt,
+      finishedAt,
+      durationMs: 8000,
+      clubsConfigured: 214,
+      clubsSucceeded: 206,
+      clubsEmptyFuels: 8,
+      clubsHardFailed: 0,
+      fuelObservations: 505,
+      historyChanges: 0,
+      databaseQueries: 1,
+      degraded: false,
+      failures: [],
+    };
+    const statusPrisma = {
+      collectionRun: {
+        findMany: vi.fn(async () => [run]),
+      },
+      $queryRaw: vi.fn(async () => [
+        {
+          latest: finishedAt,
+          oldest: finishedAt,
+          rows: 505n,
+          stations_recent: 206n,
+        },
+      ]),
+      club: {
+        findMany: vi.fn(async () => []),
+      },
+    } as unknown as PrismaClient;
+
+    const app = createApp({ prisma: statusPrisma, collectorSecret: "test-secret-value-0001" });
+    const statusRes = await app.request("/api/v1/status");
+    expect(statusRes.status).toBe(200);
+    expect(statusRes.headers.get("cache-control")).toContain("s-maxage=15");
+    expect(statusRes.headers.get("cache-control")).toContain("stale-while-revalidate");
+
+    const healthRes = await app.request("/health");
+    expect(healthRes.headers.get("cache-control")).toBe("no-store");
+    const healthBody = (await healthRes.json()) as {
+      revision?: string;
+      dirty?: boolean;
+      collectionInProgress?: boolean;
+    };
+    expect(healthBody.revision).toBeTruthy();
+    expect(typeof healthBody.dirty).toBe("boolean");
+    expect(healthBody.collectionInProgress).toBe(false);
+
+    const stationsRes = await app.request("/api/v1/stations");
+    expect(stationsRes.status).toBe(200);
+    expect(stationsRes.headers.get("cache-control")).toContain("s-maxage=300");
   });
 });
 

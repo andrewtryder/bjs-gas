@@ -8,6 +8,8 @@ export type FetchFuelOptions = {
   maxAttempts?: number;
   fetchImpl?: typeof fetch | undefined;
   feedClubNumber?: number | undefined;
+  /** Collection-scoped abort; when aborted, in-flight fetch + retries stop immediately. */
+  signal?: AbortSignal | undefined;
 };
 
 export type FetchFuelSuccess = {
@@ -25,8 +27,29 @@ export type FetchFuelFailure = {
   retryable: boolean;
 };
 
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+export function isAbortError(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const name = "name" in error ? String(error.name) : "";
+  const message = "message" in error ? String(error.message) : String(error);
+  return name === "AbortError" || /abort/i.test(message);
+}
+
+export function sleep(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(signal.reason instanceof Error ? signal.reason : new Error("aborted"));
+      return;
+    }
+    const timer = setTimeout(() => {
+      signal?.removeEventListener("abort", onAbort);
+      resolve();
+    }, ms);
+    const onAbort = () => {
+      clearTimeout(timer);
+      reject(signal?.reason instanceof Error ? signal.reason : new Error("aborted"));
+    };
+    signal?.addEventListener("abort", onAbort, { once: true });
+  });
 }
 
 function jitter(ms: number): number {
@@ -46,6 +69,47 @@ function parseRetryAfterMs(header: string | null): number | null {
   return null;
 }
 
+function throwIfCollectionAborted(signal: AbortSignal | undefined): void {
+  if (!signal?.aborted) return;
+  const err = new Error("collection_aborted");
+  (err as Error & { code?: string }).code = "COLLECTION_ABORTED";
+  throw err;
+}
+
+/**
+ * Compose a per-request AbortController with an optional parent collection signal
+ * and a per-request timeout. Timers and listeners are always cleaned up.
+ */
+export function createRequestAbort(options: {
+  timeoutMs: number;
+  parent?: AbortSignal | undefined;
+}): { signal: AbortSignal; dispose: () => void } {
+  const controller = new AbortController();
+  const timer = setTimeout(() => {
+    controller.abort(new Error("timeout"));
+  }, options.timeoutMs);
+
+  const onParentAbort = () => {
+    controller.abort(options.parent?.reason ?? new Error("collection_aborted"));
+  };
+
+  if (options.parent) {
+    if (options.parent.aborted) {
+      onParentAbort();
+    } else {
+      options.parent.addEventListener("abort", onParentAbort, { once: true });
+    }
+  }
+
+  return {
+    signal: controller.signal,
+    dispose: () => {
+      clearTimeout(timer);
+      options.parent?.removeEventListener("abort", onParentAbort);
+    },
+  };
+}
+
 export async function fetchClubFuel(
   clubNumber: number,
   observedAt: string,
@@ -60,23 +124,28 @@ export async function fetchClubFuel(
   let lastStatus: number | undefined;
 
   while (attempt < maxAttempts) {
+    throwIfCollectionAborted(options.signal);
     attempt += 1;
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    const { signal, dispose } = createRequestAbort({
+      timeoutMs,
+      parent: options.signal,
+    });
     const urlClubNumber = options.feedClubNumber ?? clubNumber;
     try {
       const response = await fetchImpl(FUEL_URL(urlClubNumber), {
         method: "GET",
         headers: { accept: "application/json" },
-        signal: controller.signal,
+        signal,
       });
       lastStatus = response.status;
 
       if (isRetryableStatus(response.status)) {
         lastError = `HTTP ${response.status}`;
         if (attempt < maxAttempts) {
+          dispose();
+          throwIfCollectionAborted(options.signal);
           const retryAfter = parseRetryAfterMs(response.headers.get("retry-after"));
-          await sleep(retryAfter ?? jitter(400 * 2 ** (attempt - 1)));
+          await sleep(retryAfter ?? jitter(400 * 2 ** (attempt - 1)), options.signal);
           continue;
         }
         return {
@@ -112,10 +181,11 @@ export async function fetchClubFuel(
         };
       }
     } catch (error) {
+      throwIfCollectionAborted(options.signal);
       const message = error instanceof Error ? error.message : String(error);
-      lastError = message.includes("abort") ? "timeout" : message;
+      lastError = isAbortError(error) || /timeout/i.test(message) ? "timeout" : message;
       if (attempt < maxAttempts) {
-        await sleep(jitter(400 * 2 ** (attempt - 1)));
+        await sleep(jitter(400 * 2 ** (attempt - 1)), options.signal);
         continue;
       }
       return {
@@ -126,7 +196,7 @@ export async function fetchClubFuel(
         retryable: true,
       };
     } finally {
-      clearTimeout(timer);
+      dispose();
     }
   }
 

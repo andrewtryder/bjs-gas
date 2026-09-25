@@ -15,7 +15,7 @@ export function createAnalyticsRouter(prisma: PrismaClient): Hono {
     const fuelSku = c.req.query("fuelSku");
     try {
       const result = await getNationalSummary(prisma, fuelSku);
-      c.header("Cache-Control", "public, max-age=60, s-maxage=300");
+      c.header("Cache-Control", "public, max-age=60, s-maxage=120, stale-while-revalidate=60");
       return c.json(result);
     } catch (err) {
       console.error(
@@ -37,7 +37,7 @@ export function createAnalyticsRouter(prisma: PrismaClient): Hono {
 
     try {
       const result = await getNationalTrends(prisma, { fuelSku, days, state });
-      c.header("Cache-Control", "public, max-age=300, s-maxage=1800");
+      c.header("Cache-Control", "public, max-age=120, s-maxage=600, stale-while-revalidate=120");
       return c.json(result);
     } catch (err) {
       console.error(
@@ -58,7 +58,7 @@ export function createAnalyticsRouter(prisma: PrismaClient): Hono {
 
     try {
       const result = await getNationalTrends(prisma, { fuelSku, days, state });
-      c.header("Cache-Control", "public, max-age=300, s-maxage=1800");
+      c.header("Cache-Control", "public, max-age=120, s-maxage=600, stale-while-revalidate=120");
       return c.json(result);
     } catch (err) {
       console.error(
@@ -76,7 +76,7 @@ export function createAnalyticsRouter(prisma: PrismaClient): Hono {
     const fuelSku = c.req.query("fuelSku");
     try {
       const result = await getStateSummaries(prisma, fuelSku);
-      c.header("Cache-Control", "public, max-age=300, s-maxage=900");
+      c.header("Cache-Control", "public, max-age=120, s-maxage=600, stale-while-revalidate=120");
       return c.json(result);
     } catch (err) {
       console.error(
@@ -99,7 +99,7 @@ export function createAnalyticsRouter(prisma: PrismaClient): Hono {
 
     try {
       const result = await getPriceMovers(prisma, { fuelSku, days, limit });
-      c.header("Cache-Control", "public, max-age=300, s-maxage=900");
+      c.header("Cache-Control", "public, max-age=120, s-maxage=600, stale-while-revalidate=120");
       return c.json(result);
     } catch (err) {
       console.error(
