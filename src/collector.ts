@@ -9,7 +9,11 @@ import {
   type CollectionResult,
   type FuelObservation,
 } from "./fuel/types.js";
-import { persistFuelObservations, type PersistOptions } from "./persist.js";
+import {
+  persistFuelObservations,
+  resolvePersistWatchdogTimeoutMs,
+  type PersistOptions,
+} from "./persist.js";
 import { getUpstreamFuelFeedClub, loadGasStationAliases } from "./gas-station-alias.js";
 import gasClubsJson from "../data/gas-clubs.json" with { type: "json" };
 
@@ -415,6 +419,13 @@ async function runCollectionBody(input: {
 
   if (!options.dryRun) {
     assertWithinDeadline(deadlineAtMs, signal, "pre-persistence");
+    const remainingMs = deadlineAtMs - Date.now();
+    const requiredPersistBudgetMs = resolvePersistWatchdogTimeoutMs(options.persistOptions);
+    if (remainingMs <= requiredPersistBudgetMs) {
+      throw collectionAbortedError(
+        `insufficient time remaining for persistence: ${remainingMs}ms remaining <= ${requiredPersistBudgetMs}ms required budget`,
+      );
+    }
     if (!options.prisma) {
       throw new Error("prisma client required unless dryRun");
     }

@@ -23,6 +23,13 @@ export type PersistOptions = {
   _testSleepSeconds?: number | undefined;
 };
 
+export function resolvePersistWatchdogTimeoutMs(options?: PersistOptions): number {
+  if (options?.watchdogTimeoutMs !== undefined) return options.watchdogTimeoutMs;
+  const maxWaitMs = options?.maxWaitMs ?? DEFAULT_DB_MAX_WAIT_MS;
+  const transactionTimeoutMs = options?.transactionTimeoutMs ?? DEFAULT_DB_TRANSACTION_TIMEOUT_MS;
+  return maxWaitMs + transactionTimeoutMs + DEFAULT_WATCHDOG_SAFETY_MARGIN_MS;
+}
+
 /**
  * Persist observations + one CollectionRun with a single parameterized SQL statement.
  * History inserts only when price is new or changed (NUMERIC IS DISTINCT FROM).
@@ -39,9 +46,7 @@ export async function persistFuelObservations(
   const statementTimeoutMs = options.statementTimeoutMs ?? DEFAULT_DB_STATEMENT_TIMEOUT_MS;
   const transactionTimeoutMs = options.transactionTimeoutMs ?? DEFAULT_DB_TRANSACTION_TIMEOUT_MS;
   const maxWaitMs = options.maxWaitMs ?? DEFAULT_DB_MAX_WAIT_MS;
-  const watchdogTimeoutMs =
-    options.watchdogTimeoutMs ??
-    maxWaitMs + transactionTimeoutMs + DEFAULT_WATCHDOG_SAFETY_MARGIN_MS;
+  const watchdogTimeoutMs = resolvePersistWatchdogTimeoutMs(options);
   const terminate = options.terminateProcess ?? ((code: number) => process.exit(code));
 
   const batch = dedupeObservations(observations);
@@ -269,8 +274,18 @@ export async function persistFuelObservations(
           transactionTimeoutMs,
         }),
       );
-      options.onWatchdogTimeout?.(fatalError);
-      terminate(1);
+      try {
+        options.onWatchdogTimeout?.(fatalError);
+      } catch (hookError) {
+        console.error(
+          JSON.stringify({
+            event: "collector_persistence_watchdog_hook_error",
+            error: hookError instanceof Error ? hookError.message : String(hookError),
+          }),
+        );
+      } finally {
+        terminate(1);
+      }
       reject(fatalError);
     }, watchdogTimeoutMs);
   });

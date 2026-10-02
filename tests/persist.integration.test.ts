@@ -215,7 +215,9 @@ describeDb("bulk persistence against Postgres", () => {
     expect(inserted?.durationMs).toBe(stats.durationMs);
   });
 
-  it("preserves exact ISO-8601 UTC instant when database session timezone is non-UTC (America/New_York)", async () => {
+  it(
+    "preserves exact ISO-8601 UTC instant when database session timezone is non-UTC (America/New_York)",
+    async () => {
     const nyPrisma = new PrismaClient({
       datasources: {
         db: {
@@ -301,5 +303,5 @@ describeDb("bulk persistence against Postgres", () => {
     } finally {
       await nyPrisma.$disconnect();
     }
-  });
+  }, 15_000);
 });

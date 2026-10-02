@@ -1232,6 +1232,172 @@ describe("persistence timeout and lock safety", () => {
     expect(onWatchdogTimeout).toHaveBeenCalled();
     expect(terminateProcess).toHaveBeenCalledWith(1);
   });
+
+  it("fail-closed watchdog: a throwing watchdog hook does not bypass terminateProcess(1) or clear the lock", async () => {
+    const { runCollection, isCollectionInProgress } = await import("../src/collector.js");
+
+    const neverSettlingPromise = new Promise(() => {});
+    const { prisma } = createMockPrisma({
+      onTransaction: async () => {
+        return await neverSettlingPromise;
+      },
+    });
+
+    const onWatchdogTimeout = vi.fn(() => {
+      throw new Error("unhandled hook explosion");
+    });
+    const terminateProcess = vi.fn();
+
+    const collectionPromise = runCollection({
+      prisma,
+      dataDir: "tests/fixtures/tiny-data",
+      fetchImpl: successfulFetchImpl,
+      persistOptions: {
+        statementTimeoutMs: 30,
+        transactionTimeoutMs: 50,
+        maxWaitMs: 20,
+        watchdogTimeoutMs: 100,
+        onWatchdogTimeout,
+        terminateProcess,
+      },
+    });
+
+    await expect(collectionPromise).rejects.toMatchObject({
+      code: "PERSIST_WATCHDOG_TIMEOUT",
+    });
+
+    // 1. Hook threw, but terminateProcess(1) was STILL called unconditionally!
+    expect(onWatchdogTimeout).toHaveBeenCalled();
+    expect(terminateProcess).toHaveBeenCalledWith(1);
+
+    // 2. Lock remains asserted (fail-closed!)
+    expect(isCollectionInProgress()).toBe(true);
+
+    // 3. No subsequent collection can start
+    await expect(
+      runCollection({
+        prisma,
+        dataDir: "tests/fixtures/tiny-data",
+        fetchImpl: successfulFetchImpl,
+      }),
+    ).rejects.toMatchObject({ code: "COLLECTION_IN_PROGRESS" });
+
+    // Clean up test lock
+    const { __setCollectionLockForTests } = await import("../src/collector.js");
+    __setCollectionLockForTests(null);
+  });
+
+  it("insufficient persistence budget: main persistence is never entered when remainingMs <= requiredPersistBudgetMs", async () => {
+    const { runCollection, isCollectionInProgress } = await import("../src/collector.js");
+
+    let mainPersistCalled = false;
+    let fallbackPersistCalled = false;
+
+    const mockPrisma = {
+      $transaction: vi.fn(async (fn: (tx: unknown) => Promise<unknown>) => {
+        const mockTx = {
+          $executeRaw: vi.fn(async () => 1),
+          $queryRaw: vi.fn(async (query: unknown, ...params: unknown[]) => {
+            const queryStr = JSON.stringify(query) + JSON.stringify(params);
+            if (queryStr.includes("Regular") || queryStr.includes("3.919") || queryStr.includes("Unleaded")) {
+              mainPersistCalled = true;
+            }
+            return [
+              {
+                observations_received: 0n,
+                history_rows_inserted: 0n,
+                current_rows_upserted: 0n,
+                run_rows_inserted: 1n,
+                run_finished_at: new Date(),
+                run_duration_ms: 10,
+              },
+            ];
+          }),
+        };
+        fallbackPersistCalled = true;
+        return await fn(mockTx);
+      }),
+    } as unknown as PrismaClient;
+
+    // Simulate fetch taking 30ms with timeoutMs = 70ms.
+    // Remaining time after fetch will be ~40ms.
+    // Required persistence budget is watchdogTimeoutMs = 100ms.
+    // Since 40ms <= 100ms, pre-persistence check MUST reject with COLLECTION_ABORTED!
+    const slowFetch = vi.fn(async (input: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => {
+      await sleep(30);
+      return await successfulFetchImpl(input, init);
+    }) as unknown as typeof fetch;
+
+    const collectPromise = runCollection({
+      prisma: mockPrisma,
+      dataDir: "tests/fixtures/tiny-data",
+      fetchImpl: slowFetch,
+      timeoutMs: 70,
+      persistOptions: {
+        statementTimeoutMs: 30,
+        transactionTimeoutMs: 50,
+        maxWaitMs: 20,
+        watchdogTimeoutMs: 100, // required budget = 100ms
+      },
+    });
+
+    await expect(collectPromise).rejects.toMatchObject({
+      code: "COLLECTION_ABORTED",
+    });
+
+    // 1. Main persistence was NEVER entered!
+    expect(mainPersistCalled).toBe(false);
+
+    // 2. Ordinary failure recording occurred
+    expect(fallbackPersistCalled).toBe(true);
+
+    // 3. Collection lock is released after the bounded failure path settles
+    expect(isCollectionInProgress()).toBe(false);
+  });
+
+  it("sufficient persistence budget: normal persistence proceeds when remainingMs > requiredPersistBudgetMs", async () => {
+    const { runCollection, isCollectionInProgress } = await import("../src/collector.js");
+
+    let mainPersistCalled = false;
+    const mockPrisma = {
+      $transaction: vi.fn(async (fn: (tx: unknown) => Promise<unknown>) => {
+        const mockTx = {
+          $executeRaw: vi.fn(async () => 1),
+          $queryRaw: vi.fn(async () => {
+            mainPersistCalled = true;
+            return [
+              {
+                observations_received: 1n,
+                history_rows_inserted: 1n,
+                current_rows_upserted: 1n,
+                run_rows_inserted: 1n,
+                run_finished_at: new Date(),
+                run_duration_ms: 10,
+              },
+            ];
+          }),
+        };
+        return await fn(mockTx);
+      }),
+    } as unknown as PrismaClient;
+
+    const result = await runCollection({
+      prisma: mockPrisma,
+      dataDir: "tests/fixtures/tiny-data",
+      fetchImpl: successfulFetchImpl,
+      timeoutMs: 10_000,
+      persistOptions: {
+        statementTimeoutMs: 30,
+        transactionTimeoutMs: 50,
+        maxWaitMs: 20,
+        watchdogTimeoutMs: 100,
+      },
+    });
+
+    expect(result.clubsSucceeded).toBe(1);
+    expect(mainPersistCalled).toBe(true);
+    expect(isCollectionInProgress()).toBe(false);
+  });
 });
 
 // Keep import referenced for typecheck of optional dry-run path
