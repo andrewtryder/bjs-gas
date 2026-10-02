@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { ConcurrencyLimiter } from "../src/api/limiter.js";
+import { ConcurrencyLimiter, LimiterOverloadError } from "../src/api/limiter.js";
 import { getCollectionStatus } from "../src/api/status.js";
 import { createAnalyticsRouter } from "../src/api/analytics.js";
 import { createApp } from "../src/app.js";
@@ -7,8 +7,9 @@ import { persistFuelObservations } from "../src/persist.js";
 import type { PrismaClient } from "@prisma/client";
 
 describe("Admission Control and Concurrency Limiter", () => {
+  // 1. concurrent analytics work never exceeds maxConcurrency
   it("bounds multiple concurrent analytics requests to maxConcurrency", async () => {
-    const limiter = new ConcurrencyLimiter(1);
+    const limiter = new ConcurrencyLimiter({ maxConcurrency: 1, maxQueueLength: 10 });
     let active = 0;
     let maxObservedActive = 0;
     const completed: number[] = [];
@@ -43,8 +44,25 @@ describe("Admission Control and Concurrency Limiter", () => {
     expect(limiter.waitingCount).toBe(0);
   });
 
+  // 2. permits are released after success & 10. limiter metrics return to zero after requests settle
+  it("releases permits after success and settles metrics to zero", async () => {
+    const limiter = new ConcurrencyLimiter({ maxConcurrency: 1 });
+    expect(limiter.activeCount).toBe(0);
+    expect(limiter.waitingCount).toBe(0);
+
+    const result = await limiter.run(async () => {
+      expect(limiter.activeCount).toBe(1);
+      return 42;
+    });
+
+    expect(result).toBe(42);
+    expect(limiter.activeCount).toBe(0);
+    expect(limiter.waitingCount).toBe(0);
+  });
+
+  // 3. permits are released after errors
   it("releases permits on errors so subsequent requests proceed", async () => {
-    const limiter = new ConcurrencyLimiter(1);
+    const limiter = new ConcurrencyLimiter({ maxConcurrency: 1 });
 
     // Failing task
     await expect(
@@ -66,10 +84,96 @@ describe("Admission Control and Concurrency Limiter", () => {
     expect(executed).toBe(true);
     expect(result).toBe("success");
     expect(limiter.activeCount).toBe(0);
+    expect(limiter.waitingCount).toBe(0);
   });
 
+  // 4. queue length is bounded & 6. queue overflow receives controlled overload failure
+  it("bounds queue length and rejects overflow with QUEUE_FULL LimiterOverloadError", async () => {
+    const limiter = new ConcurrencyLimiter({
+      maxConcurrency: 1,
+      maxQueueLength: 2,
+      maxQueueWaitMs: 5_000,
+    });
+
+    let releaseFirstTask!: () => void;
+    const firstTaskBlocker = new Promise<void>((r) => {
+      releaseFirstTask = r;
+    });
+
+    // 1 active task
+    const t1 = limiter.run(async () => {
+      await firstTaskBlocker;
+      return "t1";
+    });
+
+    // 2 queued tasks (filling maxQueueLength: 2)
+    const t2 = limiter.run(async () => "t2");
+    const t3 = limiter.run(async () => "t3");
+
+    expect(limiter.activeCount).toBe(1);
+    expect(limiter.waitingCount).toBe(2);
+
+    // 4th task must immediately reject with QUEUE_FULL
+    await expect(limiter.run(async () => "t4")).rejects.toSatisfy(
+      (err: any) => err instanceof LimiterOverloadError && err.code === "QUEUE_FULL",
+    );
+
+    // Metrics remain bounded
+    expect(limiter.activeCount).toBe(1);
+    expect(limiter.waitingCount).toBe(2);
+
+    // Unblock and allow queued to complete
+    releaseFirstTask();
+    const [r1, r2, r3] = await Promise.all([t1, t2, t3]);
+    expect([r1, r2, r3]).toEqual(["t1", "t2", "t3"]);
+
+    expect(limiter.activeCount).toBe(0);
+    expect(limiter.waitingCount).toBe(0);
+  });
+
+  // 5. queued work exceeding max wait receives controlled overload failure
+  it("rejects queued tasks exceeding maxQueueWaitMs with QUEUE_TIMEOUT", async () => {
+    const limiter = new ConcurrencyLimiter({
+      maxConcurrency: 1,
+      maxQueueLength: 5,
+      maxQueueWaitMs: 30, // 30ms queue wait limit
+    });
+
+    let releaseActiveTask!: () => void;
+    const activeBlocker = new Promise<void>((r) => {
+      releaseActiveTask = r;
+    });
+
+    // Start long-running active task
+    const activeTask = limiter.run(async () => {
+      await activeBlocker;
+      return "active_done";
+    });
+
+    // Queue a task that will wait longer than 30ms
+    const queuedTask = limiter.run(async () => "queued_done");
+
+    expect(limiter.activeCount).toBe(1);
+    expect(limiter.waitingCount).toBe(1);
+
+    // Queued task must reject with QUEUE_TIMEOUT after 30ms
+    await expect(queuedTask).rejects.toSatisfy(
+      (err: any) => err instanceof LimiterOverloadError && err.code === "QUEUE_TIMEOUT",
+    );
+
+    // Item was removed from queue on timeout
+    expect(limiter.waitingCount).toBe(0);
+
+    // Release active task
+    releaseActiveTask();
+    await activeTask;
+    expect(limiter.activeCount).toBe(0);
+    expect(limiter.waitingCount).toBe(0);
+  });
+
+  // 7. /api/v1/status completes while analytics work is queued
   it("status can complete while analytics work is queued", async () => {
-    const limiter = new ConcurrencyLimiter(1);
+    const limiter = new ConcurrencyLimiter({ maxConcurrency: 1, maxQueueLength: 5 });
 
     let analyticsStarted = false;
     let resolveAnalytics!: () => void;
@@ -142,10 +246,12 @@ describe("Admission Control and Concurrency Limiter", () => {
     resolveAnalytics();
     await Promise.all([longRunningAnalytics, queuedAnalytics]);
     expect(limiter.activeCount).toBe(0);
+    expect(limiter.waitingCount).toBe(0);
   });
 
+  // 8. collector persistence itself is not wrapped in the analytics limiter
   it("collector persistence is not blocked by analytics admission control", async () => {
-    const limiter = new ConcurrencyLimiter(1);
+    const limiter = new ConcurrencyLimiter({ maxConcurrency: 1, maxQueueLength: 5 });
 
     let resolveAnalytics!: () => void;
     const analyticsGate = new Promise<void>((r) => {
@@ -217,8 +323,10 @@ describe("Admission Control and Concurrency Limiter", () => {
     resolveAnalytics();
     await Promise.all([analyticsTask1, analyticsTask2]);
     expect(limiter.activeCount).toBe(0);
+    expect(limiter.waitingCount).toBe(0);
   });
 
+  // 9. P2024 becomes structured HTTP 503 & overload becomes structured HTTP 503
   it("analytics router returns 503 with structured P2024 JSON on pool timeout", async () => {
     const p2024Error = Object.assign(
       new Error("Timed out fetching a new connection from the connection pool"),
@@ -240,6 +348,34 @@ describe("Admission Control and Concurrency Limiter", () => {
       code: "P2024",
       message: "Database connection pool exhausted. Please retry.",
     });
+  });
+
+  it("analytics router returns 503 with analytics_overloaded on limiter queue rejection", async () => {
+    const mockPrisma = {} as unknown as PrismaClient;
+    const overloadedLimiter = new ConcurrencyLimiter({
+      maxConcurrency: 1,
+      maxQueueLength: 0, // Queue full immediately on second request
+    });
+
+    const router = createAnalyticsRouter(mockPrisma, overloadedLimiter);
+
+    // Block the 1 active permit
+    let unblock!: () => void;
+    const blocker = new Promise<void>((r) => {
+      unblock = r;
+    });
+    const firstCall = router.request("/summary");
+
+    // Next request hits queue full (maxQueueLength: 0)
+    const secondRes = await router.request("/summary");
+    expect(secondRes.status).toBe(503);
+    const body = await secondRes.json();
+    expect(body).toEqual({
+      error: "analytics_overloaded",
+      reason: "QUEUE_FULL",
+    });
+
+    unblock();
   });
 
   it("app.onError catches P2024 on operational routes and returns 503 with structured JSON", async () => {

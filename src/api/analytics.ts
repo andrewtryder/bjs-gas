@@ -6,7 +6,7 @@ import {
   getStateSummaries,
   getPriceMovers,
 } from "../analytics/queries.js";
-import { ConcurrencyLimiter, analyticsLimiter } from "./limiter.js";
+import { ConcurrencyLimiter, LimiterOverloadError, analyticsLimiter } from "./limiter.js";
 
 function handleAnalyticsError(
   err: unknown,
@@ -15,6 +15,30 @@ function handleAnalyticsError(
   fallbackError: string,
   limiter: ConcurrencyLimiter,
 ) {
+  if (err instanceof LimiterOverloadError) {
+    console.warn(
+      JSON.stringify({
+        event: "analytics_overloaded",
+        route: c.req.path,
+        method: c.req.method,
+        queryCategory: "analytics",
+        reason: err.code,
+        message: err.message,
+        poolPressure: {
+          activeAnalytics: limiter.activeCount,
+          waitingAnalytics: limiter.waitingCount,
+        },
+      }),
+    );
+    return c.json(
+      {
+        error: "analytics_overloaded",
+        reason: err.code,
+      },
+      503,
+    );
+  }
+
   const isP2024 =
     typeof err === "object" &&
     err !== null &&
