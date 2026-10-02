@@ -243,6 +243,8 @@ describeDb("bulk persistence against Postgres", () => {
         },
         update: { hasGas: true },
       });
+      await nyPrisma.fuelPriceHistory.deleteMany({ where: { clubNumber: testClubNumber } });
+      await nyPrisma.fuelPriceCurrent.deleteMany({ where: { clubNumber: testClubNumber } });
 
       const inputObservedAt = "2026-09-02T13:45:00.000Z";
       const inputStartedAt = "2026-09-02T13:40:00.000Z";
