@@ -36,21 +36,20 @@ export default async function HomePage() {
   let fetchError: string | null = null;
 
   try {
-    const [
-      stationsRes,
-      summaryRes,
-      trendsRes,
-      statesRes,
-      moversRes,
-      statusRes,
-    ] = await Promise.allSettled([
+    // Fetch operational endpoints first so primary station list and health render
+    // without contending with heavier analytics database queries against the pool.
+    const [stationsRes, statusRes] = await Promise.allSettled([
       getStations(),
-      getNationalSummary("1"),
-      getNationalTrends(30, "1"),
-      getStateSummaries("1"),
-      getPriceMovers(7, "1"),
       getSystemStatus(),
     ]);
+
+    const [summaryRes, trendsRes, statesRes, moversRes] =
+      await Promise.allSettled([
+        getNationalSummary("1"),
+        getNationalTrends(30, "1"),
+        getStateSummaries("1"),
+        getPriceMovers(7, "1"),
+      ]);
 
     if (stationsRes.status === "fulfilled") {
       stations = stationsRes.value.stations || [];

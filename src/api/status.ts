@@ -190,29 +190,28 @@ export async function getCollectionStatus(prisma: PrismaClient): Promise<StatusP
   const configuredGasClubs = loadGasClubs().length;
   const collectionLock = getCollectionLockState();
 
-  const [latestRuns, freshnessRows] = await Promise.all([
-    prisma.collectionRun.findMany({
-      orderBy: { finishedAt: "desc" },
-      take: 20,
-    }),
-    prisma.$queryRaw<
-      Array<{
-        latest: Date | null;
-        oldest: Date | null;
-        rows: bigint;
-        stations_recent: bigint;
-      }>
-    >`
-      SELECT
-        MAX("observedAt") AS latest,
-        MIN("observedAt") AS oldest,
-        COUNT(*)::bigint AS rows,
-        COUNT(DISTINCT "clubNumber") FILTER (
-          WHERE "observedAt" >= NOW() - (${FRESH_WINDOW_MINUTES}::int * INTERVAL '1 minute')
-        )::bigint AS stations_recent
-      FROM "FuelPriceCurrent"
-    `,
-  ]);
+  const latestRuns = await prisma.collectionRun.findMany({
+    orderBy: { finishedAt: "desc" },
+    take: 20,
+  });
+
+  const freshnessRows = await prisma.$queryRaw<
+    Array<{
+      latest: Date | null;
+      oldest: Date | null;
+      rows: bigint;
+      stations_recent: bigint;
+    }>
+  >`
+    SELECT
+      MAX("observedAt") AS latest,
+      MIN("observedAt") AS oldest,
+      COUNT(*)::bigint AS rows,
+      COUNT(DISTINCT "clubNumber") FILTER (
+        WHERE "observedAt" >= NOW() - (${FRESH_WINDOW_MINUTES}::int * INTERVAL '1 minute')
+      )::bigint AS stations_recent
+    FROM "FuelPriceCurrent"
+  `;
 
   const fres = freshnessRows[0];
   const stationsObservedRecently = Number(fres?.stations_recent ?? 0n);
