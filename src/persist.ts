@@ -9,7 +9,9 @@ import {
 export const DEFAULT_DB_STATEMENT_TIMEOUT_MS = 30_000;
 export const DEFAULT_DB_TRANSACTION_TIMEOUT_MS = 35_000;
 export const DEFAULT_DB_MAX_WAIT_MS = 15_000;
-export const DEFAULT_PERSIST_WATCHDOG_TIMEOUT_MS = 45_000;
+export const DEFAULT_WATCHDOG_SAFETY_MARGIN_MS = 10_000;
+export const DEFAULT_PERSIST_WATCHDOG_TIMEOUT_MS =
+  DEFAULT_DB_MAX_WAIT_MS + DEFAULT_DB_TRANSACTION_TIMEOUT_MS + DEFAULT_WATCHDOG_SAFETY_MARGIN_MS;
 
 export type PersistOptions = {
   statementTimeoutMs?: number | undefined;
@@ -37,7 +39,9 @@ export async function persistFuelObservations(
   const statementTimeoutMs = options.statementTimeoutMs ?? DEFAULT_DB_STATEMENT_TIMEOUT_MS;
   const transactionTimeoutMs = options.transactionTimeoutMs ?? DEFAULT_DB_TRANSACTION_TIMEOUT_MS;
   const maxWaitMs = options.maxWaitMs ?? DEFAULT_DB_MAX_WAIT_MS;
-  const watchdogTimeoutMs = options.watchdogTimeoutMs ?? (transactionTimeoutMs + 10_000);
+  const watchdogTimeoutMs =
+    options.watchdogTimeoutMs ??
+    maxWaitMs + transactionTimeoutMs + DEFAULT_WATCHDOG_SAFETY_MARGIN_MS;
   const terminate = options.terminateProcess ?? ((code: number) => process.exit(code));
 
   const batch = dedupeObservations(observations);
@@ -265,11 +269,8 @@ export async function persistFuelObservations(
           transactionTimeoutMs,
         }),
       );
-      if (options.onWatchdogTimeout) {
-        options.onWatchdogTimeout(fatalError);
-      } else {
-        terminate(1);
-      }
+      options.onWatchdogTimeout?.(fatalError);
+      terminate(1);
       reject(fatalError);
     }, watchdogTimeoutMs);
   });

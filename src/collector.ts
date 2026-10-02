@@ -274,7 +274,7 @@ export async function runCollection(options: CollectOptions = {}): Promise<Colle
               statementTimeoutMs: 5_000,
               transactionTimeoutMs: 6_000,
               maxWaitMs: 3_000,
-              watchdogTimeoutMs: 8_000,
+              watchdogTimeoutMs: 12_000,
             },
           );
         } catch (persistError) {

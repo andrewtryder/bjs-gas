@@ -10,6 +10,13 @@ import {
   observationsFromFuelResponse,
 } from "../src/fuel/types.js";
 import { runCollection } from "../src/collector.js";
+import {
+  persistFuelObservations,
+  DEFAULT_DB_STATEMENT_TIMEOUT_MS,
+  DEFAULT_DB_TRANSACTION_TIMEOUT_MS,
+  DEFAULT_DB_MAX_WAIT_MS,
+  DEFAULT_PERSIST_WATCHDOG_TIMEOUT_MS,
+} from "../src/persist.js";
 import type { PrismaClient } from "@prisma/client";
 
 describe("price normalization", () => {
@@ -1049,8 +1056,9 @@ describe("persistence timeout and lock safety", () => {
       dataDir: "tests/fixtures/tiny-data",
       fetchImpl: successfulFetchImpl,
       persistOptions: {
-        statementTimeoutMs: 50,
-        transactionTimeoutMs: 80,
+        statementTimeoutMs: 30,
+        transactionTimeoutMs: 50,
+        maxWaitMs: 20,
         watchdogTimeoutMs: 100,
         onWatchdogTimeout,
         terminateProcess,
@@ -1062,8 +1070,9 @@ describe("persistence timeout and lock safety", () => {
       code: "PERSIST_WATCHDOG_TIMEOUT",
     });
 
-    // 1. Watchdog hook was invoked
+    // 1. Watchdog hook and terminateProcess were invoked
     expect(onWatchdogTimeout).toHaveBeenCalled();
+    expect(terminateProcess).toHaveBeenCalledWith(1);
 
     // 2. Lock is STILL ASSERTED (fail-closed, not cleared!)
     expect(isCollectionInProgress()).toBe(true);
@@ -1080,6 +1089,148 @@ describe("persistence timeout and lock safety", () => {
     // Clean up test lock
     const { __setCollectionLockForTests } = await import("../src/collector.js");
     __setCollectionLockForTests(null);
+  });
+
+  it("enforces timeout hierarchy: statementTimeout < transactionTimeout < maxWait + transactionTimeout < watchdogTimeout", () => {
+    expect(DEFAULT_DB_STATEMENT_TIMEOUT_MS).toBeLessThan(DEFAULT_DB_TRANSACTION_TIMEOUT_MS);
+    expect(DEFAULT_DB_TRANSACTION_TIMEOUT_MS).toBeLessThan(
+      DEFAULT_DB_MAX_WAIT_MS + DEFAULT_DB_TRANSACTION_TIMEOUT_MS,
+    );
+    expect(
+      DEFAULT_DB_MAX_WAIT_MS + DEFAULT_DB_TRANSACTION_TIMEOUT_MS,
+    ).toBeLessThan(DEFAULT_PERSIST_WATCHDOG_TIMEOUT_MS);
+    expect(DEFAULT_PERSIST_WATCHDOG_TIMEOUT_MS).toBeGreaterThanOrEqual(60_000);
+  });
+
+  it("watchdog does not fire during a transaction that legitimately consumes most/all of maxWait plus transaction timeout", async () => {
+    const onWatchdogTimeout = vi.fn();
+    const terminateProcess = vi.fn();
+
+    // Mock Prisma that simulates legitimate time to acquire connection (maxWait) + execute query
+    const mockPrisma = {
+      $transaction: vi.fn(
+        async (
+          fn: (tx: unknown) => Promise<unknown>,
+          _txOpts?: { maxWait?: number; timeout?: number },
+        ) => {
+          // Simulate connection acquisition delay (e.g. 25ms out of 35ms maxWait)
+          await new Promise((r) => setTimeout(r, 25));
+          const mockTx = {
+            $executeRaw: vi.fn(async () => 1),
+            $queryRaw: vi.fn(async () => {
+              // Simulate query execution delay (e.g. 35ms out of 45ms transaction timeout)
+              await new Promise((r) => setTimeout(r, 35));
+              return [
+                {
+                  observations_received: 1n,
+                  history_rows_inserted: 0n,
+                  current_rows_upserted: 1n,
+                  run_rows_inserted: 1n,
+                  run_finished_at: new Date(),
+                  run_duration_ms: 60,
+                },
+              ];
+            }),
+          };
+          return await fn(mockTx);
+        },
+      ),
+    } as unknown as PrismaClient;
+
+    // maxWaitMs = 35, transactionTimeoutMs = 45 -> combined bound = 80ms.
+    // watchdogTimeoutMs = 120ms (with 40ms safety margin).
+    // Total elapsed is ~60ms, which exceeds maxWaitMs and transactionTimeoutMs individually,
+    // but settles safely within the outer bound and well before watchdog.
+    const stats = await persistFuelObservations(
+      mockPrisma,
+      [
+        {
+          clubNumber: 1,
+          fuelSku: "1",
+          fuelName: "Regular",
+          price: "3.50",
+          sourcePriceAtLocal: null,
+          observedAt: "2026-09-02T12:00:00.000Z",
+        },
+      ],
+      {
+        startedAt: "2026-09-02T12:00:00.000Z",
+        clubsConfigured: 1,
+        clubsSucceeded: 1,
+        clubsEmptyFuels: 0,
+        clubsHardFailed: 0,
+        fuelObservations: 1,
+        degraded: false,
+        failures: [],
+      },
+      {
+        statementTimeoutMs: 30,
+        maxWaitMs: 35,
+        transactionTimeoutMs: 45,
+        watchdogTimeoutMs: 120,
+        onWatchdogTimeout,
+        terminateProcess,
+      },
+    );
+
+    expect(stats.observationsReceived).toBe(1);
+    expect(onWatchdogTimeout).not.toHaveBeenCalled();
+    expect(terminateProcess).not.toHaveBeenCalled();
+  });
+
+  it("watchdog fires only after that outer bound (maxWait + transactionTimeout)", async () => {
+    const onWatchdogTimeout = vi.fn();
+    const terminateProcess = vi.fn();
+
+    const maxWaitMs = 25;
+    const transactionTimeoutMs = 35;
+    // Outer bound is maxWaitMs + transactionTimeoutMs = 60ms.
+    // Watchdog is set to 80ms (with 20ms safety margin).
+    const watchdogTimeoutMs = 80;
+
+    let watchdogFiredAt = 0;
+    onWatchdogTimeout.mockImplementation(() => {
+      watchdogFiredAt = Date.now();
+    });
+
+    const hungPrisma = {
+      $transaction: vi.fn(async () => {
+        // Hangs indefinitely beyond outer bound
+        await new Promise(() => {});
+      }),
+    } as unknown as PrismaClient;
+
+    const start = Date.now();
+    await expect(
+      persistFuelObservations(
+        hungPrisma,
+        [],
+        {
+          startedAt: "2026-09-02T12:00:00.000Z",
+          clubsConfigured: 1,
+          clubsSucceeded: 1,
+          clubsEmptyFuels: 0,
+          clubsHardFailed: 0,
+          fuelObservations: 0,
+          degraded: false,
+          failures: [],
+        },
+        {
+          statementTimeoutMs: 20,
+          maxWaitMs,
+          transactionTimeoutMs,
+          watchdogTimeoutMs,
+          onWatchdogTimeout,
+          terminateProcess,
+        },
+      ),
+    ).rejects.toMatchObject({ code: "PERSIST_WATCHDOG_TIMEOUT" });
+
+    const elapsed = watchdogFiredAt - start;
+    // Watchdog must NOT have fired prematurely before maxWait + transactionTimeout
+    expect(elapsed).toBeGreaterThanOrEqual(maxWaitMs + transactionTimeoutMs);
+    expect(onWatchdogTimeout).toHaveBeenCalled();
+    expect(terminateProcess).toHaveBeenCalledWith(1);
   });
 });
 
