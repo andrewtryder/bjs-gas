@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { authorizeCollector } from "../src/auth.js";
 import { createApp } from "../src/app.js";
 import { evaluateHealthy } from "../src/api/status.js";
-import { fetchClubFuel, mapPool } from "../src/fuel/client.js";
+import { fetchClubFuel, mapPool, sleep } from "../src/fuel/client.js";
 import {
   dedupeObservations,
   normalizePrice,
@@ -150,6 +150,55 @@ describe("HTTP fetch behavior", () => {
     }) as unknown as typeof fetch;
     const result = await fetchClubFuel(1, "2026-09-02T12:00:00.000Z", { fetchImpl });
     expect(result.ok).toBe(true);
+  });
+
+  it("bounds Retry-After when delay exceeds remaining collection deadline", async () => {
+    const fetchImpl = vi.fn(async () => {
+      return new Response("rate limited", {
+        status: 429,
+        headers: { "retry-after": "3600" }, // 1 hour requested
+      });
+    }) as unknown as typeof fetch;
+
+    const startedAt = Date.now();
+    const deadlineAtMs = startedAt + 40; // only 40ms left
+
+    await expect(
+      fetchClubFuel(1, "2026-09-02T12:00:00.000Z", {
+        fetchImpl,
+        deadlineAtMs,
+      }),
+    ).rejects.toMatchObject({ code: "COLLECTION_ABORTED" });
+
+    // Must have aborted bounded by remaining deadline, not waited 3600s
+    expect(Date.now() - startedAt).toBeLessThan(500);
+  });
+
+  it("sleep expires and rejects with COLLECTION_ABORTED when deadline reached", async () => {
+    const start = Date.now();
+    await expect(sleep(5000, undefined, start + 30)).rejects.toMatchObject({
+      code: "COLLECTION_ABORTED",
+    });
+    expect(Date.now() - start).toBeLessThan(300);
+
+    // Immediate rejection if deadline already passed
+    await expect(sleep(5000, undefined, Date.now() - 10)).rejects.toMatchObject({
+      code: "COLLECTION_ABORTED",
+    });
+  });
+
+  it("sleep preserves AbortSignal cancellation", async () => {
+    const controller = new AbortController();
+    setTimeout(() => controller.abort(new Error("parent canceled")), 15);
+    await expect(sleep(5000, controller.signal, Date.now() + 10_000)).rejects.toThrow(
+      "parent canceled",
+    );
+  });
+
+  it("normal short retry sleep remains unchanged", async () => {
+    const start = Date.now();
+    await sleep(20, undefined, start + 5000);
+    expect(Date.now() - start).toBeGreaterThanOrEqual(15);
   });
 
   it("mapPool never exceeds concurrency", async () => {

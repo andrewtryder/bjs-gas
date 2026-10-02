@@ -72,6 +72,7 @@ export async function persistFuelObservations(
   }): Promise<PersistStats> => {
     if (typeof db.$executeRaw === "function") {
       await db.$executeRaw`SELECT set_config('statement_timeout', ${String(Math.floor(statementTimeoutMs))}, true)`;
+      await db.$executeRaw`SELECT set_config('timezone', 'UTC', true)`;
     }
 
     const rows = await db.$queryRaw<
@@ -94,7 +95,7 @@ export async function persistFuelObservations(
           fuel_name::text AS fuel_name,
           price::numeric(6,3) AS price,
           NULLIF(source_price_at_local, '')::text AS source_price_at_local,
-          (observed_at::timestamptz AT TIME ZONE 'UTC') AS observed_at
+          observed_at::timestamptz AS observed_at
         FROM jsonb_to_recordset(${JSON.stringify(payload)}::jsonb)
           AS x(
             club_number int,
@@ -164,8 +165,8 @@ export async function persistFuelObservations(
           "createdAt"
         )
         SELECT
-          (r.started_at::timestamptz AT TIME ZONE 'UTC'),
-          (COALESCE(r.finished_at::timestamptz, clock_timestamp()) AT TIME ZONE 'UTC'),
+          r.started_at::timestamptz,
+          COALESCE(r.finished_at::timestamptz, clock_timestamp()),
           COALESCE(
             r.duration_ms::int,
             LEAST(

@@ -46,11 +46,16 @@ export function sleep(
       reject(signal.reason instanceof Error ? signal.reason : new Error("aborted"));
       return;
     }
-    if (deadlineAtMs !== undefined && Date.now() >= deadlineAtMs) {
-      const err = new Error("collection_aborted: wall-clock deadline exceeded");
-      (err as { code?: string }).code = "COLLECTION_ABORTED";
-      reject(err);
-      return;
+    let sleepMs = ms;
+    if (deadlineAtMs !== undefined) {
+      const remainingMs = deadlineAtMs - Date.now();
+      if (remainingMs <= 0) {
+        const err = new Error("collection_aborted: wall-clock deadline exceeded");
+        (err as { code?: string }).code = "COLLECTION_ABORTED";
+        reject(err);
+        return;
+      }
+      sleepMs = Math.min(ms, remainingMs);
     }
     const timer = setTimeout(() => {
       signal?.removeEventListener("abort", onAbort);
@@ -61,7 +66,7 @@ export function sleep(
         return;
       }
       resolve();
-    }, ms);
+    }, sleepMs);
     const onAbort = () => {
       clearTimeout(timer);
       reject(signal?.reason instanceof Error ? signal.reason : new Error("aborted"));
