@@ -703,5 +703,336 @@ describe("API cache headers", () => {
   });
 });
 
+describe("persistence timeout and lock safety", () => {
+  afterEach(async () => {
+    const { __setCollectionLockForTests } = await import("../src/collector.js");
+    __setCollectionLockForTests(null);
+  });
+
+  const successfulFetchImpl = (async () => {
+    return new Response(
+      JSON.stringify({
+        response: {
+          fuelPriceResponse: {
+            data: [
+              {
+                sku: "1",
+                name: "Unleaded",
+                price: 3.919,
+                priceDateTime: "2026-09-02T12:00:00",
+              },
+            ],
+          },
+        },
+      }),
+      { status: 200, headers: { "content-type": "application/json" } },
+    );
+  }) as unknown as typeof fetch;
+
+  function createMockPrisma(options: {
+    onQuery?: (query: unknown) => Promise<unknown>;
+    onTransaction?: (cb: (tx: any) => Promise<unknown>, txOptions?: any) => Promise<unknown>;
+  } = {}) {
+    const txClient = {
+      $executeRaw: vi.fn(async () => 1),
+      $executeRawUnsafe: vi.fn(async () => 1),
+      $queryRaw: vi.fn(async (query: unknown) => {
+        if (options.onQuery) return await options.onQuery(query);
+        return [
+          {
+            observations_received: 1n,
+            history_rows_inserted: 1n,
+            current_rows_upserted: 1n,
+            run_rows_inserted: 1n,
+          },
+        ];
+      }),
+    };
+
+    const prisma = {
+      ...txClient,
+      $transaction: vi.fn(async (cb: (tx: any) => Promise<unknown>, txOptions?: any) => {
+        if (options.onTransaction) {
+          return await options.onTransaction(cb, txOptions);
+        }
+        return await cb(txClient);
+      }),
+    } as unknown as PrismaClient;
+
+    return { prisma, txClient };
+  }
+
+  it("persistence takes longer than its configured DB timeout -> collection rejects/fails observably", async () => {
+    const { runCollection, isCollectionInProgress } = await import("../src/collector.js");
+
+    const { prisma } = createMockPrisma({
+      onTransaction: async (_cb, txOptions) => {
+        // Simulate database statement timeout inside the transaction
+        const timeoutMs = txOptions?.timeout ?? 50;
+        await new Promise((r) => setTimeout(r, 10));
+        const err = new Error(
+          `Raw query failed. Code: 57014. Message: ERROR: canceling statement due to statement timeout after ${timeoutMs}ms`,
+        );
+        throw err;
+      },
+    });
+
+    await expect(
+      runCollection({
+        prisma,
+        dataDir: "tests/fixtures/tiny-data",
+        fetchImpl: successfulFetchImpl,
+        persistOptions: { statementTimeoutMs: 50, transactionTimeoutMs: 100, maxWaitMs: 50 },
+      }),
+    ).rejects.toThrow(/statement timeout/);
+
+    expect(isCollectionInProgress()).toBe(false);
+  });
+
+  it("collection lock is eventually released after the DB operation actually settles", async () => {
+    const { runCollection, isCollectionInProgress } = await import("../src/collector.js");
+
+    let resolveDb: () => void = () => {};
+    const dbPromise = new Promise<void>((resolve) => {
+      resolveDb = resolve;
+    });
+
+    const { prisma } = createMockPrisma({
+      onTransaction: async (cb) => {
+        await dbPromise;
+        return await cb({
+          $executeRawUnsafe: vi.fn(async () => 1),
+          $queryRaw: vi.fn(async () => [
+            {
+              observations_received: 1n,
+              history_rows_inserted: 1n,
+              current_rows_upserted: 1n,
+              run_rows_inserted: 1n,
+            },
+          ]),
+        });
+      },
+    });
+
+    const collectionPromise = runCollection({
+      prisma,
+      dataDir: "tests/fixtures/tiny-data",
+      fetchImpl: successfulFetchImpl,
+    });
+
+    // Wait briefly so fetch finishes and persistence starts
+    await new Promise((r) => setTimeout(r, 20));
+    expect(isCollectionInProgress()).toBe(true);
+
+    // Release the DB operation
+    resolveDb();
+    const result = await collectionPromise;
+
+    expect(result.clubsSucceeded).toBe(1);
+    expect(isCollectionInProgress()).toBe(false);
+  });
+
+  it("no subsequent collection overlaps unresolved persistence", async () => {
+    const { runCollection, isCollectionInProgress } = await import("../src/collector.js");
+
+    let resolveFirstDb: () => void = () => {};
+    const firstDbPromise = new Promise<void>((resolve) => {
+      resolveFirstDb = resolve;
+    });
+
+    const { prisma: prismaFirst } = createMockPrisma({
+      onTransaction: async (cb) => {
+        await firstDbPromise;
+        return await cb({
+          $executeRawUnsafe: vi.fn(async () => 1),
+          $queryRaw: vi.fn(async () => [
+            {
+              observations_received: 1n,
+              history_rows_inserted: 1n,
+              current_rows_upserted: 1n,
+              run_rows_inserted: 1n,
+            },
+          ]),
+        });
+      },
+    });
+
+    const first = runCollection({
+      prisma: prismaFirst,
+      dataDir: "tests/fixtures/tiny-data",
+      fetchImpl: successfulFetchImpl,
+    });
+
+    await new Promise((r) => setTimeout(r, 20));
+    expect(isCollectionInProgress()).toBe(true);
+
+    // Second collection must be rejected with COLLECTION_IN_PROGRESS while first is persisting
+    await expect(
+      runCollection({
+        prisma: prismaFirst,
+        dataDir: "tests/fixtures/tiny-data",
+        fetchImpl: successfulFetchImpl,
+      }),
+    ).rejects.toMatchObject({ code: "COLLECTION_IN_PROGRESS" });
+
+    // Let the first collection finish
+    resolveFirstDb();
+    await first;
+    expect(isCollectionInProgress()).toBe(false);
+
+    // Third collection is now allowed to run and succeed
+    const { prisma: prismaThird } = createMockPrisma();
+    const third = await runCollection({
+      prisma: prismaThird,
+      dataDir: "tests/fixtures/tiny-data",
+      fetchImpl: successfulFetchImpl,
+    });
+    expect(third.clubsSucceeded).toBe(1);
+    expect(isCollectionInProgress()).toBe(false);
+  });
+
+  it("duration includes persistence time", async () => {
+    const { runCollection } = await import("../src/collector.js");
+
+    const delayMs = 60;
+    const { prisma } = createMockPrisma({
+      onTransaction: async (cb) => {
+        await new Promise((r) => setTimeout(r, delayMs));
+        return await cb({
+          $executeRawUnsafe: vi.fn(async () => 1),
+          $queryRaw: vi.fn(async () => [
+            {
+              observations_received: 1n,
+              history_rows_inserted: 1n,
+              current_rows_upserted: 1n,
+              run_rows_inserted: 1n,
+            },
+          ]),
+        });
+      },
+    });
+
+    const result = await runCollection({
+      prisma,
+      dataDir: "tests/fixtures/tiny-data",
+      fetchImpl: successfulFetchImpl,
+    });
+
+    expect(result.durationMs).toBeGreaterThanOrEqual(delayMs);
+    const measuredWallClock =
+      new Date(result.finishedAt).getTime() - new Date(result.startedAt).getTime();
+    expect(measuredWallClock).toBeGreaterThanOrEqual(delayMs);
+  });
+
+  it("rejects on wall-clock deadline even if setTimeout callback did not fire and prevents persistence", async () => {
+    const { runCollection, isCollectionInProgress } = await import("../src/collector.js");
+
+    const realNow = Date.now;
+    let mockedNow = realNow();
+    vi.spyOn(Date, "now").mockImplementation(() => mockedNow);
+
+    let mainPersistCalled = false;
+    let failurePersistCalled = false;
+
+    const { prisma } = createMockPrisma({
+      onTransaction: async (cb, txOptions) => {
+        if (txOptions?.timeout === 6_000) {
+          failurePersistCalled = true;
+        } else {
+          mainPersistCalled = true;
+        }
+        return await cb({
+          $executeRaw: vi.fn(async () => 1),
+          $executeRawUnsafe: vi.fn(async () => 1),
+          $queryRaw: vi.fn(async () => [
+            {
+              observations_received: 0n,
+              history_rows_inserted: 0n,
+              current_rows_upserted: 0n,
+              run_rows_inserted: 1n,
+            },
+          ]),
+        });
+      },
+    });
+
+    // Simulate 5-hour suspension/delay during fetch:
+    const customFetch: typeof fetch = vi.fn(async (input, init) => {
+      mockedNow += 5 * 3600 * 1000;
+      return await successfulFetchImpl(input, init);
+    });
+
+    try {
+      await expect(
+        runCollection({
+          prisma,
+          dataDir: "tests/fixtures/tiny-data",
+          fetchImpl: customFetch,
+          timeoutMs: 10_000,
+        }),
+      ).rejects.toMatchObject({ code: "COLLECTION_ABORTED" });
+
+      // Crucial: must NOT enter main persistence for observations!
+      expect(mainPersistCalled).toBe(false);
+      // Lock is released on ordinary deadline exceeded
+      expect(isCollectionInProgress()).toBe(false);
+    } finally {
+      vi.restoreAllMocks();
+    }
+  });
+
+  it("fail-closed watchdog: unresolved persistence keeps lock asserted and blocks subsequent collections", async () => {
+    const { runCollection, isCollectionInProgress } = await import("../src/collector.js");
+
+    // DB hangs indefinitely
+    const neverSettlingPromise = new Promise(() => {});
+    const { prisma } = createMockPrisma({
+      onTransaction: async () => {
+        return await neverSettlingPromise;
+      },
+    });
+
+    const onWatchdogTimeout = vi.fn();
+    const terminateProcess = vi.fn();
+
+    const collectionPromise = runCollection({
+      prisma,
+      dataDir: "tests/fixtures/tiny-data",
+      fetchImpl: successfulFetchImpl,
+      persistOptions: {
+        statementTimeoutMs: 50,
+        transactionTimeoutMs: 80,
+        watchdogTimeoutMs: 100,
+        onWatchdogTimeout,
+        terminateProcess,
+      },
+    });
+
+    // Expect collection to reject with PERSIST_WATCHDOG_TIMEOUT
+    await expect(collectionPromise).rejects.toMatchObject({
+      code: "PERSIST_WATCHDOG_TIMEOUT",
+    });
+
+    // 1. Watchdog hook was invoked
+    expect(onWatchdogTimeout).toHaveBeenCalled();
+
+    // 2. Lock is STILL ASSERTED (fail-closed, not cleared!)
+    expect(isCollectionInProgress()).toBe(true);
+
+    // 3. Second collection is BLOCKED from running
+    await expect(
+      runCollection({
+        prisma,
+        dataDir: "tests/fixtures/tiny-data",
+        fetchImpl: successfulFetchImpl,
+      }),
+    ).rejects.toMatchObject({ code: "COLLECTION_IN_PROGRESS" });
+
+    // Clean up test lock
+    const { __setCollectionLockForTests } = await import("../src/collector.js");
+    __setCollectionLockForTests(null);
+  });
+});
+
 // Keep import referenced for typecheck of optional dry-run path
 void runCollection;

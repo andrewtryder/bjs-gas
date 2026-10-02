@@ -9,7 +9,7 @@ import {
   type CollectionResult,
   type FuelObservation,
 } from "./fuel/types.js";
-import { persistFuelObservations } from "./persist.js";
+import { persistFuelObservations, type PersistOptions } from "./persist.js";
 import { getUpstreamFuelFeedClub, loadGasStationAliases } from "./gas-station-alias.js";
 import gasClubsJson from "../data/gas-clubs.json" with { type: "json" };
 
@@ -150,10 +150,33 @@ export type CollectOptions = {
   fetchImpl?: typeof fetch | undefined;
   /** Override hard deadline (tests). */
   timeoutMs?: number | undefined;
+  /** Override database persistence timeouts (tests/ops). */
+  persistOptions?: PersistOptions | undefined;
 };
 
 function isEmptyFuelFailure(error: string): boolean {
   return /empty fuel/i.test(error);
+}
+
+export function isDeadlineExceeded(deadlineAtMs: number, nowMs: number = Date.now()): boolean {
+  return nowMs >= deadlineAtMs;
+}
+
+export function assertWithinDeadline(
+  deadlineAtMs: number,
+  signal?: AbortSignal,
+  stage?: string,
+  nowMs: number = Date.now(),
+): void {
+  if (signal?.aborted) {
+    throw collectionAbortedError(signal.reason);
+  }
+  if (isDeadlineExceeded(deadlineAtMs, nowMs)) {
+    const stageInfo = stage ? ` at stage '${stage}'` : "";
+    throw collectionAbortedError(
+      `runCollection exceeded wall-clock deadline${stageInfo} (deadlineAtMs=${deadlineAtMs}, nowMs=${nowMs})`,
+    );
+  }
 }
 
 function collectionAbortedError(reason?: unknown): Error & { code: string } {
@@ -181,6 +204,8 @@ export async function runCollection(options: CollectOptions = {}): Promise<Colle
 
   const startedAtDate = new Date();
   const startedAt = startedAtDate.toISOString();
+  const startedAtMs = startedAtDate.getTime();
+  const deadlineAtMs = startedAtMs + timeoutMs;
   const observedAt = startedAt;
   const clubs = loadGasClubs(options.dataDir);
   const concurrency = options.concurrency ?? DEFAULT_CONCURRENCY;
@@ -189,6 +214,8 @@ export async function runCollection(options: CollectOptions = {}): Promise<Colle
   let deadlineTimer: ReturnType<typeof setTimeout> | undefined = setTimeout(() => {
     deadline.abort(collectionAbortedError(`runCollection timed out after ${timeoutMs}ms`));
   }, timeoutMs);
+
+  let persistWatchdogTriggered = false;
 
   try {
     try {
@@ -200,6 +227,7 @@ export async function runCollection(options: CollectOptions = {}): Promise<Colle
         startedAtDate,
         startedAt,
         observedAt,
+        deadlineAtMs,
         signal: deadline.signal,
       });
     } catch (error) {
@@ -209,31 +237,46 @@ export async function runCollection(options: CollectOptions = {}): Promise<Colle
       throw error;
     }
   } catch (error) {
+    const isWatchdog = (error as { code?: string }).code === "PERSIST_WATCHDOG_TIMEOUT";
+    if (isWatchdog) {
+      persistWatchdogTriggered = true;
+    }
     // Persist a failure run when possible so status cannot keep showing only an older success.
-    if (!options.dryRun && options.prisma) {
+    // Do NOT attempt to persist a failure run if Prisma watchdog timed out (Prisma is hung/broken).
+    if (!options.dryRun && options.prisma && !isWatchdog) {
       const finishedAtDate = new Date();
       const message = error instanceof Error ? error.message : String(error);
       const code = (error as { code?: string }).code;
       if (code !== "COLLECTION_IN_PROGRESS") {
         try {
-          await persistFuelObservations(options.prisma, [], {
-            startedAt,
-            finishedAt: finishedAtDate.toISOString(),
-            durationMs: finishedAtDate.getTime() - startedAtDate.getTime(),
-            clubsConfigured: clubs.length,
-            clubsSucceeded: 0,
-            clubsEmptyFuels: 0,
-            clubsHardFailed: clubs.length,
-            fuelObservations: 0,
-            degraded: true,
-            failures: [
-              {
-                clubNumber: 0,
-                attempts: 1,
-                error: `collection_aborted: ${message}`,
-              },
-            ],
-          });
+          await persistFuelObservations(
+            options.prisma,
+            [],
+            {
+              startedAt,
+              finishedAt: finishedAtDate.toISOString(),
+              durationMs: finishedAtDate.getTime() - startedAtDate.getTime(),
+              clubsConfigured: clubs.length,
+              clubsSucceeded: 0,
+              clubsEmptyFuels: 0,
+              clubsHardFailed: clubs.length,
+              fuelObservations: 0,
+              degraded: true,
+              failures: [
+                {
+                  clubNumber: 0,
+                  attempts: 1,
+                  error: `collection_aborted: ${message}`,
+                },
+              ],
+            },
+            {
+              statementTimeoutMs: 5_000,
+              transactionTimeoutMs: 6_000,
+              maxWaitMs: 3_000,
+              watchdogTimeoutMs: 8_000,
+            },
+          );
         } catch (persistError) {
           console.error(
             JSON.stringify({
@@ -253,7 +296,10 @@ export async function runCollection(options: CollectOptions = {}): Promise<Colle
     if (!deadline.signal.aborted) {
       deadline.abort(collectionAbortedError("runCollection cleanup"));
     }
-    clearCollectionLock();
+    // Fail-closed: never clear lock if persistence watchdog triggered (unsettled Prisma hang)
+    if (!persistWatchdogTriggered) {
+      clearCollectionLock();
+    }
   }
 }
 
@@ -265,6 +311,7 @@ async function runCollectionBody(input: {
   startedAtDate: Date;
   startedAt: string;
   observedAt: string;
+  deadlineAtMs: number;
   signal: AbortSignal;
 }): Promise<CollectionResult> {
   const {
@@ -275,24 +322,27 @@ async function runCollectionBody(input: {
     startedAtDate,
     startedAt,
     observedAt,
+    deadlineAtMs,
     signal,
   } = input;
 
-  if (signal.aborted) throw collectionAbortedError(signal.reason);
+  assertWithinDeadline(deadlineAtMs, signal, "start");
 
   const results = await mapPool(clubs, concurrency, async (club) => {
-    if (signal.aborted) throw collectionAbortedError(signal.reason);
+    assertWithinDeadline(deadlineAtMs, signal, "pre-fetch");
     const feedClubNumber = getUpstreamFuelFeedClub(club.clubNumber, aliases);
     const fuelOpts = {
       signal,
+      deadlineAtMs,
       ...(options.fetchImpl !== undefined ? { fetchImpl: options.fetchImpl } : {}),
       ...(feedClubNumber !== club.clubNumber ? { feedClubNumber } : {}),
     };
     const result = await fetchClubFuel(club.clubNumber, observedAt, fuelOpts);
+    assertWithinDeadline(deadlineAtMs, signal, "post-fetch");
     return { clubNumber: club.clubNumber, result };
   });
 
-  if (signal.aborted) throw collectionAbortedError(signal.reason);
+  assertWithinDeadline(deadlineAtMs, signal, "post-pool");
 
   const observations: FuelObservation[] = [];
   const failures: ClubFailure[] = [];
@@ -328,14 +378,11 @@ async function runCollectionBody(input: {
   }
 
   const deduped = dedupeObservations(observations);
-  const finishedAtDate = new Date();
-  const finishedAt = finishedAtDate.toISOString();
   const clubsFailed = failures.length;
   const clubsHardFailed = clubsFailed - clubsEmptyFuels;
   const clubsConfigured = clubs.length;
   const failureRatio = clubsConfigured === 0 ? 0 : clubsFailed / clubsConfigured;
   const degraded = failureRatio > FAILURE_DEGRADED_RATIO;
-  const durationMs = finishedAtDate.getTime() - startedAtDate.getTime();
 
   if (failureRatio >= FAILURE_CRITICAL_RATIO) {
     console.warn(
@@ -363,28 +410,54 @@ async function runCollectionBody(input: {
 
   let historyChanges = 0;
   let databaseQueries = 0;
+  let finishedAt: string;
+  let durationMs: number;
 
   if (!options.dryRun) {
-    // Abort only checked before the atomic bulk write. Once persist starts,
-    // do not cancel mid-SQL — network/retry/sleep paths honor AbortSignal.
-    if (signal.aborted) throw collectionAbortedError(signal.reason);
+    assertWithinDeadline(deadlineAtMs, signal, "pre-persistence");
     if (!options.prisma) {
       throw new Error("prisma client required unless dryRun");
     }
-    const stats = await persistFuelObservations(options.prisma, deduped, {
-      startedAt,
-      finishedAt,
-      durationMs,
-      clubsConfigured,
-      clubsSucceeded,
-      clubsEmptyFuels,
-      clubsHardFailed,
-      fuelObservations: deduped.length,
-      degraded,
-      failures,
-    });
+    console.log(
+      JSON.stringify({
+        event: "gas_persistence_start",
+        observations: deduped.length,
+      }),
+    );
+    const persistStartedAtMs = Date.now();
+    const stats = await persistFuelObservations(
+      options.prisma,
+      deduped,
+      {
+        startedAt,
+        clubsConfigured,
+        clubsSucceeded,
+        clubsEmptyFuels,
+        clubsHardFailed,
+        fuelObservations: deduped.length,
+        degraded,
+        failures,
+      },
+      options.persistOptions,
+    );
+    const persistDurationMs = Date.now() - persistStartedAtMs;
     historyChanges = stats.historyRowsInserted;
     databaseQueries = stats.databaseQueries;
+    finishedAt = stats.finishedAt;
+    durationMs = stats.durationMs;
+    console.log(
+      JSON.stringify({
+        event: "gas_persistence_complete",
+        durationMs: persistDurationMs,
+        historyRowsInserted: stats.historyRowsInserted,
+        currentRowsUpserted: stats.currentRowsUpserted,
+      }),
+    );
+    assertWithinDeadline(deadlineAtMs, signal, "post-persistence");
+  } else {
+    const finishedAtDate = new Date();
+    finishedAt = finishedAtDate.toISOString();
+    durationMs = finishedAtDate.getTime() - startedAtDate.getTime();
   }
 
   const summary: CollectionResult = {

@@ -68,13 +68,15 @@ export type PersistStats = {
   currentRowsUpserted: number;
   historyRowsInserted: number;
   databaseQueries: number;
+  finishedAt: string;
+  durationMs: number;
 };
 
 /** Summary written into CollectionRun in the same bulk SQL as prices. */
 export type CollectionRunInput = {
   startedAt: string;
-  finishedAt: string;
-  durationMs: number;
+  finishedAt?: string | undefined;
+  durationMs?: number | undefined;
   clubsConfigured: number;
   clubsSucceeded: number;
   clubsEmptyFuels: number;

@@ -10,6 +10,8 @@ export type FetchFuelOptions = {
   feedClubNumber?: number | undefined;
   /** Collection-scoped abort; when aborted, in-flight fetch + retries stop immediately. */
   signal?: AbortSignal | undefined;
+  /** Absolute wall-clock deadline timestamp (ms). When exceeded, operations immediately abort. */
+  deadlineAtMs?: number | undefined;
 };
 
 export type FetchFuelSuccess = {
@@ -34,14 +36,30 @@ export function isAbortError(error: unknown): boolean {
   return name === "AbortError" || /abort/i.test(message);
 }
 
-export function sleep(ms: number, signal?: AbortSignal): Promise<void> {
+export function sleep(
+  ms: number,
+  signal?: AbortSignal,
+  deadlineAtMs?: number,
+): Promise<void> {
   return new Promise((resolve, reject) => {
     if (signal?.aborted) {
       reject(signal.reason instanceof Error ? signal.reason : new Error("aborted"));
       return;
     }
+    if (deadlineAtMs !== undefined && Date.now() >= deadlineAtMs) {
+      const err = new Error("collection_aborted: wall-clock deadline exceeded");
+      (err as { code?: string }).code = "COLLECTION_ABORTED";
+      reject(err);
+      return;
+    }
     const timer = setTimeout(() => {
       signal?.removeEventListener("abort", onAbort);
+      if (deadlineAtMs !== undefined && Date.now() >= deadlineAtMs) {
+        const err = new Error("collection_aborted: wall-clock deadline exceeded");
+        (err as { code?: string }).code = "COLLECTION_ABORTED";
+        reject(err);
+        return;
+      }
       resolve();
     }, ms);
     const onAbort = () => {
@@ -69,11 +87,20 @@ function parseRetryAfterMs(header: string | null): number | null {
   return null;
 }
 
-function throwIfCollectionAborted(signal: AbortSignal | undefined): void {
-  if (!signal?.aborted) return;
-  const err = new Error("collection_aborted");
-  (err as Error & { code?: string }).code = "COLLECTION_ABORTED";
-  throw err;
+function throwIfCollectionAborted(
+  signal: AbortSignal | undefined,
+  deadlineAtMs?: number,
+): void {
+  if (signal?.aborted) {
+    const err = new Error("collection_aborted");
+    (err as Error & { code?: string }).code = "COLLECTION_ABORTED";
+    throw err;
+  }
+  if (deadlineAtMs !== undefined && Date.now() >= deadlineAtMs) {
+    const err = new Error(`collection_aborted: wall-clock deadline exceeded (${deadlineAtMs})`);
+    (err as Error & { code?: string }).code = "COLLECTION_ABORTED";
+    throw err;
+  }
 }
 
 /**
@@ -124,7 +151,7 @@ export async function fetchClubFuel(
   let lastStatus: number | undefined;
 
   while (attempt < maxAttempts) {
-    throwIfCollectionAborted(options.signal);
+    throwIfCollectionAborted(options.signal, options.deadlineAtMs);
     attempt += 1;
     const { signal, dispose } = createRequestAbort({
       timeoutMs,
@@ -143,9 +170,10 @@ export async function fetchClubFuel(
         lastError = `HTTP ${response.status}`;
         if (attempt < maxAttempts) {
           dispose();
-          throwIfCollectionAborted(options.signal);
+          throwIfCollectionAborted(options.signal, options.deadlineAtMs);
           const retryAfter = parseRetryAfterMs(response.headers.get("retry-after"));
-          await sleep(retryAfter ?? jitter(400 * 2 ** (attempt - 1)), options.signal);
+          await sleep(retryAfter ?? jitter(400 * 2 ** (attempt - 1)), options.signal, options.deadlineAtMs);
+          throwIfCollectionAborted(options.signal, options.deadlineAtMs);
           continue;
         }
         return {
@@ -181,11 +209,12 @@ export async function fetchClubFuel(
         };
       }
     } catch (error) {
-      throwIfCollectionAborted(options.signal);
+      throwIfCollectionAborted(options.signal, options.deadlineAtMs);
       const message = error instanceof Error ? error.message : String(error);
       lastError = isAbortError(error) || /timeout/i.test(message) ? "timeout" : message;
       if (attempt < maxAttempts) {
-        await sleep(jitter(400 * 2 ** (attempt - 1)), options.signal);
+        await sleep(jitter(400 * 2 ** (attempt - 1)), options.signal, options.deadlineAtMs);
+        throwIfCollectionAborted(options.signal, options.deadlineAtMs);
         continue;
       }
       return {

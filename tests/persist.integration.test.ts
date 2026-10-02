@@ -49,14 +49,14 @@ describeDb("bulk persistence against Postgres", () => {
     };
   }
 
-  function runInput(overrides: Partial<CollectionRunInput> = {}): CollectionRunInput {
+  function runInput(
+    overrides: Partial<CollectionRunInput> = {},
+  ): CollectionRunInput & { finishedAt: string; durationMs: number } {
     runSeq += 1;
     const startedAt = new Date(Date.UTC(2026, 8, 2, 12, runSeq, 0)).toISOString();
     const finishedAt = new Date(Date.UTC(2026, 8, 2, 12, runSeq, 5)).toISOString();
     return {
       startedAt,
-      finishedAt,
-      durationMs: 5000,
       clubsConfigured: 1,
       clubsSucceeded: 1,
       clubsEmptyFuels: 0,
@@ -65,6 +65,8 @@ describeDb("bulk persistence against Postgres", () => {
       degraded: false,
       failures: [],
       ...overrides,
+      finishedAt: overrides.finishedAt ?? finishedAt,
+      durationMs: overrides.durationMs ?? 5000,
     };
   }
 
@@ -154,5 +156,62 @@ describeDb("bulk persistence against Postgres", () => {
     expect(inserted?.databaseQueries).toBe(1);
     expect(inserted?.historyChanges).toBe(0);
     expect(inserted?.clubsEmptyFuels).toBe(1);
+  });
+
+  it("cancels statement on PostgreSQL statement_timeout, rolls back, and leaves connection usable", async () => {
+    const beforeRuns = await prisma.collectionRun.count();
+    const beforeHist = await prisma.fuelPriceHistory.count({ where: { clubNumber } });
+    const beforeCurrent = await prisma.fuelPriceCurrent.count({ where: { clubNumber } });
+
+    let caughtError: unknown;
+    try {
+      await persistFuelObservations(
+        prisma,
+        [obs("3.999", "99", "2026-09-02T17:00:00.000Z")],
+        runInput(),
+        {
+          statementTimeoutMs: 100,
+          transactionTimeoutMs: 1_000,
+          _testSleepSeconds: 0.5,
+        },
+      );
+    } catch (err) {
+      caughtError = err;
+    }
+
+    expect(caughtError).toBeDefined();
+    const message = caughtError instanceof Error ? caughtError.message : String(caughtError);
+    expect(message).toMatch(/statement timeout|57014/i);
+
+    expect(await prisma.collectionRun.count()).toBe(beforeRuns);
+    expect(await prisma.fuelPriceHistory.count({ where: { clubNumber } })).toBe(beforeHist);
+    expect(await prisma.fuelPriceCurrent.count({ where: { clubNumber } })).toBe(beforeCurrent);
+
+    const healthCheck = await prisma.club.count();
+    expect(healthCheck).toBeGreaterThan(0);
+  });
+
+  it("computes finishedAt and durationMs including persistence when not provided", async () => {
+    const run = runInput({
+      startedAt: new Date(Date.now() - 5000).toISOString(),
+    });
+    const stats = await persistFuelObservations(
+      prisma,
+      [obs("3.777", "1", "2026-09-02T18:00:00.000Z")],
+      {
+        ...run,
+        finishedAt: undefined,
+        durationMs: undefined,
+      },
+    );
+    expect(stats.finishedAt).toBeDefined();
+    expect(new Date(stats.finishedAt).getTime()).toBeGreaterThan(0);
+    expect(stats.durationMs).toBeGreaterThan(0);
+
+    const inserted = await prisma.collectionRun.findFirst({
+      where: { finishedAt: new Date(stats.finishedAt) },
+    });
+    expect(inserted).toBeDefined();
+    expect(inserted?.durationMs).toBe(stats.durationMs);
   });
 });
