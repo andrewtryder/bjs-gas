@@ -73,6 +73,22 @@ describe("isClosedConnectionError classifier", () => {
     expect(isClosedConnectionError(error)).toBe(false);
   });
 
+  it("fails closed on non-P1017 Prisma error even if message mentions closed connection (P1000)", () => {
+    const error = {
+      code: "P1000",
+      message: "Authentication failed against database server: Server has closed the connection",
+    };
+    expect(isClosedConnectionError(error)).toBe(false);
+  });
+
+  it("fails closed on non-P1017 Prisma error even if message mentions closed connection (P2010)", () => {
+    const error = {
+      code: "P2010",
+      message: "Raw query failed: Server has closed the connection",
+    };
+    expect(isClosedConnectionError(error)).toBe(false);
+  });
+
   it("rejects non-object, null, or undefined errors", () => {
     expect(isClosedConnectionError(null)).toBe(false);
     expect(isClosedConnectionError(undefined)).toBe(false);

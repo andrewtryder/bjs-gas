@@ -57,17 +57,17 @@ export function isClosedConnectionError(error: unknown): boolean {
         ? err.errorCode
         : undefined;
 
-  // Explicit exclusions: pool timeouts and transaction timeouts are not closed connections
-  if (code === "P2024" || code === "P2028") {
-    return false;
-  }
-
-  // Structured Prisma code for ConnectionClosed
+  // Fail-closed on structured Prisma codes:
+  // P1017 is the only recognized retryable closed connection code.
+  // Any other Prisma code (Pxxxx) is strictly non-retryable.
   if (code === "P1017") {
     return true;
   }
+  if (code?.startsWith("P")) {
+    return false;
+  }
 
-  // Check driverAdapterError metadata if present
+  // When no structured Prisma code exists, inspect driver adapter structured cause.
   if (err.meta?.driverAdapterError?.cause?.kind === "ConnectionClosed") {
     return true;
   }
