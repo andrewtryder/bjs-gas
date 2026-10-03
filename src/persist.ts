@@ -31,6 +31,72 @@ export function resolvePersistWatchdogTimeoutMs(options?: PersistOptions): numbe
 }
 
 /**
+ * Detects server-closed or broken database connections where retrying
+ * transaction acquisition is safe BEFORE any transaction callback work has started.
+ *
+ * Prefers structured Prisma error codes (e.g. P1017) and only falls back to
+ * narrow, explicit error messages representing closed connection sockets.
+ * Unrelated query errors, syntax errors, pool timeouts (P2024), transaction timeouts,
+ * or statement_timeout are explicitly excluded.
+ */
+export function isClosedConnectionError(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+
+  const err = error as {
+    code?: unknown;
+    errorCode?: unknown;
+    message?: unknown;
+    meta?: { driverAdapterError?: { cause?: { kind?: unknown; message?: unknown } } };
+    cause?: { code?: unknown; message?: unknown };
+  };
+
+  const code =
+    typeof err.code === "string"
+      ? err.code
+      : typeof err.errorCode === "string"
+        ? err.errorCode
+        : undefined;
+
+  // Fail-closed on structured Prisma codes:
+  // P1017 is the only recognized retryable closed connection code.
+  // Any other Prisma code (Pxxxx) is strictly non-retryable.
+  if (code === "P1017") {
+    return true;
+  }
+  if (code?.startsWith("P")) {
+    return false;
+  }
+
+  // When no structured Prisma code exists, inspect driver adapter structured cause.
+  if (err.meta?.driverAdapterError?.cause?.kind === "ConnectionClosed") {
+    return true;
+  }
+
+  // Check error message and cause message with narrow fallback
+  const message = `${typeof err.message === "string" ? err.message : ""} ${
+    typeof err.cause?.message === "string" ? err.cause.message : ""
+  }`;
+
+  // Explicit exclusions on message content
+  if (
+    /statement_timeout|canceling statement due to statement timeout/i.test(message) ||
+    /timed out fetching a connection from the pool/i.test(message)
+  ) {
+    return false;
+  }
+
+  // Narrow string fallback for direct node-pg / socket drop messages
+  if (
+    /Server has closed the connection/i.test(message) ||
+    /Connection terminated unexpectedly/i.test(message)
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
  * Persist observations + one CollectionRun with a single parameterized SQL statement.
  * History inserts only when price is new or changed (NUMERIC IS DISTINCT FROM).
  * Empty observation arrays leave current prices untouched but still record the run.
@@ -82,6 +148,13 @@ export async function persistFuelObservations(
     if (typeof db.$executeRaw === "function") {
       await db.$executeRaw`SELECT set_config('statement_timeout', ${String(Math.floor(statementTimeoutMs))}, true)`;
     }
+
+    console.log(
+      JSON.stringify({
+        event: "collector_persistence_sql_start",
+        observations: payload.length,
+      }),
+    );
 
     const rows = await db.$queryRaw<
       Array<{
@@ -246,7 +319,7 @@ export async function persistFuelObservations(
         ? Number(row.run_duration_ms)
         : Math.max(1, new Date(finishedAt).getTime() - new Date(run.startedAt).getTime());
 
-    return {
+    const resultStats: PersistStats = {
       observationsReceived: Number(row.observations_received),
       currentRowsUpserted: Number(row.current_rows_upserted),
       historyRowsInserted: Number(row.history_rows_inserted),
@@ -254,6 +327,17 @@ export async function persistFuelObservations(
       finishedAt,
       durationMs,
     };
+
+    console.log(
+      JSON.stringify({
+        event: "collector_persistence_sql_complete",
+        historyRowsInserted: resultStats.historyRowsInserted,
+        currentRowsUpserted: resultStats.currentRowsUpserted,
+        durationMs: resultStats.durationMs,
+      }),
+    );
+
+    return resultStats;
   };
 
   let watchdogTimer: ReturnType<typeof setTimeout> | undefined;
@@ -292,16 +376,61 @@ export async function persistFuelObservations(
 
   try {
     const persistWork = async (): Promise<PersistStats> => {
-      if (typeof prisma.$transaction === "function") {
-        return await prisma.$transaction(
-          async (tx) => executePersist(tx as unknown as PrismaClient),
-          {
-            maxWait: maxWaitMs,
-            timeout: transactionTimeoutMs,
-          },
-        );
+      if (typeof prisma.$transaction !== "function") {
+        return await executePersist(prisma);
       }
-      return await executePersist(prisma);
+
+      const maxAttempts = 2;
+      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        let transactionEntered = false;
+        console.log(
+          JSON.stringify({
+            event: "collector_persistence_acquisition_attempt",
+            attempt,
+            maxAttempts,
+          }),
+        );
+
+        try {
+          return await prisma.$transaction(
+            async (tx) => {
+              transactionEntered = true;
+              console.log(
+                JSON.stringify({
+                  event: "collector_persistence_transaction_entered",
+                  attempt,
+                }),
+              );
+              return await executePersist(tx as unknown as PrismaClient);
+            },
+            {
+              maxWait: maxWaitMs,
+              timeout: transactionTimeoutMs,
+            },
+          );
+        } catch (error) {
+          const rawCode =
+            (error as { code?: unknown; errorCode?: unknown })?.code ??
+            (error as { code?: unknown; errorCode?: unknown })?.errorCode;
+          const code = typeof rawCode === "string" ? rawCode : undefined;
+          // Safe retry invariant: retry only on attempt 1 when the transaction
+          // callback has NOT started and the error indicates a severed connection.
+          if (attempt === 1 && !transactionEntered && isClosedConnectionError(error)) {
+            console.warn(
+              JSON.stringify({
+                event: "collector_persistence_connection_retry",
+                reason: "closed_connection_before_transaction",
+                attempt,
+                maxAttempts,
+                code: code ?? "NONE",
+              }),
+            );
+            continue;
+          }
+          throw error;
+        }
+      }
+      throw new Error("Persistence transaction acquisition exhausted attempts");
     };
 
     return await Promise.race([persistWork(), watchdogPromise]);
