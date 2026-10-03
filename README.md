@@ -4,24 +4,9 @@ Hourly BJ's Wholesale Club fuel-price collector and public map UI.
 
 **Prisma Composer owns Postgres, the collector API, the native cron scheduler, and the Next.js web app.**
 
-```
-Prisma cronScheduler (every 60m)
-        |
-        |  POST /rpc/trigger  { jobId: "collect" }
-        v
-Prisma Compute API  (bjsgasapi)
-        |
-        +-- fetch eisapi fuel prices (bundled gas-clubs.json)
-        +-- Zod validate / normalize (exact 3-decimal strings)
-        +-- one bulk SQL write (JSONB → history-on-change + current upsert)
-        +-- GET /api/v1/status | /api/v1/stations* | /api/v1/analytics*
-        v
-Prisma Postgres
-        ^
-Prisma Compute Web (bjsgasweb)  --HTTP-->  API (cache: "no-store" from the app)
-```
+See **[Architecture](docs/architecture.md)** for topology, collector/persistence invariants, fleet vs diagnostic runs, contracts, CI, and pins.
 
-Cloudflare is **not** the production scheduler. Earlier Worker-based triggers were removed when the app moved to Prisma-native cron (`defineSchedule` + `cronScheduler` + `serveSchedule`).
+Cloudflare is **not** the production scheduler. Collection uses Prisma-native cron (`defineSchedule` + `cronScheduler` + `serveSchedule`). The scheduler interval is relative to process boot (first tick after 60m), not wall-clock minutes.
 
 ## Why the web/API boundary exists
 
@@ -34,15 +19,17 @@ Composer injects the colocated Postgres URL via `rawPostgres()` → `service.loa
 
 ## Layers
 
+High-level ownership; details and invariants are in [Architecture](docs/architecture.md).
+
 | Layer | Owner | Notes |
 | --- | --- | --- |
-| Discovery | Local (Playwright + Chrome) | Infrequent admin task. Locator is authoritative for membership + `hasGas`. Writes **candidates**; promote via diff/accept. |
+| Discovery | Local (Playwright + Chrome) | Locator is authoritative for membership + `hasGas`. Candidates → diff → accept. |
 | Sitemap canary | Local HTTP | `pnpm discover:sitemap-canary` — alert on **new** SEO IDs only. Never authoritative. |
-| Collection | Prisma Compute API | Poll every entry in bundled `gas-clubs.json` via eisapi. Prices only — not topology. |
-| Persistence | Prisma Compute API | Bulk CTE: insert history only when `price IS DISTINCT FROM`; upsert current (`observedAt` always advances). |
+| Collection | Prisma Compute API | Poll bundled `gas-clubs.json` via eisapi. Prices only — not topology. |
+| Persistence | Prisma Compute API | One bulk CTE per run; FLEET vs DIAGNOSTIC `CollectionRun` scope. |
 | API | Prisma Compute | `/health`, `/internal/collect`, `/api/v1/*`, `/rpc/trigger` |
-| Scheduler | Prisma `cronScheduler` | Hourly `collect` job → authenticated peer RPC to the API |
-| Frontend | Prisma Compute (Next.js) | Calls API over HTTP; no DB credentials |
+| Scheduler | Prisma `cronScheduler` | Boot-relative `60m` `collect` job → typed RPC to the API |
+| Frontend | Prisma Compute (Next.js) | HTTP/JSON only; no DB credentials |
 
 ## DISCOVERY DATA SEMANTICS
 

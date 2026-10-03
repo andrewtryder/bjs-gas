@@ -47,6 +47,11 @@ Root `alchemy@2.0.0-beta.74` and `effect@4.0.0-rc.112` are **not** application i
 ### Audit ignore
 `GHSA-vfj7-8cjw-p6xm` remains ignored: transitive `braces@3.0.3` via `alchemy` → `fast-glob` → `micromatch`. Latest `braces` is still 3.0.3 (unpatched). CI still fails on any other high/critical advisory.
 
+### Prisma agent skills
+Canonical generated skill location is `.agents/skills/` (portable Agent Skills path). Sync with `pnpm skills:sync`, which passes `--config prisma.skills.config.ts` (`agents: ["agents"]` only).
+
+Do **not** add `prisma.config.ts` while Prisma Client remains 6.x: `pnpm prisma generate` auto-loads that filename and cannot parse the CLI 8 `$prismaConfig` marker. Unconfigured `pnpm dlx @prisma/cli@8.0.0-rc.19 skills sync` still targets every harness and would recreate `.cursor/skills`, `.claude/skills`, and `.devin/skills` (gitignored).
+
 ### Synchronized Git Remote
 - Never leave local `main` ahead of `origin/main`.
 - If deployment happens before push for a technical or operational reason, the task is **not complete** until the exact deployed commit has been pushed to GitHub.
