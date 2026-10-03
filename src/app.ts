@@ -11,6 +11,7 @@ import { getNearbyStations, getStationHistory, getStationWithPrices, listStation
 import { getCollectionStatus } from "./api/status.js";
 import { createAnalyticsRouter } from "./api/analytics.js";
 import { analyticsLimiter } from "./api/limiter.js";
+import { isClosedConnectionError } from "./persistence/transaction-policy.js";
 import { fetchClubFuel } from "./fuel/client.js";
 import { reportApiError } from "./honeybadger.js";
 
@@ -161,7 +162,23 @@ export function createApp(env: AppEnv): Hono {
   });
 
   app.get("/api/v1/status", async (c) => {
-    const payload = await getCollectionStatus(env.prisma);
+    let payload;
+    try {
+      payload = await getCollectionStatus(env.prisma);
+    } catch (error) {
+      // This endpoint is read-only. A single retry is safe when an idle pooled
+      // socket was closed by the database before the query could run.
+      if (!isClosedConnectionError(error)) throw error;
+      console.warn(
+        JSON.stringify({
+          event: "status_read_connection_retry",
+          route: c.req.path,
+          method: c.req.method,
+          code: "P1017",
+        }),
+      );
+      payload = await getCollectionStatus(env.prisma);
+    }
     // Status must stay highly fresh while diagnosing collector/scheduler health.
     c.header("Cache-Control", "public, max-age=15, s-maxage=15, stale-while-revalidate=30");
     return c.json(payload);
