@@ -6,10 +6,6 @@ import dynamic from "next/dynamic";
 
 import type { StationDto } from "../lib/types";
 import {
-  filterStations,
-  getAvailableStates,
-  getAvailableFuels,
-  getCityStateCollisionKeys,
   getStationPrice,
   getCanonicalFuelPrices,
   formatStationTitle,
@@ -21,6 +17,11 @@ import {
 } from "../lib/discovery";
 import { getFreshnessInfo } from "../lib/freshness";
 import { STATE_NAMES } from "../lib/states";
+import { useStationFilters } from "../hooks/useStationFilters";
+import { FilterToolbar } from "./filters/FilterToolbar";
+import { FuelFilter } from "./filters/FuelFilter";
+import { SearchField } from "./filters/SearchField";
+import { SelectField } from "./filters/SelectField";
 
 // Dynamically import InteractiveMap without SSR since MapLibre GL is browser-only
 const InteractiveMap = dynamic(() => import("./InteractiveMap"), {
@@ -46,9 +47,24 @@ export default function MapDiscoveryView({
   initialStationNumber,
   cartoApiKey,
 }: MapDiscoveryViewProps) {
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedState, setSelectedState] = useState(initialState || "ALL");
-  const [selectedFuel, setSelectedFuel] = useState("ALL");
+  const {
+    query: searchQuery,
+    setQuery: setSearchQuery,
+    selectedState,
+    setSelectedState,
+    selectedFuel,
+    setSelectedFuel,
+    availableStates,
+    availableFuels,
+    collisionKeys,
+    filteredStations,
+    hasActiveFilters,
+    resetFilters: handleClearFilters,
+  } = useStationFilters({
+    stations,
+    initialState: initialState || "ALL",
+  });
+
   const [selectedStation, setSelectedStation] = useState<StationDto | null>(() => {
     if (initialStationNumber != null) {
       return stations.find((s) => s.clubNumber === initialStationNumber) || null;
@@ -60,7 +76,7 @@ export default function MapDiscoveryView({
     if (initialState) {
       setSelectedState(initialState);
     }
-  }, [initialState]);
+  }, [initialState, setSelectedState]);
 
   useEffect(() => {
     if (initialStationNumber != null) {
@@ -70,18 +86,6 @@ export default function MapDiscoveryView({
       }
     }
   }, [initialStationNumber, stations]);
-
-  const availableStates = useMemo(() => getAvailableStates(stations), [stations]);
-  const availableFuels = useMemo(() => getAvailableFuels(stations), [stations]);
-  const collisionKeys = useMemo(() => getCityStateCollisionKeys(stations), [stations]);
-
-  const filteredStations = useMemo(() => {
-    return filterStations(stations, {
-      query: searchQuery,
-      state: selectedState,
-      fuelSku: selectedFuel,
-    });
-  }, [stations, searchQuery, selectedState, selectedFuel]);
 
   // Synchronize selected station when filtered set changes (DS-4 Section 29)
   useEffect(() => {
@@ -96,13 +100,16 @@ export default function MapDiscoveryView({
     setSelectedStation(station);
   };
 
-  const handleClearFilters = () => {
-    setSearchQuery("");
-    setSelectedState("ALL");
-    setSelectedFuel("ALL");
-  };
-
-  const hasActiveFilters = searchQuery.trim() !== "" || selectedState !== "ALL" || selectedFuel !== "ALL";
+  const stateOptions = useMemo(
+    () => [
+      { value: "ALL", label: "All states" },
+      ...availableStates.map((s) => ({
+        value: s.state,
+        label: `${s.state} (${s.count})`,
+      })),
+    ],
+    [availableStates]
+  );
 
   // Selected station summary details
   const selectedStationPrice = selectedStation ? getStationPrice(selectedStation, selectedFuel) : null;
@@ -150,108 +157,38 @@ export default function MapDiscoveryView({
   return (
     <div className="map-discovery-v2">
       {/* Unified Filter Toolbar */}
-      <div className="map-toolbar directory-toolbar" role="search">
-        <div className="directory-toolbar-primary">
-          {/* Search Field */}
-          <div className="directory-search-field">
-            <label htmlFor="map-station-search" className="sr-only">
-              Search gas stations on map
-            </label>
-            <span className="directory-search-icon" aria-hidden="true">
-              <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="8.5" cy="8.5" r="5.5" />
-                <line x1="12.5" y1="12.5" x2="18" y2="18" />
-              </svg>
-            </span>
-            <input
+      <FilterToolbar
+        className="map-toolbar directory-toolbar"
+        totalCount={stations.length}
+        filteredCount={filteredStations.length}
+        hasActiveFilters={hasActiveFilters}
+        onResetFilters={handleClearFilters}
+        primary={
+          <>
+            <SearchField
               id="map-station-search"
-              type="search"
-              className="directory-search-input"
-              placeholder="Search city, ZIP, or club"
+              ariaLabel="Search city, ZIP, or club"
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              aria-label="Search city, ZIP, or club"
+              onChange={setSearchQuery}
+              placeholder="Search city, ZIP, or club"
             />
-            {searchQuery && (
-              <button
-                type="button"
-                className="directory-search-clear"
-                onClick={() => setSearchQuery("")}
-                aria-label="Clear search"
-              >
-                &times;
-              </button>
-            )}
-          </div>
-
-          {/* State Selector */}
-          <div className="directory-select-field">
-            <label htmlFor="map-state-select" className="sr-only">
-              Filter by state
-            </label>
-            <select
+            <SelectField
               id="map-state-select"
-              className="directory-select"
+              label="Filter by state"
               value={selectedState}
-              onChange={(e) => setSelectedState(e.target.value)}
-              aria-label="Filter by state"
-            >
-              <option value="ALL">All states</option>
-              {availableStates.map((s) => (
-                <option key={s.state} value={s.state}>
-                  {s.state} ({s.count})
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        {/* Secondary Toolbar: Fuel Pills & Meta summary */}
-        <div className="directory-toolbar-secondary">
-          <div
-            className="directory-fuel-group"
-            role="group"
-            aria-label="Filter by fuel type"
-          >
-            <button
-              type="button"
-              className={`directory-fuel-chip ${selectedFuel === "ALL" ? "active" : ""}`}
-              onClick={() => setSelectedFuel("ALL")}
-              aria-pressed={selectedFuel === "ALL"}
-            >
-              All fuels
-            </button>
-            {availableFuels.map((f) => (
-              <button
-                key={f.sku}
-                type="button"
-                className={`directory-fuel-chip ${selectedFuel === f.sku ? "active" : ""}`}
-                onClick={() => setSelectedFuel(f.sku)}
-                aria-pressed={selectedFuel === f.sku}
-              >
-                {f.name}
-              </button>
-            ))}
-          </div>
-
-          <div className="directory-meta">
-            <span className="directory-count tabular-nums">
-              {filteredStations.length === stations.length
-                ? `${stations.length} locations`
-                : `${filteredStations.length} of ${stations.length} locations`}
-            </span>
-            {hasActiveFilters && (
-              <button
-                type="button"
-                className="directory-clear-btn"
-                onClick={handleClearFilters}
-              >
-                Clear filters
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
+              onChange={setSelectedState}
+              options={stateOptions}
+            />
+          </>
+        }
+        secondary={
+          <FuelFilter
+            fuels={availableFuels}
+            selectedFuel={selectedFuel}
+            onSelectFuel={setSelectedFuel}
+          />
+        }
+      />
 
       {/* Main Split Layout: Sidebar + Map */}
       <div className="map-split-v2">
@@ -438,4 +375,3 @@ export default function MapDiscoveryView({
     </div>
   );
 }
-

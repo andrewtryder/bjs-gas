@@ -10,10 +10,20 @@ import {
   filterStates,
   type StateSortOption,
 } from "../lib/states-view";
+import { FilterToolbar } from "./filters/FilterToolbar";
+import { SearchField } from "./filters/SearchField";
+import { SelectField } from "./filters/SelectField";
 
 interface StateIndexDirectoryProps {
   states: StateSummaryItem[];
 }
+
+const STATE_SORT_OPTIONS = [
+  { value: "price-asc", label: "Price: low to high" },
+  { value: "price-desc", label: "Price: high to low" },
+  { value: "name-asc", label: "State A–Z" },
+  { value: "stations-desc", label: "Most locations" },
+];
 
 export default function StateIndexDirectory({ states }: StateIndexDirectoryProps) {
   const [selectedSort, setSelectedSort] = useState<StateSortOption>("price-asc");
@@ -27,78 +37,32 @@ export default function StateIndexDirectory({ states }: StateIndexDirectoryProps
   return (
     <div className="directory-container" style={{ marginTop: "2rem" }}>
       {/* Filter & Sort Toolbar */}
-      <div className="directory-toolbar">
-        <div className="directory-toolbar-primary">
-          <div className="directory-search-field" role="search">
-            <span className="directory-search-icon" aria-hidden="true">
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <circle cx="11" cy="11" r="8" />
-                <line x1="21" y1="21" x2="16.65" y2="16.65" />
-              </svg>
-            </span>
-            <input
-              type="search"
-              className="directory-search-input"
+      <FilterToolbar
+        totalCount={states.length}
+        filteredCount={filteredAndSorted.length}
+        unitLabel="states"
+        unitLabelSingular="state"
+        hasActiveFilters={searchQuery.trim() !== ""}
+        onResetFilters={() => setSearchQuery("")}
+        resetLabel="Clear filter"
+        primary={
+          <>
+            <SearchField
               placeholder="Filter by state name or code..."
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              aria-label="Filter by state name or code"
+              onChange={setSearchQuery}
+              ariaLabel="Filter by state name or code"
             />
-            {searchQuery && (
-              <button
-                type="button"
-                className="directory-search-clear"
-                onClick={() => setSearchQuery("")}
-                aria-label="Clear state search"
-              >
-                &times;
-              </button>
-            )}
-          </div>
-
-          <div className="directory-select-field">
-            <label htmlFor="state-sort-select" className="sr-only">
-              Sort states
-            </label>
-            <select
+            <SelectField
               id="state-sort-select"
-              className="directory-select"
+              label="Sort states"
               value={selectedSort}
-              onChange={(e) => setSelectedSort(e.target.value as StateSortOption)}
-              aria-label="Sort states"
-            >
-              <option value="price-asc">Price: low to high</option>
-              <option value="price-desc">Price: high to low</option>
-              <option value="name-asc">State A–Z</option>
-              <option value="stations-desc">Most locations</option>
-            </select>
-          </div>
-        </div>
-
-        <div className="directory-toolbar-secondary">
-          <span className="directory-count">
-            {filteredAndSorted.length} {filteredAndSorted.length === 1 ? "state" : "states"}
-          </span>
-          {searchQuery && (
-            <button
-              type="button"
-              className="btn-clear-filters"
-              onClick={() => setSearchQuery("")}
-            >
-              Clear filter
-            </button>
-          )}
-        </div>
-      </div>
+              onChange={(val) => setSelectedSort(val as StateSortOption)}
+              options={STATE_SORT_OPTIONS}
+            />
+          </>
+        }
+      />
 
       {/* Empty State */}
       {filteredAndSorted.length === 0 ? (

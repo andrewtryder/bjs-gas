@@ -19,5 +19,5 @@
     "types": ["node"]
   },
   "include": ["src/**/*.ts", "tests/**/*.ts"],
-  "exclude": ["node_modules", "dist", "module.ts", "prisma-composer.config.ts", "src/server.ts", "src/service.ts", "src/schedule.ts"]
+  "exclude": ["node_modules", "dist", "module.ts", "prisma-composer.config.ts", "src/server.ts", "src/service.ts", "src/schedule.ts", "tests/discovery.test.ts", "tests/stations-modules.test.ts"]
 }

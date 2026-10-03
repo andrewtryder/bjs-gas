@@ -1,0 +1,94 @@
+:root {
+  /* ==========================================================================
+     Ledger Slate Design System Foundations (Phase DS-1)
+     Authoritative Reference: docs/design-system.md
+     ========================================================================== */
+
+  /* Core Surfaces */
+  --color-bg: #f8fafc;
+  --color-surface: #ffffff;
+  --color-surface-subtle: #f1f5f9;
+
+  /* Typography & Text */
+  --color-text-primary: #0f172a;
+  --color-text-secondary: #475569;
+  --color-text-muted: #64748b;
+
+  /* Borders & Hairlines */
+  --color-border: #e2e8f0;
+  --color-border-hover: #cbd5e1;
+
+  /* Accent (Rationed Blue) */
+  --color-accent: #2563eb;
+  --color-accent-hover: #1d4ed8;
+  --color-accent-subtle: #eff6ff;
+
+  /* Semantic Price Movements */
+  --color-positive: #047857;
+  --color-positive-bg: #ecfdf5;
+  --color-positive-border: #a7f3d0;
+
+  --color-danger: #b91c1c;
+  --color-danger-bg: #fef2f2;
+  --color-danger-border: #fecaca;
+
+  --color-warning: #d97706;
+  --color-warning-bg: #fffbeb;
+  --color-warning-border: #fde68a;
+
+  /* Radii */
+  --radius-control: 8px;
+  --radius-panel: 12px;
+  --radius-pill: 9999px;
+  --radius-flush: 0px;
+  --radius-sm: 6px;
+  --radius-md: var(--radius-control);
+  --radius-lg: var(--radius-panel);
+
+  /* Shadows */
+  --shadow-panel: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-dropdown: 0 4px 6px -1px rgb(0 0 0 / 0.07), 0 2px 4px -2px rgb(0 0 0 / 0.07);
+  --shadow-sm: var(--shadow-panel);
+  --shadow-md: var(--shadow-dropdown);
+
+  /* Layout & Spacing Rhythm */
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --content-max-width: 1240px;
+  --container-max-width: var(--content-max-width);
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 14px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-7: 32px;
+  --space-8: 40px;
+  --space-9: 48px;
+
+  /* Backwards compatibility aliases */
+  --bg-main: var(--color-bg);
+  --bg-surface: var(--color-surface);
+  --bg-subtle: var(--color-surface-subtle);
+  --border-color: var(--color-border);
+  --border-hover: var(--color-border-hover);
+  --border: var(--color-border);
+  --text-primary: var(--color-text-primary);
+  --text-secondary: var(--color-text-secondary);
+  --text-muted: var(--color-text-muted);
+  --text: var(--color-text-primary);
+  --accent: var(--color-accent);
+  --accent-hover: var(--color-accent-hover);
+  --accent-subtle: var(--color-accent-subtle);
+  --cheaper: var(--color-positive);
+  --cheaper-bg: var(--color-positive-bg);
+  --higher: var(--color-danger);
+  --higher-bg: var(--color-danger-bg);
+  --warning: var(--color-warning);
+  --warning-bg: var(--color-warning-bg);
+
+  --cheapest: var(--cheaper);
+  --cheapest-bg: var(--cheaper-bg);
+  --expensive: var(--higher);
+  --expensive-bg: var(--higher-bg);
+}
