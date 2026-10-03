@@ -1,30 +1,12 @@
 import type { PrismaClient } from "@prisma/client";
+import type {
+  FuelPriceHistoryItem,
+  NearbyStationDto,
+  StationDto,
+  StationFuel,
+} from "@bjs-gas/contracts";
+export type { FuelPriceHistoryItem, NearbyStationDto, StationDto, StationFuel } from "@bjs-gas/contracts";
 import { haversineDistanceMiles } from "../analytics/haversine.js";
-
-export type StationFuel = {
-  sku: string;
-  name: string;
-  price: string;
-  sourcePriceAtLocal: string | null;
-  observedAt: string;
-};
-
-export type StationDto = {
-  clubNumber: number;
-  clubId: string;
-  name: string;
-  storeType: string | null;
-  address1: string;
-  address2: string | null;
-  /** Convenience combined address for clients that prefer a single string. */
-  address: string;
-  city: string;
-  state: string;
-  postalCode: string;
-  latitude: number | null;
-  longitude: number | null;
-  fuels: StationFuel[];
-};
 
 function formatPrice(value: { toFixed: (n: number) => string } | string | number): string {
   if (typeof value === "string") return value;
@@ -114,13 +96,7 @@ export async function getStationHistory(
   clubNumber: number,
   options: { limit?: number } = {},
 ): Promise<
-  Array<{
-    fuelSku: string;
-    fuelName: string;
-    price: string;
-    sourcePriceAtLocal: string | null;
-    observedAt: string;
-  }>
+  FuelPriceHistoryItem[]
 > {
   const limit = Math.min(Math.max(options.limit ?? 100, 1), 500);
   const rows = await prisma.fuelPriceHistory.findMany({
@@ -136,14 +112,6 @@ export async function getStationHistory(
     observedAt: r.observedAt.toISOString(),
   }));
 }
-
-export type NearbyStationDto = StationDto & {
-  distanceMiles: number;
-  distanceFormatted: string;
-  regularPrice: string | null;
-  priceDeltaVsTarget: string | null;
-  priceDeltaFormatted: string | null;
-};
 
 export async function getNearbyStations(
   prisma: PrismaClient,
@@ -237,4 +205,3 @@ export async function getNearbyStations(
     nearby: resultsWithDistance.slice(0, limit),
   };
 }
-

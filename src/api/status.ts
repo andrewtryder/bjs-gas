@@ -1,4 +1,10 @@
 import type { PrismaClient } from "@prisma/client";
+import type {
+  StatusFreshness,
+  StatusLastCollection,
+  SystemStatusResponse,
+} from "@bjs-gas/contracts";
+export type { StatusFreshness, StatusLastCollection, SystemStatusResponse as StatusPayload } from "@bjs-gas/contracts";
 import {
   COLLECTION_EXPECTED_MAX_MS,
   getCollectionLockState,
@@ -11,50 +17,6 @@ import type { ClubFailure } from "../fuel/types.js";
 export const FRESH_WINDOW_MINUTES = 90;
 export const HARD_FAILURE_UNHEALTHY_RATIO = 0.2;
 
-export type StatusFreshness = {
-  latestObservedAt: string | null;
-  oldestObservedAt: string | null;
-  currentPriceRows: number;
-  stationsObservedRecently: number;
-  /** stationsObservedRecently / configuredGasClubs, 0 when none configured. */
-  freshStationRatio: number;
-  freshWindowMinutes: number;
-};
-
-export type StatusLastCollection = {
-  startedAt: string;
-  finishedAt: string;
-  durationMs: number;
-  clubsConfigured: number;
-  clubsSucceeded: number;
-  clubsEmptyFuels: number;
-  clubsHardFailed: number;
-  clubsFailed: number;
-  fuelObservations: number;
-  historyChanges: number;
-  databaseQueries: number;
-  degraded: boolean;
-  failures: ClubFailure[];
-  usable: boolean;
-};
-
-export type StatusPayload = {
-  ok: true;
-  healthy: boolean;
-  unhealthyReasons: string[];
-  /** Most recent persisted attempt (success or failure). */
-  lastAttemptedCollection: StatusLastCollection | null;
-  /** Most recent usable attempt (observations > 0, not aborted). */
-  lastSuccessfulCollection: StatusLastCollection | null;
-  /**
-   * Backward-compatible alias: prefers lastSuccessfulCollection, else lastAttempted.
-   * Prefer the explicit fields for new clients.
-   */
-  lastCollection: StatusLastCollection | null;
-  collectionLock: CollectionLockState;
-  freshness: StatusFreshness;
-  configuredGasClubs: number;
-};
 
 function asIso(value: Date | string | null | undefined): string | null {
   if (!value) return null;
@@ -186,7 +148,7 @@ export function evaluateHealthy(input: {
 
 export { COLLECTION_EXPECTED_MAX_MS };
 
-export async function getCollectionStatus(prisma: PrismaClient): Promise<StatusPayload> {
+export async function getCollectionStatus(prisma: PrismaClient): Promise<SystemStatusResponse> {
   const configuredGasClubs = loadGasClubs().length;
   const collectionLock = getCollectionLockState();
 
