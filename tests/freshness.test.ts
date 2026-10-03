@@ -1,35 +1,31 @@
 import { describe, expect, it } from "vitest";
-import { getFreshnessInfo, formatRelativeTime } from "../web/lib/freshness.js";
+import { getFreshnessInfo, formatAgeAgo, formatRelativeTime } from "../web/lib/freshness.js";
 
 describe("Data Freshness Model", () => {
   const now = new Date("2026-09-12T12:00:00.000Z");
 
-  it("classifies <= 2 hours as fresh", () => {
-    // 30 minutes ago
-    const timestamp = new Date(now.getTime() - 30 * 60_000).toISOString();
-    const info = getFreshnessInfo(timestamp, now);
-    expect(info.level).toBe("fresh");
-    expect(info.relativeText).toBe("Updated 30m ago");
-  });
-
-  it("classifies exactly 120 minutes as fresh boundary", () => {
-    const timestamp = new Date(now.getTime() - 120 * 60_000).toISOString();
+  it("classifies <= 3 hours as fresh", () => {
+    const timestamp = new Date(now.getTime() - 130 * 60_000).toISOString();
     const info = getFreshnessInfo(timestamp, now);
     expect(info.level).toBe("fresh");
     expect(info.relativeText).toBe("Updated 2h ago");
   });
 
-  it("classifies between 2 and 6 hours as aging", () => {
-    // 180 minutes (3 hours) ago
+  it("classifies exactly 180 minutes as the fresh boundary", () => {
     const timestamp = new Date(now.getTime() - 180 * 60_000).toISOString();
     const info = getFreshnessInfo(timestamp, now);
-    expect(info.level).toBe("aging");
-    expect(info.label).toBe("Aging");
+    expect(info.level).toBe("fresh");
     expect(info.relativeText).toBe("Updated 3h ago");
   });
 
+  it("classifies between 3 and 6 hours as aging", () => {
+    const timestamp = new Date(now.getTime() - 181 * 60_000).toISOString();
+    const info = getFreshnessInfo(timestamp, now);
+    expect(info.level).toBe("aging");
+    expect(info.label).toBe("Aging");
+  });
+
   it("classifies > 6 hours as stale", () => {
-    // 8 hours ago
     const timestamp = new Date(now.getTime() - 8 * 60 * 60_000).toISOString();
     const info = getFreshnessInfo(timestamp, now);
     expect(info.level).toBe("stale");
@@ -38,7 +34,6 @@ describe("Data Freshness Model", () => {
   });
 
   it("classifies days-old data with day notation", () => {
-    // 48 hours ago
     const timestamp = new Date(now.getTime() - 48 * 60 * 60_000).toISOString();
     const info = getFreshnessInfo(timestamp, now);
     expect(info.level).toBe("stale");
@@ -59,5 +54,12 @@ describe("Data Freshness Model", () => {
     expect(formatRelativeTime(45)).toBe("Updated 45m ago");
     expect(formatRelativeTime(90)).toBe("Updated 1h ago");
     expect(formatRelativeTime(1440)).toBe("Updated 1d ago");
+  });
+
+  it("formats spoken ages for the About page", () => {
+    expect(formatAgeAgo(42)).toBe("42 minutes ago");
+    expect(formatAgeAgo(1)).toBe("1 minute ago");
+    expect(formatAgeAgo(240)).toBe("4 hours ago");
+    expect(formatAgeAgo(0)).toBe("just now");
   });
 });

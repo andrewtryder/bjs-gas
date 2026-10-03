@@ -14,7 +14,7 @@ BJ's Gas Prices is a public consumer utility tracking current fuel prices, histo
 
 - **Domain**: Fuel price tracking, club warehouse retail directory, market pricing utility.
 - **Audience**: BJ's Wholesale Club members, cost-conscious drivers, commuter fuel shoppers, and price comparison analysts.
-- **Cadence**: Hourly data collection across all reporting clubs.
+- **Cadence**: Automatic collection approximately every two hours across reporting clubs.
 - **Tone**: Restrained, utilitarian, highly scannable, editorial, civic-utility. Feels like a financial ledger or transit fare schedule rather than a marketing landing page or a SaaS dashboard.
 
 ---
@@ -187,7 +187,7 @@ This guarantees alignment across station ledger rows and historical tables.
 - **Right**:
   - `Map` (`/map`)
   - `States` (`/states`)
-  - `Data status` (`/status` with `6px` emerald status dot)
+  - `About` (`/about`)
 - **Subdued Styling**: Text color `#475569`, hover `#0F172A`. No loud header CTA button.
 
 ---
@@ -196,9 +196,9 @@ This guarantees alignment across station ledger rows and historical tables.
 
 - **Status Pill**: Compact badge (`border-radius: 9999px`, background `#F1F5F9`, border `#E2E8F0`) containing:
   - Small green status dot (`6px`)
-  - Text: `Updated hourly • Updated 17m ago` (dynamic relative time)
+  - Text: `About every 2 hours • Updated 17m ago` (dynamic relative time)
 - **Title**: `BJ's gas prices` (`40px` mobile, `48px` desktop, weight `800`).
-- **Subtitle**: `Current BJ's gas prices, price history, and locations across the U.S. Updated hourly.`
+- **Subtitle**: `Current BJ's gas prices, price history, and locations across the U.S. Checked approximately every two hours.`
 - **Action Buttons**:
   - Primary CTA: `Find a station` (height `41px`, padding `0.5rem 1.25rem`, background `#2563EB`, text `#FFFFFF`, radius `8px`).
   - Secondary CTA: `View map` (height `41px`, padding `0.5rem 1.25rem`, background `#FFFFFF`, border `1px solid #CBD5E1`, text `#0F172A`, radius `8px`).
@@ -319,7 +319,7 @@ The station directory is the primary workhorse of the product. It must scan as a
 ## 18. Footer System
 
 - **Container**: Full-width white background (`#FFFFFF`), border-top `1px solid #E2E8F0`, padding `2rem 1.5rem`.
-- **Nav Links**: Horizontal flex row linking to `Map`, `States`, `Data status`.
+- **Nav Links**: Horizontal flex row linking to `Map`, `States`, `About`.
 - **Brand & Disclaimer**:
   - `BJ's Gas Prices` (`14px`, weight `600`, color `#0F172A`).
   - `Independent price tracking project. Not affiliated with BJ's Wholesale Club.` (`13px`, color `#64748B`).
@@ -344,14 +344,14 @@ The station directory is the primary workhorse of the product. It must scan as a
 - `BJ's gas prices`
 - `current prices`
 - `price history`
-- `updated hourly`
+- `checked approximately every two hours`
 - `Updated Xm ago`
 - `Regular`, `Premium`, `Diesel`
 - `station`, `location`, `Club #N`
-- `Data status`
+- `About`
 
 ### Prohibited Terminology
-- ❌ `real-time` (prices are collected hourly)
+- ❌ `real-time` (prices are collected approximately every two hours)
 - ❌ `pipeline`, `observations`, `reporting facilities` (too technical for consumers)
 - ❌ `historical analytics` (use `price history` or `price trends`)
 - ❌ `station discovery` (use `find a station` or `gas station map`)

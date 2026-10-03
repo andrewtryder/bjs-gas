@@ -1,14 +1,18 @@
 /**
- * Data Freshness Model & Formatting Utility
+ * Public freshness bands for station timestamps and About-page copy.
  *
- * Collector runs periodically (hourly, fresh window is 90 minutes).
- * Thresholds:
- * - fresh: <= 2 hours (120 minutes)
- * - aging: 2 to 6 hours (120 to 360 minutes)
- * - stale: > 6 hours (> 360 minutes)
+ * Collector cadence is ~120 minutes (boot-relative).
+ * - fresh:  <= 3 hours
+ * - aging:  3 to 6 hours
+ * - stale:  > 6 hours
+ *
+ * Operator `/api/v1/status` uses FRESH_WINDOW_MINUTES (180) separately.
  */
 
 export type FreshnessLevel = "fresh" | "aging" | "stale";
+
+export const USER_FRESH_MAX_MINUTES = 180;
+export const USER_STALE_AFTER_MINUTES = 360;
 
 export interface FreshnessInfo {
   level: FreshnessLevel;
@@ -49,14 +53,14 @@ export function getFreshnessInfo(
   let badgeBorder: string;
   let badgeClass: string;
 
-  if (ageMinutes <= 120) {
+  if (ageMinutes <= USER_FRESH_MAX_MINUTES) {
     level = "fresh";
     label = "Updated recently";
     badgeBg = "var(--cheaper-bg)";
     badgeColor = "var(--cheaper)";
     badgeBorder = "rgba(34, 197, 94, 0.25)";
     badgeClass = "badge-fresh";
-  } else if (ageMinutes <= 360) {
+  } else if (ageMinutes <= USER_STALE_AFTER_MINUTES) {
     level = "aging";
     label = "Aging";
     badgeBg = "rgba(234, 179, 8, 0.1)";
@@ -111,4 +115,33 @@ export function formatRelativeTime(
   }
   const days = Math.floor(hours / 24);
   return `Updated ${days}d ago`;
+}
+
+/** Spoken age for About-page copy, e.g. "42 minutes ago". */
+export function formatAgeAgo(
+  timestampOrMinutes: string | number | null | undefined,
+  now: Date = new Date(),
+): string | null {
+  if (timestampOrMinutes == null) return null;
+
+  let ageMinutes: number;
+  if (typeof timestampOrMinutes === "string") {
+    const d = new Date(timestampOrMinutes);
+    if (Number.isNaN(d.getTime())) return null;
+    ageMinutes = Math.max(0, Math.floor((now.getTime() - d.getTime()) / 60_000));
+  } else {
+    if (!Number.isFinite(timestampOrMinutes)) return null;
+    ageMinutes = Math.max(0, Math.floor(timestampOrMinutes));
+  }
+
+  if (ageMinutes < 1) return "just now";
+  if (ageMinutes < 60) {
+    return `${ageMinutes} ${ageMinutes === 1 ? "minute" : "minutes"} ago`;
+  }
+  const hours = Math.floor(ageMinutes / 60);
+  if (hours < 24) {
+    return `${hours} ${hours === 1 ? "hour" : "hours"} ago`;
+  }
+  const days = Math.floor(hours / 24);
+  return `${days} ${days === 1 ? "day" : "days"} ago`;
 }

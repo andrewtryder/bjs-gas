@@ -23,6 +23,15 @@ const nextConfig = {
     };
     return config;
   },
+  async redirects() {
+    return [
+      {
+        source: "/status",
+        destination: "/about",
+        permanent: true,
+      },
+    ];
+  },
   async headers() {
     return [
       {

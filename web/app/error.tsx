@@ -47,10 +47,10 @@ export default function ErrorBoundary({
             Return home
           </Link>
           <Link
-            href="/status"
+            href="/about"
             className="btn btn-secondary"
           >
-            Data status
+            About
           </Link>
         </div>
       </div>

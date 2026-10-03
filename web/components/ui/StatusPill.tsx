@@ -40,12 +40,12 @@ export default function StatusPill({
     <>
       {showDot && <span className={`status-pill-dot ${dotClass}`} aria-hidden="true" />}
       <span className="status-pill-text">
-        {cadencePrefix ? `Updated hourly \u2022 ${text}` : text}
+        {cadencePrefix ? `About every 2 hours \u2022 ${text}` : text}
       </span>
     </>
   );
 
-  const fullAriaLabel = ariaLabel || (cadencePrefix ? `Updated hourly, ${text}. Status: ${levelLabel}` : `${text}. Status: ${levelLabel}`);
+  const fullAriaLabel = ariaLabel || (cadencePrefix ? `Checked about every 2 hours, ${text}. Status: ${levelLabel}` : `${text}. Status: ${levelLabel}`);
   const combinedClass = `status-pill ${className}`.trim();
 
   if (href) {

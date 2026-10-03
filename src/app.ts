@@ -174,7 +174,7 @@ export function createApp(env: AppEnv): Hono {
 
   app.get("/api/v1/stations", async (c) => {
     const payload = await listStationsWithPrices(env.prisma);
-    // Hourly collector → ~5 minute CDN cache is safe; avoid longer stale windows.
+    // Two-hour collector → ~5 minute CDN cache is safe; avoid longer stale windows.
     c.header("Cache-Control", "public, max-age=60, s-maxage=300, stale-while-revalidate=60");
     return c.json(payload);
   });

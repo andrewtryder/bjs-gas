@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: "BJ's Gas Station Map | BJ's Gas Prices",
   description:
-    "Find BJ's gas stations and current fuel prices across the U.S. Updated hourly.",
+    "Find BJ's gas stations and current fuel prices across the U.S. Checked approximately every two hours.",
 };
 
 interface MapPageProps {
@@ -38,7 +38,8 @@ export default async function MapPage({ searchParams }: MapPageProps) {
       <div className="page-intro" style={{ marginBottom: "1.25rem" }}>
         <h1 className="page-title">BJ&apos;s gas station map</h1>
         <p className="page-description">
-          Find BJ&apos;s gas stations and current fuel prices across the U.S. Updated hourly.
+          Find BJ&apos;s gas stations and current fuel prices across the U.S. Checked
+          approximately every two hours.
         </p>
       </div>
 

@@ -406,7 +406,7 @@ describe("status healthy evaluation", () => {
     currentPriceRows: 505,
     stationsObservedRecently: 206,
     freshStationRatio: 206 / 214,
-    freshWindowMinutes: 90,
+    freshWindowMinutes: 180,
   };
 
   it("marks healthy for a fresh successful run", () => {
@@ -441,13 +441,25 @@ describe("status healthy evaluation", () => {
     expect(result.unhealthyReasons).toEqual([]);
   });
 
-  it("marks unhealthy when last collection is stale", () => {
+  it("keeps a successful run slightly older than two hours healthy", () => {
     const result = evaluateHealthy({
       configuredGasClubs: 214,
       lastAttemptedCollection: baseRun,
       lastSuccessfulCollection: baseRun,
       freshness,
-      now: new Date("2026-09-02T16:00:00.000Z"),
+      now: new Date("2026-09-02T16:10:00.000Z"),
+    });
+    expect(result.healthy).toBe(true);
+    expect(result.unhealthyReasons).toEqual([]);
+  });
+
+  it("marks unhealthy when last collection exceeds the 3-hour freshness window", () => {
+    const result = evaluateHealthy({
+      configuredGasClubs: 214,
+      lastAttemptedCollection: baseRun,
+      lastSuccessfulCollection: baseRun,
+      freshness,
+      now: new Date("2026-09-02T17:05:00.000Z"),
     });
     expect(result.healthy).toBe(false);
     expect(result.unhealthyReasons).toContain("last_collection_stale");
@@ -702,9 +714,9 @@ describe("collection abort propagation", () => {
 });
 
 describe("schedule definition", () => {
-  it("defines hourly collect job for Prisma cronScheduler", async () => {
+  it("defines a 120-minute collect job for Prisma cronScheduler", async () => {
     const { schedule } = await import("../src/schedule.js");
-    expect(schedule.jobs).toEqual([{ jobId: "collect", every: "60m" }]);
+    expect(schedule.jobs).toEqual([{ jobId: "collect", every: "120m" }]);
   });
 });
 

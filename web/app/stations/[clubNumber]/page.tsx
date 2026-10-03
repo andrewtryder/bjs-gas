@@ -34,7 +34,7 @@ export async function generateMetadata({ params }: StationPageProps): Promise<Me
 
   return {
     title: `BJ's Gas in ${station.city}, ${station.state} — Current Fuel Prices & History`,
-    description: `Current fuel prices for BJ's Wholesale Club in ${station.city}, ${station.state}. Compare Regular gas prices, station price trends, and nearby club prices. Updated hourly.`,
+    description: `Current fuel prices for BJ's Wholesale Club in ${station.city}, ${station.state}. Compare Regular gas prices, station price trends, and nearby club prices. Checked approximately every two hours.`,
     alternates: {
       canonical: `${getWebBaseUrl()}/stations/${station.clubNumber}`,
     },
