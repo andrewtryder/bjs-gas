@@ -1,33 +1,4 @@
-import { z } from "zod";
-
-export const fuelItemSchema = z
-  .object({
-    name: z.string().min(1),
-    sku: z.union([z.string(), z.number()]).transform((v) => String(v)),
-    price: z.number().finite(),
-    priceDateTime: z.string().optional().nullable(),
-  })
-  .passthrough();
-
-export const fuelEnvelopeSchema = z
-  .object({
-    response: z
-      .object({
-        fuelPriceResponse: z
-          .object({
-            data: z.array(fuelItemSchema).default([]),
-          })
-          .passthrough()
-          .optional(),
-        statusCode: z.number().optional(),
-        statusMsg: z.string().optional(),
-        transactionDateTime: z.string().optional(),
-      })
-      .passthrough(),
-  })
-  .passthrough();
-
-export type FuelItem = z.infer<typeof fuelItemSchema>;
+import { fuelPriceEnvelopeSchema, fuelProductsFromEnvelope } from "./schema.js";
 
 export type FuelObservation = {
   clubNumber: number;
@@ -123,11 +94,11 @@ export function observationsFromFuelResponse(
   payload: unknown,
   observedAt: string,
 ): FuelObservation[] {
-  const parsed = fuelEnvelopeSchema.safeParse(payload);
+  const parsed = fuelPriceEnvelopeSchema.safeParse(payload);
   if (!parsed.success) {
     throw new Error(`Malformed fuel response: ${parsed.error.message}`);
   }
-  const data = parsed.data.response.fuelPriceResponse?.data ?? [];
+  const data = fuelProductsFromEnvelope(parsed.data);
   if (data.length === 0) {
     throw new Error("Empty fuel array");
   }

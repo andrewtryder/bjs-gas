@@ -1,3 +1,4 @@
+import { fuelPriceEnvelopeSchema, fuelProductsFromEnvelope } from "./fuel/schema.js";
 import type { PhysicalStore } from "./schemas.js";
 import type {
   BjsClub,
@@ -241,16 +242,9 @@ export function normalizePhysicalStore(
 }
 
 export function parseFuelHasProducts(payload: unknown): boolean {
-  if (!payload || typeof payload !== "object") {
-    throw new Error("Malformed fuel response: not an object");
+  const parsed = fuelPriceEnvelopeSchema.safeParse(payload);
+  if (!parsed.success) {
+    throw new Error(`Malformed fuel response: ${parsed.error.message}`);
   }
-  const response = (payload as { response?: unknown }).response;
-  if (!response || typeof response !== "object") {
-    throw new Error("Malformed fuel response: missing response");
-  }
-  const fuel = (response as { fuelPriceResponse?: { data?: unknown } }).fuelPriceResponse;
-  if (!fuel || !Array.isArray(fuel.data)) {
-    throw new Error("Malformed fuel response: missing fuelPriceResponse.data");
-  }
-  return fuel.data.length > 0;
+  return fuelProductsFromEnvelope(parsed.data).length > 0;
 }

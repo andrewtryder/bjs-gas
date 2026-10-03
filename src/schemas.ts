@@ -60,32 +60,5 @@ export const stateTownsResponseSchema = z
   })
   .passthrough();
 
-export const fuelPriceItemSchema = z
-  .object({
-    name: z.string(),
-    sku: z.string().optional(),
-    price: z.number().optional(),
-    priceDateTime: z.string().optional(),
-  })
-  .passthrough();
-
-export const fuelPriceResponseSchema = z
-  .object({
-    response: z
-      .object({
-        fuelPriceResponse: z
-          .object({
-            data: z.array(fuelPriceItemSchema).default([]),
-          })
-          .passthrough()
-          .optional(),
-        statusCode: z.number().optional(),
-        statusMsg: z.string().optional(),
-      })
-      .passthrough(),
-  })
-  .passthrough();
-
 export type PhysicalStore = z.infer<typeof physicalStoreSchema>;
 export type ClubSearchResponse = z.infer<typeof clubSearchResponseSchema>;
-export type FuelPriceResponse = z.infer<typeof fuelPriceResponseSchema>;

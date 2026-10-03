@@ -3,12 +3,11 @@ import path from "node:path";
 import { chromium, type Browser, type BrowserContext, type Page } from "playwright";
 import {
   clubSearchResponseSchema,
-  fuelPriceResponseSchema,
   stateTownsResponseSchema,
   type ClubSearchResponse,
   type PhysicalStore,
 } from "./schemas.js";
-import { parseFuelHasProducts } from "./normalize.js";
+import { fuelPriceEnvelopeSchema, fuelProductsFromEnvelope } from "./fuel/schema.js";
 
 export const CATALOG_STORE_ID = "10201";
 export const CLUB_SEARCH_URL = `https://api.bjs.com/digital/live/api/v1.2/club/search/${CATALOG_STORE_ID}`;
@@ -234,6 +233,24 @@ export type FuelProbeResult =
   | { kind: "empty_products" }
   | { kind: "error"; reason: string; retryable: boolean };
 
+/**
+ * Classify a parsed BJ's fuel HTTP payload using the canonical envelope schema.
+ * Empty / absent `fuelPriceResponse.data` is `empty_products` (inconclusive for hasGas).
+ * Malformed usable-product rows fail the schema and become a non-retryable error.
+ */
+export function classifyFuelProbePayload(payload: unknown): FuelProbeResult {
+  const parsed = fuelPriceEnvelopeSchema.safeParse(payload);
+  if (!parsed.success) {
+    return {
+      kind: "error",
+      reason: `schema: ${parsed.error.message}`,
+      retryable: false,
+    };
+  }
+  const hasProducts = fuelProductsFromEnvelope(parsed.data).length > 0;
+  return hasProducts ? { kind: "has_products" } : { kind: "empty_products" };
+}
+
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -275,25 +292,7 @@ export async function probeFuelPrice(
       }
 
       const json: unknown = await response.json();
-      const parsed = fuelPriceResponseSchema.safeParse(json);
-      if (!parsed.success) {
-        return {
-          kind: "error",
-          reason: `schema: ${parsed.error.message}`,
-          retryable: false,
-        };
-      }
-
-      try {
-        const hasProducts = parseFuelHasProducts(parsed.data);
-        return hasProducts ? { kind: "has_products" } : { kind: "empty_products" };
-      } catch (error) {
-        return {
-          kind: "error",
-          reason: error instanceof Error ? error.message : String(error),
-          retryable: false,
-        };
-      }
+      return classifyFuelProbePayload(json);
     } catch (error) {
       lastError = error instanceof Error ? error.message : String(error);
       if (attempt < maxAttempts) {
