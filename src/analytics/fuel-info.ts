@@ -4,13 +4,14 @@ export const CANONICAL_FUEL_SKU = "1";
 
 /**
  * Resolves fuel name for SKU, defaulting to standard name or querying FuelPriceCurrent.
+ * Lookup is limited to currently active gas clubs so stale non-gas rows cannot name public analytics.
  */
 export async function resolveFuelInfo(
   prisma: PrismaClient,
   fuelSku: string,
 ): Promise<{ sku: string; name: string }> {
   const row = await prisma.fuelPriceCurrent.findFirst({
-    where: { fuelSku },
+    where: { fuelSku, club: { hasGas: true } },
     select: { fuelName: true },
   });
   if (row?.fuelName) {

@@ -68,6 +68,7 @@ export async function getPriceMovers(
         ON c."clubNumber" = curr."clubNumber"
       WHERE curr."fuelSku" = ${fuelSku}
         AND curr.price IS DISTINCT FROM s.starting_price
+        AND c."hasGas" = true
       ORDER BY "absoluteChange" DESC;
     `;
 

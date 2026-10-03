@@ -31,6 +31,7 @@ export async function getStateSummaries(
       FROM "FuelPriceCurrent" p
       JOIN "Club" c ON c."clubNumber" = p."clubNumber"
       WHERE p."fuelSku" = ${fuelSku}
+        AND c."hasGas" = true
       GROUP BY c.state
       ORDER BY percentile_cont(0.5) WITHIN GROUP (ORDER BY p.price) ASC, c.state ASC;
     `;
