@@ -1,6 +1,5 @@
 # Dependencies
 node_modules/
-cloudflare-trigger/node_modules/
 
 # Build / coverage
 dist/
@@ -8,6 +7,8 @@ build/
 coverage/
 *.tsbuildinfo
 .next/
+web/public/maplibre-gl-shared.mjs
+web/public/maplibre-gl-worker.mjs
 
 # Secrets / local env
 .env

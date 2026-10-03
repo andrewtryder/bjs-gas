@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { MAP_THEME_TOKENS } from "../web/lib/map-config.js";
 import { normalizeFuelDisplayName } from "../web/lib/fuels.js";
 
-describe("Design System DS-6 Cleanup Verification", () => {
+describe("Map Theme & Display Tokens", () => {
   it("exports canonical Ledger Slate theme tokens for MapLibre paint expressions", () => {
     expect(MAP_THEME_TOKENS.accent).toBe("#2563eb");
     expect(MAP_THEME_TOKENS.accentHover).toBe("#1d4ed8");

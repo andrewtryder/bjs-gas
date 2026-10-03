@@ -21,6 +21,7 @@
     "collect:once": "tsx src/cli.ts collect:once",
     "typecheck": "tsc --noEmit && pnpm run typecheck:web",
     "typecheck:web": "pnpm --filter web run typecheck",
+    "pretest": "node web/scripts/copy-maplibre-worker.js",
     "test": "vitest run",
     "test:integration": "vitest run tests/persist.integration.test.ts",
     "lint": "tsc --noEmit",

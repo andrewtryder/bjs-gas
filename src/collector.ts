@@ -72,19 +72,15 @@ export type CollectionLockState = {
 
 let collecting = false;
 let collectingStartedAtMs: number | null = null;
-/** Active deadline controller for the current collection, if any. */
-let activeDeadline: AbortController | null = null;
 
 function clearCollectionLock(): void {
   collecting = false;
   collectingStartedAtMs = null;
-  activeDeadline = null;
 }
 
-function acquireCollectionLock(deadline: AbortController): void {
+function acquireCollectionLock(): void {
   collecting = true;
   collectingStartedAtMs = Date.now();
-  activeDeadline = deadline;
 }
 
 /**
@@ -204,7 +200,7 @@ export async function runCollection(options: CollectOptions = {}): Promise<Colle
 
   const timeoutMs = options.timeoutMs ?? COLLECTION_TIMEOUT_MS;
   const deadline = new AbortController();
-  acquireCollectionLock(deadline);
+  acquireCollectionLock();
 
   const startedAtDate = new Date();
   const startedAt = startedAtDate.toISOString();
@@ -509,7 +505,6 @@ export function __setCollectionLockForTests(startedAtMs: number | null): void {
   }
   collecting = true;
   collectingStartedAtMs = startedAtMs;
-  activeDeadline = null;
 }
 
 export function isCollectionAbortedFailure(failures: ClubFailure[] | undefined): boolean {
