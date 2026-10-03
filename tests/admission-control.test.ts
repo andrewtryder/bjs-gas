@@ -403,4 +403,45 @@ describe("Admission Control and Concurrency Limiter", () => {
       message: "Database connection pool exhausted. Please retry.",
     });
   });
+
+  it("retries one P1017 closed connection for the read-only status endpoint", async () => {
+    const finishedAt = new Date();
+    const p1017Error = Object.assign(new Error("Server has closed the connection."), {
+      code: "P1017",
+    });
+    const mockPrisma = {
+      collectionRun: {
+        findMany: vi.fn().mockRejectedValueOnce(p1017Error).mockResolvedValueOnce([
+          {
+            startedAt: new Date(finishedAt.getTime() - 8_000),
+            finishedAt,
+            durationMs: 8_000,
+            clubsConfigured: 214,
+            clubsSucceeded: 208,
+            clubsEmptyFuels: 6,
+            clubsHardFailed: 0,
+            fuelObservations: 511,
+            historyChanges: 0,
+            databaseQueries: 1,
+            degraded: false,
+            failures: [],
+          },
+        ]),
+      },
+      $queryRaw: vi.fn().mockResolvedValue([
+        {
+          latest: finishedAt,
+          oldest: finishedAt,
+          rows: 511n,
+          stations_recent: 208n,
+        },
+      ]),
+    } as unknown as PrismaClient;
+
+    const app = createApp({ prisma: mockPrisma, collectorSecret: "secret" });
+    const res = await app.request("/api/v1/status");
+
+    expect(res.status).toBe(200);
+    expect(mockPrisma.collectionRun.findMany).toHaveBeenCalledTimes(2);
+  });
 });
