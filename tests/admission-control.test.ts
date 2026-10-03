@@ -404,6 +404,73 @@ describe("Admission Control and Concurrency Limiter", () => {
     });
   });
 
+  it("app.onError catches P2024 on stations list and returns the same 503 shape", async () => {
+    const p2024Error = Object.assign(
+      new Error("Timed out fetching a new connection from the connection pool"),
+      { code: "P2024" },
+    );
+    const mockPrisma = {
+      club: {
+        findMany: vi.fn().mockRejectedValue(p2024Error),
+      },
+    } as unknown as PrismaClient;
+
+    const app = createApp({
+      prisma: mockPrisma,
+      collectorSecret: "secret",
+    });
+
+    const res = await app.request("/api/v1/stations");
+    expect(res.status).toBe(503);
+    expect(await res.json()).toEqual({
+      error: "database_pool_timeout",
+      code: "P2024",
+      message: "Database connection pool exhausted. Please retry.",
+    });
+  });
+
+  it("analytics router returns route-specific 500 on generic errors", async () => {
+    const mockPrisma = {
+      $queryRaw: vi.fn().mockRejectedValue(new Error("query exploded")),
+      fuelPriceCurrent: {
+        findFirst: vi.fn().mockRejectedValue(new Error("query exploded")),
+      },
+    } as unknown as PrismaClient;
+
+    const router = createAnalyticsRouter(mockPrisma);
+    const res = await router.request("/summary");
+    expect(res.status).toBe(500);
+    expect(await res.json()).toEqual({ error: "analytics_summary_failed" });
+  });
+
+  it("analytics summary still runs through the limiter, sets cache, and returns the query result", async () => {
+    const mockPrisma = {
+      $queryRaw: vi.fn().mockResolvedValue([]),
+      fuelPriceCurrent: {
+        findFirst: vi.fn().mockResolvedValue({ fuelName: "Unleaded" }),
+      },
+    } as unknown as PrismaClient;
+    const limiter = new ConcurrencyLimiter({ maxConcurrency: 1 });
+    const runSpy = vi.spyOn(limiter, "run");
+
+    const router = createAnalyticsRouter(mockPrisma, limiter);
+    const res = await router.request("/summary");
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get("cache-control")).toBe(
+      "public, max-age=60, s-maxage=120, stale-while-revalidate=60",
+    );
+    const body = (await res.json()) as {
+      stationCount: number;
+      fuel: { sku: string; name: string };
+      medianPrice: string | null;
+    };
+    expect(runSpy).toHaveBeenCalledTimes(1);
+    expect(body.stationCount).toBe(0);
+    expect(body.fuel).toEqual({ sku: "1", name: "Unleaded" });
+    expect(body.medianPrice).toBeNull();
+  });
+
   it("retries one P1017 closed connection for the read-only status endpoint", async () => {
     const finishedAt = new Date();
     const p1017Error = Object.assign(new Error("Server has closed the connection."), {
