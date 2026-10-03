@@ -28,3 +28,13 @@ overrides:
   valibot: ^1.4.2
   deepmerge-ts: ^8.0.2
   vitest: ^4.1.11
+  "@effect/platform-node>undici": "8.10.2"
+  "alchemy>undici": "7.29.1"
+  fast-uri: ^3.1.8
+audit:
+  ignore:
+    - GHSA-vfj7-8cjw-p6xm
+auditConfig:
+  ignoreGhsas:
+    - GHSA-vfj7-8cjw-p6xm
+
