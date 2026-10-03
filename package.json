@@ -21,10 +21,12 @@
     "typecheck": "tsc --noEmit && pnpm run typecheck:deploy && pnpm run typecheck:web",
     "typecheck:deploy": "tsc -p tsconfig.deploy.json --noEmit",
     "typecheck:web": "pnpm --filter web run typecheck",
+    "lint": "biome lint .",
+    "format:check": "biome format .",
+    "format": "biome format --write .",
     "pretest": "node web/scripts/copy-maplibre-worker.js",
     "test": "vitest run",
     "test:integration": "vitest run tests/persist.integration.test.ts tests/analytics-scope.integration.test.ts",
-    "lint": "tsc --noEmit && pnpm run typecheck:deploy",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate deploy",
     "prisma:migrate:dev": "prisma migrate dev",
@@ -35,6 +37,7 @@
   },
   "packageManager": "pnpm@11.22.0",
   "devDependencies": {
+    "@biomejs/biome": "2.5.15",
     "@types/bun": "^1.4.0",
     "@types/node": "^24.3.0",
     "prisma": "^6.19.3",
@@ -54,9 +57,5 @@
     "hono": "^4.13.7",
     "playwright": "^1.55.0",
     "zod": "^3.25.76"
-  },
-  "overrides": {
-    "@prisma/config>effect": "3.21.0",
-    "effect": "4.0.0-rc.112"
   }
 }

@@ -995,13 +995,10 @@ describe("persistence timeout and lock safety", () => {
     vi.spyOn(Date, "now").mockImplementation(() => mockedNow);
 
     let mainPersistCalled = false;
-    let failurePersistCalled = false;
 
     const { prisma } = createMockPrisma({
       onTransaction: async (cb, txOptions) => {
-        if (txOptions?.timeout === 6_000) {
-          failurePersistCalled = true;
-        } else {
+        if (txOptions?.timeout !== 6_000) {
           mainPersistCalled = true;
         }
         return await cb({

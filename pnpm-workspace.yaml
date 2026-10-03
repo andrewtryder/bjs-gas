@@ -21,6 +21,8 @@ minimumReleaseAgeExclude:
   - '@next/swc-win32-x64-msvc@16.3.5'
   - next@16.3.5
 overrides:
+  # Composer 0.18 + Alchemy need Effect 4 at the workspace root.
+  # Prisma CLI 6 still needs Effect 3 on @prisma/config only.
   "@prisma/config>effect": "3.21.0"
   effect: 4.0.0-rc.112
   hono: ^4.13.7
@@ -32,9 +34,7 @@ overrides:
   "@effect/platform-node>undici": "8.10.2"
   "alchemy>undici": "7.29.1"
   fast-uri: ^3.1.8
+# braces@3.0.3 (via alchemy → micromatch) has no patched release for GHSA-vfj7-8cjw-p6xm.
 audit:
   ignore:
-    - GHSA-vfj7-8cjw-p6xm
-auditConfig:
-  ignoreGhsas:
     - GHSA-vfj7-8cjw-p6xm

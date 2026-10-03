@@ -1,6 +1,5 @@
 "use client";
 
-import React from "react";
 
 export interface SegmentedControlOption<T extends string | number> {
   value: T;

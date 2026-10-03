@@ -367,11 +367,7 @@ describe("Admission Control and Concurrency Limiter", () => {
     const router = createAnalyticsRouter(mockPrisma, overloadedLimiter);
 
     // Block the 1 active permit
-    let unblock!: () => void;
-    const blocker = new Promise<void>((r) => {
-      unblock = r;
-    });
-    const firstCall = router.request("/summary");
+    void router.request("/summary");
 
     // Next request hits queue full (maxQueueLength: 0)
     const secondRes = await router.request("/summary");
@@ -381,8 +377,6 @@ describe("Admission Control and Concurrency Limiter", () => {
       error: "analytics_overloaded",
       reason: "QUEUE_FULL",
     });
-
-    unblock();
   });
 
   it("app.onError catches P2024 on operational routes and returns 503 with structured JSON", async () => {

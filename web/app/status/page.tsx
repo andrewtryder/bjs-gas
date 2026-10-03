@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Breadcrumbs from "../../components/Breadcrumbs";
 import { getSystemStatus } from "../../lib/api";
-import { getFreshnessInfo, formatRelativeTime } from "../../lib/freshness";
+import { formatRelativeTime } from "../../lib/freshness";
 import { resolveStatusHero, formatCollectionDuration } from "../../lib/status-view";
 
 export const metadata: Metadata = {
@@ -24,9 +24,6 @@ export default async function StatusPage() {
 
   const lastRun = status?.lastCollection;
   const freshness = status?.freshness;
-  const freshnessInfo = freshness?.latestObservedAt
-    ? getFreshnessInfo(freshness.latestObservedAt)
-    : null;
 
   const hero = resolveStatusHero(
     status,

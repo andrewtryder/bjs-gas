@@ -1,13 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
-  formatPrice,
-  formatDate,
   formatDisplayDate,
   formatPriceComparison,
   formatNearbyPriceDelta,
-  calculateFuelStats,
 } from "../web/lib/stats.js";
-import type { StationDto } from "../web/lib/types.js";
 
 describe("formatPriceComparison", () => {
   it("formats cheaper prices in cents below reference", () => {
