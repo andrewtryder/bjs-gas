@@ -29,10 +29,23 @@ This guarantees GitHub `main` always directly describes what production is runni
 ### Pre-Deployment Checks
 Always validate locally before deploying:
 ```bash
+pnpm --filter bjs-gas run lint
+pnpm --filter bjs-gas run format:check
 pnpm typecheck
 pnpm test
+pnpm test:integration
 pnpm run build
 ```
+
+`pnpm --filter bjs-gas run lint` is Biome (correctness/suspicious). `pnpm typecheck` remains the TypeScript coverage for core, deploy entrypoints, and web. Do not treat lint as a substitute for `tsc`. In this workspace, `pnpm lint` is not the root script (pnpm may treat it as a recursive/exec alias).
+
+A repository-wide Biome format rewrite is deferred: a check-only run would change ~167 files (~67k lines), mostly CSS wrapping. Formatter enforcement currently covers `biome.json` only.
+
+### Composer dependency pins
+Root `alchemy@2.0.0-beta.74` and `effect@4.0.0-rc.112` are **not** application imports. They pin Prisma Composer's runtime graph (Composer 0.18 fails when the Effect constellation resolves incompatibly). `pnpm-workspace.yaml` `overrides` is the authoritative pin set, including `@prisma/config>effect` at 3.21.0 for Prisma CLI vs Composer Effect 4.
+
+### Audit ignore
+`GHSA-vfj7-8cjw-p6xm` remains ignored: transitive `braces@3.0.3` via `alchemy` → `fast-glob` → `micromatch`. Latest `braces` is still 3.0.3 (unpatched). CI still fails on any other high/critical advisory.
 
 ### Synchronized Git Remote
 - Never leave local `main` ahead of `origin/main`.

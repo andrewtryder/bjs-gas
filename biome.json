@@ -1,0 +1,71 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.5.15/schema.json",
+  "vcs": {
+    "enabled": true,
+    "clientKind": "git",
+    "useIgnoreFile": true
+  },
+  "files": {
+    "ignoreUnknown": true,
+    "includes": [
+      "**",
+      "!**/node_modules",
+      "!!**/dist",
+      "!!**/.next",
+      "!!**/coverage",
+      "!**/.agents/skills",
+      "!**/.claude/skills",
+      "!**/.cursor/skills",
+      "!**/.devin/skills",
+      "!**/web/public/maplibre-gl-*.mjs",
+      "!**/playwright-report",
+      "!**/test-results",
+      "!**/.playwright",
+      "!**/data/raw-*.json"
+    ]
+  },
+  "formatter": {
+    "enabled": true,
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "includes": ["biome.json"]
+  },
+  "javascript": {
+    "formatter": {
+      "quoteStyle": "double",
+      "semicolons": "always",
+      "trailingCommas": "all"
+    }
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "recommended": true,
+      "a11y": {
+        "recommended": false
+      },
+      "style": {
+        "recommended": false
+      },
+      "complexity": {
+        "recommended": false
+      },
+      "security": {
+        "noDangerouslySetInnerHtml": "off"
+      },
+      "suspicious": {
+        "noArrayIndexKey": "off",
+        "noExplicitAny": "off"
+      },
+      "correctness": {
+        "noUnusedImports": "error",
+        "noUnusedVariables": "error",
+        "noUnusedFunctionParameters": "off",
+        "useExhaustiveDependencies": "off"
+      }
+    }
+  },
+  "assist": {
+    "enabled": false
+  }
+}

@@ -52,6 +52,12 @@ jobs:
       - name: Generate Prisma Client
         run: pnpm run prisma:generate
 
+      - name: Lint
+        run: pnpm --filter bjs-gas run lint
+
+      - name: Format Check
+        run: pnpm --filter bjs-gas run format:check
+
       - name: Typecheck
         run: pnpm typecheck
 

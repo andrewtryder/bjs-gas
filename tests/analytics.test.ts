@@ -191,8 +191,6 @@ describe("historical price reconstruction logic", () => {
 
 describe("price movers calculation logic", () => {
   it("correctly identifies increases, decreases, and unchanged stations", () => {
-    const cutoffStart = new Date("2026-09-01T00:00:00Z");
-
     const stationCurrent = [
       { clubNumber: 1, currentPrice: 3.299 }, // Increased from 3.199 (+0.100)
       { clubNumber: 2, currentPrice: 3.099 }, // Decreased from 3.199 (-0.100)

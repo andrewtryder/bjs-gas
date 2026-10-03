@@ -1,5 +1,5 @@
 import type { StationDto, StationFuel } from "../types";
-import { getFreshnessInfo, type FreshnessInfo } from "../freshness";
+import type { FreshnessInfo } from "../freshness";
 
 /**
  * Extracts the latest observedAt ISO timestamp from a station's fuels array.

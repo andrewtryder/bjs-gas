@@ -8,7 +8,7 @@ import {
   runCollection,
 } from "./collector.js";
 import { getNearbyStations, getStationHistory, getStationWithPrices, listStationsWithPrices } from "./api/stations.js";
-import { getCollectionStatus } from "./api/status.js";
+import { getCollectionStatus, type StatusPayload } from "./api/status.js";
 import { createAnalyticsRouter } from "./api/analytics.js";
 import { analyticsLimiter } from "./api/limiter.js";
 import { isPrismaPoolTimeout, prismaPoolTimeoutBody } from "./api/errors.js";
@@ -150,7 +150,7 @@ export function createApp(env: AppEnv): Hono {
   });
 
   app.get("/api/v1/status", async (c) => {
-    let payload;
+    let payload: StatusPayload;
     try {
       payload = await getCollectionStatus(env.prisma);
     } catch (error) {

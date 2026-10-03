@@ -1,4 +1,3 @@
-import React from "react";
 import { formatPrice } from "../../lib/stats";
 import { normalizeFuelDisplayName } from "../../lib/fuels";
 
