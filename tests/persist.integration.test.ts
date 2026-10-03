@@ -65,7 +65,7 @@ describeDb("bulk persistence against Postgres", () => {
       degraded: false,
       failures: [],
       ...overrides,
-      scope: overrides.scope ?? "FLEET",
+      scope: overrides.scope ?? "DIAGNOSTIC",
       finishedAt: overrides.finishedAt ?? finishedAt,
       durationMs: overrides.durationMs ?? 5000,
     };
@@ -137,6 +137,7 @@ describeDb("bulk persistence against Postgres", () => {
     const beforeHist = await prisma.fuelPriceHistory.count({ where: { clubNumber } });
     const beforeRuns = await prisma.collectionRun.count();
     const emptyRun = runInput({
+      scope: "FLEET",
       clubsSucceeded: 0,
       clubsEmptyFuels: 1,
       clubsHardFailed: 0,
@@ -255,6 +256,7 @@ describeDb("bulk persistence against Postgres", () => {
       const inputFinishedAt = "2026-09-02T13:45:10.000Z";
 
       const run = runInput({
+        scope: "FLEET",
         startedAt: inputStartedAt,
         finishedAt: inputFinishedAt,
         durationMs: 70000,
