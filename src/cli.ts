@@ -15,6 +15,7 @@ import { fetchClubFuel } from "./fuel/client.js";
 import { importClubsBulk } from "./persist.js";
 import { runSitemapCanary } from "./sitemap-canary.js";
 import { coerceClub, type BjsClub } from "./types.js";
+import { diagnosticCollectionRunInput } from "./fuel/types.js";
 import { isAliasedParentClub, loadGasStationAliases } from "./gas-station-alias.js";
 
 function parseArgs(argv: string[]) {
@@ -75,18 +76,16 @@ async function collectClub(clubNumber: number, persist: boolean): Promise<void> 
   if (persist && result.ok) {
     const finishedAt = new Date();
     const { persistFuelObservations } = await import("./persist.js");
-    const stats = await persistFuelObservations(getPrisma(), result.observations, {
-      startedAt: observedAt,
-      finishedAt: finishedAt.toISOString(),
-      durationMs: finishedAt.getTime() - startedAt.getTime(),
-      clubsConfigured: 1,
-      clubsSucceeded: 1,
-      clubsEmptyFuels: 0,
-      clubsHardFailed: 0,
-      fuelObservations: result.observations.length,
-      degraded: false,
-      failures: [],
-    });
+    const stats = await persistFuelObservations(
+      getPrisma(),
+      result.observations,
+      diagnosticCollectionRunInput({
+        startedAt: observedAt,
+        finishedAt: finishedAt.toISOString(),
+        durationMs: finishedAt.getTime() - startedAt.getTime(),
+        fuelObservations: result.observations.length,
+      }),
+    );
     console.log(JSON.stringify({ persisted: true, ...stats }));
   }
 }

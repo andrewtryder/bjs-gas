@@ -4,7 +4,7 @@ import { getCollectionStatus } from "../src/api/status.js";
 import { createAnalyticsRouter } from "../src/api/analytics.js";
 import { createApp } from "../src/app.js";
 import { persistFuelObservations } from "../src/persist.js";
-import type { PrismaClient } from "@prisma/client";
+import { CollectionRunScope, type PrismaClient } from "@prisma/client";
 
 describe("Admission Control and Concurrency Limiter", () => {
   // 1. concurrent analytics work never exceeds maxConcurrency
@@ -235,7 +235,13 @@ describe("Admission Control and Concurrency Limiter", () => {
     const statusPayload = await getCollectionStatus(mockPrisma);
 
     expect(statusPayload.ok).toBe(true);
-    expect(mockPrisma.collectionRun.findMany).toHaveBeenCalled();
+    expect(mockPrisma.collectionRun.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { scope: CollectionRunScope.FLEET },
+        orderBy: { finishedAt: "desc" },
+        take: 20,
+      }),
+    );
     expect(mockPrisma.$queryRaw).toHaveBeenCalled();
 
     // Analytics is still active/queued while status has completed
@@ -305,6 +311,7 @@ describe("Admission Control and Concurrency Limiter", () => {
         },
       ],
       {
+        scope: "FLEET",
         startedAt: new Date().toISOString(),
         clubsConfigured: 1,
         clubsSucceeded: 1,
@@ -510,5 +517,10 @@ describe("Admission Control and Concurrency Limiter", () => {
 
     expect(res.status).toBe(200);
     expect(mockPrisma.collectionRun.findMany).toHaveBeenCalledTimes(2);
+    expect(mockPrisma.collectionRun.findMany).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        where: { scope: CollectionRunScope.FLEET },
+      }),
+    );
   });
 });

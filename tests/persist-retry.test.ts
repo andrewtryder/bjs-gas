@@ -110,6 +110,7 @@ describe("persistFuelObservations transaction acquisition resilience", () => {
   ];
 
   const sampleRun: CollectionRunInput = {
+    scope: "FLEET",
     startedAt: "2026-10-02T22:00:00.000Z",
     finishedAt: "2026-10-02T22:00:05.000Z",
     durationMs: 5000,

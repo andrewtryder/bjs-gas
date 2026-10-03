@@ -1,5 +1,6 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
 import {
+  COLLECTION_RUN_SCOPE,
   dedupeObservations,
   type CollectionRunInput,
   type FuelObservation,
@@ -49,8 +50,16 @@ export async function persistFuelObservations(
     observed_at: o.observedAt,
   }));
 
+  if (
+    run.scope !== COLLECTION_RUN_SCOPE.FLEET &&
+    run.scope !== COLLECTION_RUN_SCOPE.DIAGNOSTIC
+  ) {
+    throw new Error(`Invalid CollectionRun scope: ${String(run.scope)}`);
+  }
+
   const runPayload = [
     {
+      scope: run.scope,
       started_at: run.startedAt,
       finished_at: run.finishedAt ?? null,
       duration_ms: run.durationMs ?? null,
@@ -151,6 +160,7 @@ export async function persistFuelObservations(
       ),
       run_row AS (
         INSERT INTO "CollectionRun" (
+          "scope",
           "startedAt",
           "finishedAt",
           "durationMs",
@@ -166,6 +176,7 @@ export async function persistFuelObservations(
           "createdAt"
         )
         SELECT
+          r.scope::"CollectionRunScope",
           (r.started_at::timestamptz AT TIME ZONE 'UTC'),
           (COALESCE(r.finished_at::timestamptz, clock_timestamp()) AT TIME ZONE 'UTC'),
           COALESCE(
@@ -197,6 +208,7 @@ export async function persistFuelObservations(
           NOW()
         FROM jsonb_to_recordset(${JSON.stringify(runPayload)}::jsonb)
           AS r(
+            scope text,
             started_at text,
             finished_at text,
             duration_ms int,
