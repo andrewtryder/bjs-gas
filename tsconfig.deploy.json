@@ -1,0 +1,16 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "allowImportingTsExtensions": true,
+    "types": ["node", "bun"]
+  },
+  "include": [
+    "module.ts",
+    "prisma-composer.config.ts",
+    "src/server.ts",
+    "src/service.ts",
+    "src/schedule.ts",
+    "web/src/service.ts"
+  ],
+  "exclude": ["node_modules", "dist", "web/.next"]
+}

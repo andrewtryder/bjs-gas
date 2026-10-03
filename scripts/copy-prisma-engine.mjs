@@ -5,32 +5,44 @@ import { createRequire } from "node:module";
 const require = createRequire(import.meta.url);
 const engineName = "libquery_engine-debian-openssl-3.0.x.so.node";
 
-function findEngine() {
-  try {
-    const clientPkg = path.dirname(require.resolve("@prisma/client/package.json"));
-    const candidates = [
-      path.join(clientPkg, "..", ".prisma", "client", engineName),
-      path.join(clientPkg, ".prisma", "client", engineName),
-    ];
-    for (const c of candidates) {
-      if (existsSync(c)) return c;
-    }
-  } catch {
-    // fall through
+function engineCandidates(startDir) {
+  const candidates = [];
+  let current = startDir;
+
+  while (true) {
+    candidates.push(path.join(current, ".prisma", "client", engineName));
+    candidates.push(path.join(current, "node_modules", ".prisma", "client", engineName));
+
+    const parent = path.dirname(current);
+    if (parent === current) break;
+    current = parent;
   }
-  const fallback = path.join(
-    process.cwd(),
-    "node_modules",
-    ".pnpm",
+
+  return [...new Set(candidates)];
+}
+
+function findEngine() {
+  let clientPkgDir;
+  try {
+    clientPkgDir = path.dirname(require.resolve("@prisma/client/package.json"));
+  } catch (error) {
+    throw new Error(
+      `Could not resolve @prisma/client/package.json while locating ${engineName}: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    );
+  }
+
+  const candidates = engineCandidates(clientPkgDir);
+  for (const candidate of candidates) {
+    if (existsSync(candidate)) return candidate;
+  }
+
+  throw new Error(
+    `Could not find ${engineName} relative to @prisma/client at ${clientPkgDir}. Checked:\n${candidates
+      .map((candidate) => `- ${candidate}`)
+      .join("\n")}`,
   );
-  // last-resort scan via known pnpm layout used in this repo
-  const known = path.join(
-    process.cwd(),
-    "node_modules/.pnpm/@prisma+client@6.19.3_prisma@6.19.3_typescript@5.9.3__typescript@5.9.3/node_modules/.prisma/client",
-    engineName,
-  );
-  if (existsSync(known)) return known;
-  throw new Error(`Could not find ${engineName} (looked under ${fallback})`);
 }
 
 mkdirSync("dist", { recursive: true });

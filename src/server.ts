@@ -8,11 +8,9 @@ import { schedule } from "./schedule.ts";
 import service from "./service.ts";
 
 const { db } = service.load();
-const input = service.input() as Record<string, any>;
+const input = service.input();
 const collectorSecret = input.collectorSecret.expose();
-const honeybadgerApiKey = input.honeybadgerApiKey
-  ? input.honeybadgerApiKey.expose()
-  : undefined;
+const honeybadgerApiKey = input.honeybadgerApiKey?.expose();
 
 if (honeybadgerApiKey) {
   initApiHoneybadger(honeybadgerApiKey);
@@ -22,7 +20,7 @@ const prisma = createPrismaClient(db.url);
 const app = createApp({
   prisma,
   collectorSecret,
-  honeybadgerApiKey,
+  ...(honeybadgerApiKey !== undefined ? { honeybadgerApiKey } : {}),
 });
 
 const cronHandler = serveSchedule(service, schedule, {
