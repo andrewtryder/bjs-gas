@@ -10,6 +10,7 @@ import {
 import { getNearbyStations, getStationHistory, getStationWithPrices, listStationsWithPrices } from "./api/stations.js";
 import { getCollectionStatus } from "./api/status.js";
 import { createAnalyticsRouter } from "./api/analytics.js";
+import { analyticsLimiter } from "./api/limiter.js";
 import { fetchClubFuel } from "./fuel/client.js";
 import { reportApiError } from "./honeybadger.js";
 
@@ -34,6 +35,42 @@ export function createApp(env: AppEnv): Hono {
   const app = new Hono();
 
   app.onError((err, c) => {
+    const isP2024 =
+      typeof err === "object" &&
+      err !== null &&
+      "code" in err &&
+      (err as { code?: unknown }).code === "P2024";
+
+    if (isP2024) {
+      console.error(
+        JSON.stringify({
+          event: "prisma_pool_timeout_p2024",
+          route: c.req.path,
+          method: c.req.method,
+          queryCategory: "operational",
+          code: "P2024",
+          message: err instanceof Error ? err.message : String(err),
+          poolPressure: {
+            activeAnalytics: analyticsLimiter.activeCount,
+            waitingAnalytics: analyticsLimiter.waitingCount,
+          },
+        }),
+      );
+      reportApiError(err, {
+        route: c.req.path,
+        method: c.req.method,
+        statusCode: 503,
+      });
+      return c.json(
+        {
+          error: "database_pool_timeout",
+          code: "P2024",
+          message: "Database connection pool exhausted. Please retry.",
+        },
+        503,
+      );
+    }
+
     const status =
       "status" in err && typeof err.status === "number" ? err.status : 500;
     if (status >= 500) {
