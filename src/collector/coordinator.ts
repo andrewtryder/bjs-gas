@@ -1,6 +1,7 @@
 import type { PrismaClient } from "@prisma/client";
 import { fetchClubFuel, mapPool } from "../fuel/client.js";
 import {
+  COLLECTION_RUN_SCOPE,
   dedupeObservations,
   type ClubFailure,
   type CollectionResult,
@@ -104,6 +105,7 @@ export async function runCollection(options: CollectOptions = {}): Promise<Colle
             options.prisma,
             [],
             {
+              scope: COLLECTION_RUN_SCOPE.FLEET,
               startedAt,
               finishedAt: finishedAtDate.toISOString(),
               durationMs: finishedAtDate.getTime() - startedAtDate.getTime(),
@@ -287,6 +289,7 @@ async function runCollectionBody(input: {
       options.prisma,
       deduped,
       {
+        scope: COLLECTION_RUN_SCOPE.FLEET,
         startedAt,
         clubsConfigured,
         clubsSucceeded,

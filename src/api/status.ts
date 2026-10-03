@@ -1,4 +1,4 @@
-import type { PrismaClient } from "@prisma/client";
+import { CollectionRunScope, type PrismaClient } from "@prisma/client";
 import type {
   StatusFreshness,
   StatusLastCollection,
@@ -153,6 +153,7 @@ export async function getCollectionStatus(prisma: PrismaClient): Promise<SystemS
   const collectionLock = getCollectionLockState();
 
   const latestRuns = await prisma.collectionRun.findMany({
+    where: { scope: CollectionRunScope.FLEET },
     orderBy: { finishedAt: "desc" },
     take: 20,
   });

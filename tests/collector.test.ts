@@ -357,6 +357,13 @@ describe("auth + health API", () => {
     const app = createApp({ prisma: statusPrisma, collectorSecret: "test-secret-value-0001" });
     const res = await app.request("/api/v1/status");
     expect(res.status).toBe(200);
+    expect(statusPrisma.collectionRun.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { scope: "FLEET" },
+        orderBy: { finishedAt: "desc" },
+        take: 20,
+      }),
+    );
     const body = (await res.json()) as {
       ok: boolean;
       healthy: boolean;
@@ -1154,6 +1161,7 @@ describe("persistence timeout and lock safety", () => {
         },
       ],
       {
+        scope: "FLEET",
         startedAt: "2026-09-02T12:00:00.000Z",
         clubsConfigured: 1,
         clubsSucceeded: 1,
@@ -1206,6 +1214,7 @@ describe("persistence timeout and lock safety", () => {
         hungPrisma,
         [],
         {
+          scope: "FLEET",
           startedAt: "2026-09-02T12:00:00.000Z",
           clubsConfigured: 1,
           clubsSucceeded: 1,
@@ -1292,6 +1301,7 @@ describe("persistence timeout and lock safety", () => {
 
     let mainPersistCalled = false;
     let fallbackPersistCalled = false;
+    let fallbackPersistPayload = "";
 
     const mockPrisma = {
       $transaction: vi.fn(async (fn: (tx: unknown) => Promise<unknown>) => {
@@ -1299,6 +1309,7 @@ describe("persistence timeout and lock safety", () => {
           $executeRaw: vi.fn(async () => 1),
           $queryRaw: vi.fn(async (query: unknown, ...params: unknown[]) => {
             const queryStr = JSON.stringify(query) + JSON.stringify(params);
+            fallbackPersistPayload = queryStr;
             if (queryStr.includes("Regular") || queryStr.includes("3.919") || queryStr.includes("Unleaded")) {
               mainPersistCalled = true;
             }
@@ -1350,6 +1361,8 @@ describe("persistence timeout and lock safety", () => {
 
     // 2. Ordinary failure recording occurred
     expect(fallbackPersistCalled).toBe(true);
+    expect(fallbackPersistPayload).toMatch(/scope\\":\\"FLEET/);
+    expect(fallbackPersistPayload).not.toMatch(/DIAGNOSTIC/);
 
     // 3. Collection lock is released after the bounded failure path settles
     expect(isCollectionInProgress()).toBe(false);
@@ -1359,12 +1372,14 @@ describe("persistence timeout and lock safety", () => {
     const { runCollection, isCollectionInProgress } = await import("../src/collector.js");
 
     let mainPersistCalled = false;
+    let mainPersistPayload = "";
     const mockPrisma = {
       $transaction: vi.fn(async (fn: (tx: unknown) => Promise<unknown>) => {
         const mockTx = {
           $executeRaw: vi.fn(async () => 1),
-          $queryRaw: vi.fn(async () => {
+          $queryRaw: vi.fn(async (query: unknown, ...params: unknown[]) => {
             mainPersistCalled = true;
+            mainPersistPayload = JSON.stringify(query) + JSON.stringify(params);
             return [
               {
                 observations_received: 1n,
@@ -1396,6 +1411,7 @@ describe("persistence timeout and lock safety", () => {
 
     expect(result.clubsSucceeded).toBe(1);
     expect(mainPersistCalled).toBe(true);
+    expect(mainPersistPayload).toMatch(/scope\\":\\"FLEET/);
     expect(isCollectionInProgress()).toBe(false);
   });
 });

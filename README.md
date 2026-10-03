@@ -77,6 +77,7 @@ pnpm discovery:accept
 pnpm import:clubs
 pnpm discover:sitemap-canary
 pnpm collect:club -- 189
+pnpm collect:club -- 189 --persist   # diagnostic persist; not fleet health
 pnpm collect:once             # local collect against DATABASE_URL
 pnpm collect:once -- --dry-run
 pnpm test
@@ -149,6 +150,13 @@ Successful collections pass the full observation batch as **one JSONB parameter*
 
 Empty observation arrays still insert a `CollectionRun` (so ops can see failed/empty hours) and leave `FuelPriceCurrent` untouched.
 
+Each `CollectionRun` has an explicit scope:
+
+- **FLEET** — scheduler, `/internal/collect`, `collect:once`, and aborted/failed fleet collections.
+- **DIAGNOSTIC** — `collect:club --persist` only.
+
+`/api/v1/status` evaluates **fleet** runs only. Diagnostic `--persist` still writes `FuelPriceCurrent` / `FuelPriceHistory`; it must not masquerade as the latest fleet attempt.
+
 ## Environment ownership
 
 | Where | Variables |
@@ -198,7 +206,7 @@ Public Compute API URL:
 - `degraded: true` if >20% of configured clubs fail; explicit warning if ≥80% fail.
 - Zero observations / hard-failure ratio / stale last usable run → `/api/v1/status` reports `healthy: false` with actionable `unhealthyReasons`.
 - Concurrent collect → `409` (in-process single-flight). The lock is never auto-cleared while live work may still run.
-- Aborted collections persist a failure `CollectionRun` (`collection_aborted: …`) so status does not keep showing only an older success.
+- Aborted fleet collections persist a failure `CollectionRun` (`collection_aborted: …`) so status does not keep showing only an older success.
 - The in-process lock does not coordinate across horizontally scaled replicas.
 
 ## Caching

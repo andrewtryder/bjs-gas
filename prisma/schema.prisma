@@ -70,9 +70,14 @@ model FuelPriceHistory {
   @@index([observedAt])
 }
 
-/// One row per hourly (or ad-hoc) collection run. Written in the same bulk SQL as prices.
+enum CollectionRunScope {
+  FLEET
+  DIAGNOSTIC
+}
+
+/// One row per fleet or diagnostic collection. Fleet health reads FLEET rows only.
 model CollectionRun {
-  id                 BigInt   @id @default(autoincrement())
+  id                 BigInt              @id @default(autoincrement())
   startedAt          DateTime
   finishedAt         DateTime
   durationMs         Int
@@ -86,7 +91,9 @@ model CollectionRun {
   databaseQueries    Int
   degraded           Boolean
   failures           Json
-  createdAt          DateTime @default(now())
+  createdAt          DateTime            @default(now())
+  scope              CollectionRunScope  @default(FLEET)
 
   @@index([finishedAt(sort: Desc)])
+  @@index([scope, finishedAt(sort: Desc)])
 }

@@ -65,6 +65,7 @@ describeDb("bulk persistence against Postgres", () => {
       degraded: false,
       failures: [],
       ...overrides,
+      scope: overrides.scope ?? "FLEET",
       finishedAt: overrides.finishedAt ?? finishedAt,
       durationMs: overrides.durationMs ?? 5000,
     };
@@ -156,6 +157,7 @@ describeDb("bulk persistence against Postgres", () => {
     expect(inserted?.databaseQueries).toBe(1);
     expect(inserted?.historyChanges).toBe(0);
     expect(inserted?.clubsEmptyFuels).toBe(1);
+    expect(inserted?.scope).toBe("FLEET");
   });
 
   it("cancels statement on PostgreSQL statement_timeout, rolls back, and leaves connection usable", async () => {
@@ -294,6 +296,7 @@ describeDb("bulk persistence against Postgres", () => {
       });
       expect(collectionRun?.startedAt.toISOString()).toBe(inputStartedAt);
       expect(collectionRun?.finishedAt.toISOString()).toBe(inputFinishedAt);
+      expect(collectionRun?.scope).toBe("FLEET");
 
       // Clean up
       await nyPrisma.fuelPriceCurrent.deleteMany({ where: { clubNumber: testClubNumber } });
@@ -304,4 +307,27 @@ describeDb("bulk persistence against Postgres", () => {
       await nyPrisma.$disconnect();
     }
   }, 15_000);
+
+  it("diagnostic persist writes DIAGNOSTIC scope in the same bulk SQL", async () => {
+    const run = runInput({
+      scope: "DIAGNOSTIC",
+      startedAt: "2026-10-03T12:10:00.000Z",
+      finishedAt: "2026-10-03T12:10:05.000Z",
+      durationMs: 5_000,
+    });
+    const stats = await persistFuelObservations(
+      prisma,
+      [obs("3.111", "1", "2026-10-03T12:10:00.000Z")],
+      run,
+    );
+    expect(stats.databaseQueries).toBe(1);
+    expect(stats.currentRowsUpserted).toBe(1);
+    const inserted = await prisma.collectionRun.findFirst({
+      where: { startedAt: new Date(run.startedAt) },
+    });
+    expect(inserted?.scope).toBe("DIAGNOSTIC");
+    expect(inserted?.clubsConfigured).toBe(1);
+    expect(inserted?.databaseQueries).toBe(1);
+    await prisma.collectionRun.deleteMany({ where: { startedAt: new Date(run.startedAt) } });
+  });
 });

@@ -44,7 +44,16 @@ export type PersistStats = {
 };
 
 /** Summary written into CollectionRun in the same bulk SQL as prices. */
+export const COLLECTION_RUN_SCOPE = {
+  FLEET: "FLEET",
+  DIAGNOSTIC: "DIAGNOSTIC",
+} as const;
+
+export type CollectionRunScope =
+  (typeof COLLECTION_RUN_SCOPE)[keyof typeof COLLECTION_RUN_SCOPE];
+
 export type CollectionRunInput = {
+  scope: CollectionRunScope;
   startedAt: string;
   finishedAt?: string | undefined;
   durationMs?: number | undefined;
@@ -56,6 +65,28 @@ export type CollectionRunInput = {
   degraded: boolean;
   failures: ClubFailure[];
 };
+
+/** Used by `collect:club --persist`. Does not represent a fleet collection. */
+export function diagnosticCollectionRunInput(input: {
+  startedAt: string;
+  finishedAt: string;
+  durationMs: number;
+  fuelObservations: number;
+}): CollectionRunInput {
+  return {
+    scope: COLLECTION_RUN_SCOPE.DIAGNOSTIC,
+    startedAt: input.startedAt,
+    finishedAt: input.finishedAt,
+    durationMs: input.durationMs,
+    clubsConfigured: 1,
+    clubsSucceeded: 1,
+    clubsEmptyFuels: 0,
+    clubsHardFailed: 0,
+    fuelObservations: input.fuelObservations,
+    degraded: false,
+    failures: [],
+  };
+}
 
 /** Normalize a BJ's float price into an exact 3-decimal string. */
 export function normalizePrice(price: number): string {
