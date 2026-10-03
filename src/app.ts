@@ -28,7 +28,7 @@ export const BUILD_DIRTY =
 export type AppEnv = {
   prisma: PrismaClient;
   collectorSecret: string;
-  honeybadgerApiKey?: string;
+  honeybadgerApiKey?: string | undefined;
 };
 
 export function createApp(env: AppEnv): Hono {
