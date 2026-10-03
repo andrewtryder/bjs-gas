@@ -8,7 +8,7 @@ import { schedule } from "./schedule.ts";
 import service from "./service.ts";
 
 const { db } = service.load();
-const input = service.input() as Record<string, any>;
+const input = service.input();
 const collectorSecret = input.collectorSecret.expose();
 const honeybadgerApiKey = input.honeybadgerApiKey
   ? input.honeybadgerApiKey.expose()
