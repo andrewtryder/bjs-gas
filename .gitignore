@@ -19,6 +19,11 @@ web/public/maplibre-gl-worker.mjs
 *.key
 credentials*.json
 
+# Generated Prisma Composer skills: canonical copy is .agents/skills only.
+.claude/skills/
+.cursor/skills/
+.devin/skills/
+
 # Prisma local pin may include workspace ids (keep committed if non-secret)
 # .prisma/local.json is a project link pin — safe to commit
 

@@ -27,6 +27,7 @@
     "pretest": "node web/scripts/copy-maplibre-worker.js",
     "test": "vitest run",
     "test:integration": "vitest run tests/persist.integration.test.ts tests/analytics-scope.integration.test.ts",
+    "skills:sync": "pnpm dlx @prisma/cli@8.0.0-rc.19 skills sync --config prisma.skills.config.ts",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate deploy",
     "prisma:migrate:dev": "prisma migrate dev",
