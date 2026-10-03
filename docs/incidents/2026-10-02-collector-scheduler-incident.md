@@ -86,3 +86,11 @@ All three failure modes have been permanently resolved, tested with comprehensiv
      5. `freshStationRatio >= 0.8`
      6. Successful collection within 90 minutes
      7. Latest observation within 90 minutes
+
+---
+
+## 5. Follow-up (2026-10-03): missed-tick concern
+
+Later the same day, a missed-tick concern was investigated. Native scheduling uses `setInterval` semantics: the first collect fires one interval after scheduler boot, not on a wall-clock hour. Autonomous full-fleet delivery was subsequently verified. No additional scheduler code fix was required. The 2026-10-02/03 remediations above remain the resolution for stalling, Cloudflare-trigger overlap, P1017 retry, and P2024 admission control.
+
+This note does not change the original incident chronology.

@@ -48,26 +48,9 @@ Hourly collector must poll every `data/gas-clubs.json` entry; empty fuels preser
 
 Maintenance flow: `pnpm discover` → `discovery:diff` → `discovery:accept` → `import:clubs`.
 
-Sitemap is a **canary** (`pnpm discover:sitemap-canary`): alert on new `/cl/` IDs not in `clubs.json`. See [sitemap-discovery-investigation.md](./sitemap-discovery-investigation.md).
+Sitemap inventory is **not** authoritative for membership or `hasGas`. Locator discovery remains the maintenance path. Public sitemap `/cl/` pages may omit known clubs and may return thin HTML shells. Empty eisapi `data: []` cannot classify gas membership.
 
-## Sitemap / Chromium-free inventory probe (2026-09-02)
-
-See [sitemap-discovery-investigation.md](./sitemap-discovery-investigation.md) for the full report.
-
-Summary:
-
-- `robots.txt` advertises `https://www.bjs.com/bjs_sitemap.xml` (sitemap **index**).
-- Club SEO URLs live in `bjs_ancillary_sitemap.xml` as `/cl/<slug>/<id>/` — **272** unique IDs.
-- That set is a **strict subset** of locator `club/search` (**286**): **14** clubs (11 gas + 3 DCs / coming-soon) are missing from the sitemap.
-- Full `/cl/` HTML often embeds the same `PhysicalStore`-style fields (Features, StoreType, lat/lng). Thin SPA shells sometimes omit them.
-- eisapi empty `data: []` cannot classify gas vs non-gas.
-- **Decision:** do not replace Playwright discovery yet; do not ship `discover:http` until inventory parity (or an accepted gap policy) exists.
-
-Reproduce:
-
-```bash
-pnpm probe:sitemap
-```
+`pnpm discover:sitemap-canary` is only a change detector: it fetches sitemap IDs, compares them to authoritative `clubs.json`, and alerts on new IDs. It never classifies `hasGas` and never replaces locator discovery.
 
 ## Club search (`/digital/live/api/v1.2/club/search/10201`)
 
@@ -236,7 +219,7 @@ Normalization: strip non-digits, parse int for `clubNumber`, zero-pad to 4 for `
 5. `Features.value` truncation means parsers must prefer `displayValue`.
 6. Coming-soon clubs (e.g. name containing `ComingSoon`) may still appear in search.
 7. `StoreType=DC` distribution centers appear in club/search but not in the all-clubs HTML index; they are treated as non-gas.
-8. Public sitemap `/cl/` coverage (272) lags locator search (286); see sitemap investigation doc.
+8. Public sitemap `/cl/` coverage lags locator search; some known clubs are omitted. Use `discover:sitemap-canary` as a change detector only.
 
 ## Reproduction without interactive browsing
 
