@@ -186,7 +186,7 @@ describe("gas / fuel response parsing", () => {
     ).toBe(true);
   });
 
-  it("treats empty fuel data as no products", () => {
+  it("treats empty or absent fuel data as no products, not as hasGas === false", () => {
     expect(
       parseFuelHasProducts({
         response: {
@@ -196,13 +196,12 @@ describe("gas / fuel response parsing", () => {
         },
       }),
     ).toBe(false);
+    expect(parseFuelHasProducts({ response: {} })).toBe(false);
   });
 
   it("rejects malformed fuel responses", () => {
     expect(() => parseFuelHasProducts({})).toThrow(/Malformed fuel response/);
-    expect(() => parseFuelHasProducts({ response: {} })).toThrow(
-      /Malformed fuel response/,
-    );
+    expect(() => parseFuelHasProducts(null)).toThrow(/Malformed fuel response/);
   });
 });
 
