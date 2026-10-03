@@ -21,6 +21,9 @@ importers:
 
   .:
     dependencies:
+      '@bjs-gas/contracts':
+        specifier: workspace:*
+        version: link:packages/contracts
       '@honeybadger-io/js':
         specifier: ^6.16.3
         version: 6.16.3
@@ -71,8 +74,13 @@ importers:
         specifier: ^4.1.11
         version: 4.1.11(@types/node@24.13.3)(vite@8.3.0(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.13)(yaml@2.9.0))
 
+  packages/contracts: {}
+
   web:
     dependencies:
+      '@bjs-gas/contracts':
+        specifier: workspace:*
+        version: link:../packages/contracts
       '@honeybadger-io/js':
         specifier: ^6.16.3
         version: 6.16.3

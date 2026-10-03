@@ -1,96 +1,28 @@
 import { type PrismaClient, Prisma } from "@prisma/client";
+import type {
+  NationalSummaryResponse,
+  NationalSummaryStation,
+  NationalTrendsResponse,
+  PriceMoverItem,
+  PriceMoversResponse,
+  StateSummariesResponse,
+  StateSummaryItem,
+  TrendPoint,
+} from "@bjs-gas/contracts";
+export type {
+  NationalSummaryStation,
+  PriceMoverItem,
+  StateSummaryItem,
+  TrendPoint,
+} from "@bjs-gas/contracts";
 import { calculateMedian, formatPriceString } from "./median.js";
 
 export const CANONICAL_FUEL_SKU = "1";
 
-export interface NationalSummaryStation {
-  clubNumber: number;
-  name: string;
-  city: string;
-  state: string;
-}
-
-export interface NationalSummaryResult {
-  generatedAt: string;
-  fuel: {
-    sku: string;
-    name: string;
-  };
-  stationCount: number;
-  medianPrice: string | null;
-  min: {
-    price: string;
-    station: NationalSummaryStation;
-  } | null;
-  max: {
-    price: string;
-    station: NationalSummaryStation;
-  } | null;
-}
-
-export interface TrendPoint {
-  date: string;
-  medianPrice: string;
-  minPrice: string;
-  maxPrice: string;
-  stationCount: number;
-}
-
-export interface NationalTrendsResult {
-  generatedAt: string;
-  fuel: {
-    sku: string;
-    name: string;
-  };
-  days: number;
-  state?: string | undefined;
-  points: TrendPoint[];
-}
-
-export interface StateSummaryItem {
-  state: string;
-  stationCount: number;
-  medianPrice: string;
-  minPrice: string;
-  maxPrice: string;
-}
-
-export interface StateSummariesResult {
-  generatedAt: string;
-  fuel: {
-    sku: string;
-    name: string;
-  };
-  states: StateSummaryItem[];
-}
-
-export interface PriceMoverItem {
-  clubNumber: number;
-  name: string;
-  city: string;
-  state: string;
-  fuel: {
-    sku: string;
-    name: string;
-  };
-  startingPrice: string;
-  currentPrice: string;
-  absoluteChange: string;
-  percentageChange: string;
-  startObservedAt: string;
-  currentObservedAt: string;
-}
-
-export interface PriceMoversResult {
-  generatedAt: string;
-  fuel: {
-    sku: string;
-    name: string;
-  };
-  days: number;
-  increases: PriceMoverItem[];
-  decreases: PriceMoverItem[];
-}
+export type NationalSummaryResult = NationalSummaryResponse;
+export type NationalTrendsResult = NationalTrendsResponse;
+export type StateSummariesResult = StateSummariesResponse;
+export type PriceMoversResult = PriceMoversResponse;
 
 /**
  * Resolves fuel name for SKU, defaulting to standard name or querying FuelPriceCurrent.
