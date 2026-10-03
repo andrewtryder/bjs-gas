@@ -32,6 +32,7 @@ export async function getNationalSummary(
       FROM "FuelPriceCurrent" p
       JOIN "Club" c ON c."clubNumber" = p."clubNumber"
       WHERE p."fuelSku" = ${fuelSku}
+        AND c."hasGas" = true
       ORDER BY p.price ASC, c."clubNumber" ASC;
     `;
 

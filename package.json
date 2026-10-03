@@ -24,7 +24,7 @@
     "typecheck:web": "pnpm --filter web run typecheck",
     "pretest": "node web/scripts/copy-maplibre-worker.js",
     "test": "vitest run",
-    "test:integration": "vitest run tests/persist.integration.test.ts",
+    "test:integration": "vitest run tests/persist.integration.test.ts tests/analytics-scope.integration.test.ts",
     "lint": "tsc --noEmit && pnpm run typecheck:deploy",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate deploy",
