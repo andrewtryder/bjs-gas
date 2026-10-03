@@ -15,7 +15,6 @@
     "discovery:diff": "tsx src/cli.ts discovery:diff",
     "discovery:accept": "tsx src/cli.ts discovery:accept",
     "discover:sitemap-canary": "tsx src/cli.ts discover:sitemap-canary",
-    "probe:sitemap": "node scripts/probe-sitemap-discovery.mjs",
     "import:clubs": "tsx src/cli.ts import:clubs",
     "collect:club": "tsx src/cli.ts collect:club",
     "collect:once": "tsx src/cli.ts collect:once",

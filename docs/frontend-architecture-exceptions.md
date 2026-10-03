@@ -1,6 +1,6 @@
-# UI Technical Debt & Architectural Constraints
+# Frontend Architecture Exceptions
 
-This document records deliberate architectural constraints and legitimate technical exceptions identified during the Ledger Slate Phase DS-6 audit.
+This document records deliberate architectural exceptions identified during the Ledger Slate Phase DS-6 audit. These are not unresolved debt.
 
 ## 1. MapLibre GL Shader & Paint Expressions
 

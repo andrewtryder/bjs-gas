@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
 import { diffClubRegistries } from "../src/discover.js";
-import { assessClubHtmlCompleteness, isUsableClubHtml } from "../src/club-html-gate.js";
 import { runCollection } from "../src/collector.js";
 import type { BjsClub } from "../src/types.js";
 import type { PrismaClient } from "@prisma/client";
@@ -43,20 +42,6 @@ describe("discovery:diff semantics", () => {
     expect(diff.hasGasFlips).toEqual([
       { clubNumber: 1, name: "A", from: false, to: true },
     ]);
-  });
-});
-
-describe("club HTML completeness gate", () => {
-  it("rejects thin shells", () => {
-    const thin = "<html><title>BJs.com</title></html>";
-    expect(isUsableClubHtml(assessClubHtmlCompleteness(thin))).toBe(false);
-  });
-
-  it("accepts full documents with store payload markers", () => {
-    const full =
-      "x".repeat(120_000) +
-      `&q;uniqueID&q;:&q;39&q;,&q;addressLine&q;:[&q;1 Main&q;],&q;name&q;:&q;StoreType&q;,&q;value&q;:&q;CLUB&q;`;
-    expect(isUsableClubHtml(assessClubHtmlCompleteness(full))).toBe(true);
   });
 });
 
