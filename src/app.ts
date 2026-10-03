@@ -11,6 +11,7 @@ import { getNearbyStations, getStationHistory, getStationWithPrices, listStation
 import { getCollectionStatus } from "./api/status.js";
 import { createAnalyticsRouter } from "./api/analytics.js";
 import { analyticsLimiter } from "./api/limiter.js";
+import { isPrismaPoolTimeout, prismaPoolTimeoutBody } from "./api/errors.js";
 import { isClosedConnectionError } from "./persistence/transaction-policy.js";
 import { fetchClubFuel } from "./fuel/client.js";
 import { reportApiError } from "./honeybadger.js";
@@ -36,13 +37,7 @@ export function createApp(env: AppEnv): Hono {
   const app = new Hono();
 
   app.onError((err, c) => {
-    const isP2024 =
-      typeof err === "object" &&
-      err !== null &&
-      "code" in err &&
-      (err as { code?: unknown }).code === "P2024";
-
-    if (isP2024) {
+    if (isPrismaPoolTimeout(err)) {
       console.error(
         JSON.stringify({
           event: "prisma_pool_timeout_p2024",
@@ -62,14 +57,7 @@ export function createApp(env: AppEnv): Hono {
         method: c.req.method,
         statusCode: 503,
       });
-      return c.json(
-        {
-          error: "database_pool_timeout",
-          code: "P2024",
-          message: "Database connection pool exhausted. Please retry.",
-        },
-        503,
-      );
+      return c.json(prismaPoolTimeoutBody, 503);
     }
 
     const status =
