@@ -29,7 +29,7 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate deploy",
     "prisma:migrate:dev": "prisma migrate dev",
-    "deploy:compute": "node scripts/check-clean-tree.mjs && pnpm run build && pnpm dlx @prisma/cli@latest deploy module.ts --name bjs-gas"
+    "deploy:compute": "node scripts/check-clean-tree.mjs && pnpm run build && pnpm dlx @prisma/cli@8.0.0-rc.19 deploy module.ts --name bjs-gas"
   },
   "engines": {
     "node": ">=22.18"
