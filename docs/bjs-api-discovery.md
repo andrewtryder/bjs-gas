@@ -44,7 +44,7 @@ The following are **NOT** evidence that a club is non-gas:
 
 `data: []` can mean gas-with-no-prices, non-gas warehouse, DC, or invalid ID.
 
-Hourly collector must poll every `data/gas-clubs.json` entry; empty fuels preserve currents and must not change `Club.hasGas` or the poll list. Only locator discovery → accept → import may change `hasGas`.
+The collector must poll every `data/gas-clubs.json` entry; empty fuels preserve currents and must not change `Club.hasGas` or the poll list. Only locator discovery → accept → import may change `hasGas`.
 
 Maintenance flow: `pnpm discover` → `discovery:diff` → `discovery:accept` → `import:clubs`.
 

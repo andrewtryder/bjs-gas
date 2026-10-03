@@ -91,7 +91,7 @@ export default async function HomePage() {
     name: "BJ's gas prices",
     url: getWebBaseUrl(),
     description:
-      "Current BJ's gas prices, price history, and locations across the U.S. Updated hourly.",
+      "Current BJ's gas prices, price history, and locations across the U.S. Checked approximately every two hours.",
     potentialAction: {
       "@type": "SearchAction",
       target: {
@@ -119,22 +119,23 @@ export default async function HomePage() {
                 level={freshnessInfo.level}
                 text={freshnessInfo.relativeText}
                 cadencePrefix={true}
-                href="/status"
-                title="Data status"
+                href="/about"
+                title="About this site"
               />
             ) : (
               <StatusPill
                 level="fresh"
-                text="Updated hourly"
-                href="/status"
-                title="Data status"
+                text="About every 2 hours"
+                href="/about"
+                title="About this site"
               />
             )}
           </div>
 
           <h1 className="hero-title">BJ&apos;s gas prices</h1>
           <p className="hero-subtitle">
-            Current BJ&apos;s gas prices, price history, and locations across the U.S. Updated hourly.
+            Current BJ&apos;s gas prices, price history, and locations across the U.S. Checked
+            approximately every two hours.
           </p>
 
           <div className="hero-actions">

@@ -14,7 +14,15 @@ import {
 } from "../collector.js";
 import type { ClubFailure } from "../fuel/types.js";
 
-export const FRESH_WINDOW_MINUTES = 90;
+/**
+ * Operator health: a usable FLEET run (or latest observation) older than this
+ * is `last_collection_stale` / `latest_observation_stale`.
+ *
+ * Cadence is 120 minutes (boot-relative). 180 minutes (~3 hours) keeps a
+ * normal two-hour cycle healthy, including modest deploy/jitter delay.
+ * Public UI aging is 3–6 hours; stale is > 6 hours (`web/lib/freshness.ts`).
+ */
+export const FRESH_WINDOW_MINUTES = 180;
 export const HARD_FAILURE_UNHEALTHY_RATIO = 0.2;
 
 

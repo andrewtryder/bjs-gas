@@ -1,6 +1,6 @@
 # Architecture
 
-Current production shape of **bjs-gas**: an hourly BJ’s fuel-price collector and public map UI on Prisma Compute.
+Current production shape of **bjs-gas**: a BJ’s fuel-price collector (approximately every two hours) and public map UI on Prisma Compute.
 
 This document describes **what exists now**. Implementation is the source of truth. Operational how-tos live in [README.md](../README.md). Release discipline lives in [AGENTS.md](../AGENTS.md). Visual language lives in [design-system.md](design-system.md). Deliberate frontend exceptions live in [frontend-architecture-exceptions.md](frontend-architecture-exceptions.md).
 
@@ -72,7 +72,7 @@ There is no Cloudflare Worker scheduler. Collection is Prisma-native cron only.
 ## Scheduler → collection
 
 ```text
-defineSchedule({ collect: "60m" })     src/schedule.ts
+defineSchedule({ collect: "120m" })    src/schedule.ts
         │
         ▼
 cronScheduler()                        module.ts
@@ -87,7 +87,7 @@ serveSchedule(...)                     src/server.ts
 runCollection({ prisma })              src/collector/coordinator.ts
 ```
 
-**Timing:** the interval is **relative to scheduler process boot** (`setInterval` semantics). The first tick is after one interval, not immediately on boot. Deploy or restart **resets** the next fire. Do not assume wall-clock minutes (`:20`, `:45`). A deploy can therefore stretch the gap between fleet runs past one hour until the new scheduler process has lived 60 minutes.
+**Timing:** the interval is **relative to scheduler process boot** (`setInterval` semantics). The first tick is after one interval (**120 minutes**), not immediately on boot. Deploy or restart **resets** the next fire. Do not assume wall-clock minutes (`:20`, `:45`). A deploy can therefore stretch the gap between fleet runs past two hours until the new scheduler process has lived 120 minutes.
 
 Cron logs (JSON):
 
@@ -269,7 +269,7 @@ Web `web/lib/types.ts` re-exports station/status contracts plus local view helpe
 | `GET /api/v1/analytics/*` | summary, trends, states, movers. Admission limiter. |
 | `POST /rpc/trigger` | Composer schedule (not Hono). |
 
-Status freshness window: **90 minutes**. Hard-failure unhealthy ratio: **≥ 20%**. Fresh-station majority uses `stationsObservedRecently / clubsSucceeded < 0.8` on a usable attempt (`fresh_stations_below_majority`). Configured club count must match the latest FLEET attempt (`configured_clubs_mismatch`).
+Status freshness window: **180 minutes** (~3 hours). Hard-failure unhealthy ratio: **≥ 20%**. Fresh-station majority uses `stationsObservedRecently / clubsSucceeded < 0.8` on a usable attempt (`fresh_stations_below_majority`). Configured club count must match the latest FLEET attempt (`configured_clubs_mismatch`). Public UI aging is 3–6 hours; stale is **> 6 hours**.
 
 ### Database errors (do not collapse)
 
@@ -316,7 +316,7 @@ Analytics queries are serialized so they cannot monopolize the API process pool.
 
 ## Frontend
 
-Next.js App Router under `web/app`: `/`, `/map`, `/states`, `/states/[state]`, `/stations/[clubNumber]`, `/status`, plus `robots.ts` / `sitemap.ts`.
+Next.js App Router under `web/app`: `/`, `/map`, `/states`, `/states/[state]`, `/stations/[clubNumber]`, `/about` (`/status` permanently redirects to `/about`), plus `robots.ts` / `sitemap.ts`. Operator JSON remains `GET /api/v1/status`.
 
 Shared behavior:
 
@@ -417,7 +417,7 @@ Prisma skills for agents are generated from installed `@prisma/composer` **0.18.
 8. API/web shared DTOs live in `packages/contracts`.
 9. External BJ’s fuel JSON is interpreted only in `src/fuel/schema.ts`.
 10. **P2024** is pool pressure (503, no retry). Closed-connection **P1017** is a separate, narrow retry.
-11. Scheduler cadence is **boot-relative 60m**, not wall-clock.
+11. Scheduler cadence is **boot-relative 120m**, not wall-clock.
 12. Production is the exact merged `main` SHA (`/health.revision`, clean deploy).
 13. Do not remove Composer/Effect/Alchemy pins without full deploy validation.
 
@@ -447,7 +447,7 @@ Do not speculatively change:
 
 - analytics limiter settings
 - collector concurrency or deadline/lock thresholds
-- `/api/v1/status` health rules (90m window, 20% hard-fail, query-count === 1)
+- `/api/v1/status` health rules (180m window, 20% hard-fail, query-count === 1)
 - scheduler implementation or interval
 - bulk SQL CTE shape
 - Composer/Effect/Alchemy pins

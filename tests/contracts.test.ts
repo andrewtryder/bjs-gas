@@ -57,7 +57,7 @@ const status: SystemStatusResponse = {
     currentPriceRows: 0,
     stationsObservedRecently: 0,
     freshStationRatio: 0,
-    freshWindowMinutes: 90,
+    freshWindowMinutes: 180,
   },
   configuredGasClubs: 0,
 };

@@ -1,12 +1,12 @@
 # bjs-gas
 
-Hourly BJ's Wholesale Club fuel-price collector and public map UI.
+BJ's Wholesale Club fuel-price collector (approximately every two hours) and public map UI.
 
 **Prisma Composer owns Postgres, the collector API, the native cron scheduler, and the Next.js web app.**
 
 See **[Architecture](docs/architecture.md)** for topology, collector/persistence invariants, fleet vs diagnostic runs, contracts, CI, and pins.
 
-Cloudflare is **not** the production scheduler. Collection uses Prisma-native cron (`defineSchedule` + `cronScheduler` + `serveSchedule`). The scheduler interval is relative to process boot (first tick after 60m), not wall-clock minutes.
+Cloudflare is **not** the production scheduler. Collection uses Prisma-native cron (`defineSchedule` + `cronScheduler` + `serveSchedule`). The scheduler interval is relative to process boot (first tick after 120m), not wall-clock minutes.
 
 ## Why the web/API boundary exists
 
@@ -28,7 +28,7 @@ High-level ownership; details and invariants are in [Architecture](docs/architec
 | Collection | Prisma Compute API | Poll bundled `gas-clubs.json` via eisapi. Prices only — not topology. |
 | Persistence | Prisma Compute API | One bulk CTE per run; FLEET vs DIAGNOSTIC `CollectionRun` scope. |
 | API | Prisma Compute | `/health`, `/internal/collect`, `/api/v1/*`, `/rpc/trigger` |
-| Scheduler | Prisma `cronScheduler` | Boot-relative `60m` `collect` job → typed RPC to the API |
+| Scheduler | Prisma `cronScheduler` | Boot-relative `120m` `collect` job → typed RPC to the API |
 | Frontend | Prisma Compute (Next.js) | HTTP/JSON only; no DB credentials |
 
 ## DISCOVERY DATA SEMANTICS
@@ -44,7 +44,7 @@ The following are **NOT** evidence that a club is non-gas:
 - a temporarily incomplete/thin club HTML page
 - a temporary fetch failure
 
-Therefore the hourly collector **MUST** poll every entry in `data/gas-clubs.json`, including stations that previously returned zero fuels.
+Therefore the collector **MUST** poll every entry in `data/gas-clubs.json`, including stations that previously returned zero fuels.
 
 If a configured gas station repeatedly returns zero fuels:
 
@@ -80,7 +80,7 @@ Plain `fetch` works; no cookies / special headers required.
 
 ## Scheduler + collection flow
 
-1. `src/schedule.ts` defines `defineSchedule({ collect: "60m" })`.
+1. `src/schedule.ts` defines `defineSchedule({ collect: "120m" })`.
 2. `module.ts` provisions `cronScheduler()` with `deps: { trigger: api.trigger }` and `input: { jobs: [...schedule.jobs] }`.
 3. `src/service.ts` exposes `{ trigger: triggerContract }`.
 4. `src/server.ts` mounts `serveSchedule(...)` at `/rpc/*` and runs `runCollection` for job `collect`.
@@ -107,7 +107,7 @@ curl -sS https://a3i9pecpa5hxogp2hpozah6d.ewr.prisma.build/api/v1/status | jq
 
 Expected healthy signals:
 
-- `lastSuccessfulCollection.finishedAt` age **< 90 minutes**
+- `lastSuccessfulCollection.finishedAt` age **< 3 hours** (`FRESH_WINDOW_MINUTES = 180`)
 - `fuelObservations` **> 0** on the latest usable run
 - hard failures **< 20%** of configured clubs
 - `freshness.stationsObservedRecently` ≈ majority of `clubsSucceeded`
@@ -200,11 +200,11 @@ Public Compute API URL:
 
 - Web client fetches use `cache: "no-store"`.
 - `/api/v1/status`: short CDN TTL (~15s).
-- `/api/v1/stations*`: ~5 minute `s-maxage` (collector is hourly).
+- `/api/v1/stations*`: ~5 minute `s-maxage` (collector is every ~2 hours).
 - Analytics endpoints: moderate TTL with `stale-while-revalidate`.
 
 ## Expected scale (illustrative)
 
-- ~720 Compute collect invocations / month
-- ~159k upstream BJ's fuel HTTP requests / month (≈214 × 24 × 30)
-- ~720 primary bulk SQL ops / month (plus reads/migrations/admin)
+- ~12 full-fleet collections / day (~360 / month)
+- ~77k upstream BJ's fuel HTTP requests / month (≈214 × 12 × 30)
+- ~360 fleet `CollectionRun` rows / month (plus reads/migrations/admin)

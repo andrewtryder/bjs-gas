@@ -23,7 +23,7 @@ export async function generateMetadata({ params }: StatePageProps): Promise<Meta
 
   return {
     title: `${stateName} Gas Prices — Current BJ's Rates & Locations`,
-    description: `Current BJ's gas prices across ${stateName} locations. Compare state medians, lowest gas rates, and find local club stations. Updated hourly.`,
+    description: `Current BJ's gas prices across ${stateName} locations. Compare state medians, lowest gas rates, and find local club stations. Checked approximately every two hours.`,
     alternates: {
       canonical: `${getWebBaseUrl()}/states/${toStateSlug(stateCode)}`,
     },
@@ -103,7 +103,8 @@ export default async function StateDetailPage({ params }: StatePageProps) {
               {stateName} gas prices
             </h1>
             <p className="state-hero-subtitle">
-              Current BJ&apos;s gas prices across {stateStations.length} {stateName} locations. Updated hourly.
+              Current BJ&apos;s gas prices across {stateStations.length} {stateName} locations.
+              Checked approximately every two hours.
             </p>
           </div>
 

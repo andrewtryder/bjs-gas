@@ -6,33 +6,29 @@ import {
 
 describe("status-view helpers", () => {
   describe("resolveStatusHero", () => {
-    it("returns healthy status with relative time when healthy", () => {
+    it("returns healthy status with a spoken age when healthy", () => {
       const nowIso = new Date(Date.now() - 15 * 60 * 1000).toISOString();
       const hero = resolveStatusHero({ healthy: true }, null, nowIso);
       expect(hero.level).toBe("healthy");
       expect(hero.heading).toBe("Prices are up to date");
       expect(hero.badgeLabel).toBe("Up to date");
-      expect(hero.description).toContain("15m ago");
+      expect(hero.description).toBe("Prices updated 15 minutes ago.");
     });
 
-    it("returns degraded status when unhealthy without fetch error", () => {
-      const hero = resolveStatusHero(
-        { healthy: false, unhealthyReasons: ["2 stations missing recent observations"] },
-        null,
-        null
-      );
-      expect(hero.level).toBe("degraded");
+    it("returns delayed copy without raw operator reason codes", () => {
+      const ago = new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString();
+      const hero = resolveStatusHero({ healthy: false }, null, ago);
       expect(hero.heading).toBe("Some prices may be delayed");
-      expect(hero.badgeLabel).toBe("Some delays");
-      expect(hero.description).toBe("2 stations missing recent observations");
+      expect(hero.description).toBe("Latest price update: 4 hours ago");
+      expect(hero.description).not.toContain("last_collection_stale");
     });
 
-    it("returns stale status when fetchError is present", () => {
+    it("returns delayed copy when fetchError is present", () => {
       const hero = resolveStatusHero(null, "Failed to connect", null);
       expect(hero.level).toBe("stale");
-      expect(hero.heading).toBe("Price updates are delayed");
+      expect(hero.heading).toBe("Some prices may be delayed");
       expect(hero.badgeLabel).toBe("Delayed");
-      expect(hero.description).toContain("Unable to reach data status service");
+      expect(hero.description).toContain("unavailable");
     });
   });
 

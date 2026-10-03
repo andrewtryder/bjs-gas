@@ -15,11 +15,11 @@ export const metadata: Metadata = {
     template: "%s | BJ's Gas Prices",
   },
   description:
-    "Current fuel prices, price trends, and station directories across BJ's Wholesale Club gas stations. Updated hourly.",
+    "Current fuel prices, price trends, and station directories across BJ's Wholesale Club gas stations. Checked approximately every two hours.",
   openGraph: {
     title: "BJ's Gas Prices — Current Prices, Trends & Locations",
     description:
-      "Current fuel prices, price trends, and station directories across BJ's Wholesale Club gas stations. Updated hourly.",
+      "Current fuel prices, price trends, and station directories across BJ's Wholesale Club gas stations. Checked approximately every two hours.",
     url: "/",
     siteName: "BJ's Gas Prices",
     type: "website",
@@ -29,7 +29,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "BJ's Gas Prices — Current Prices, Trends & Locations",
     description:
-      "Current fuel prices, price trends, and station directories across BJ's Wholesale Club gas stations. Updated hourly.",
+      "Current fuel prices, price trends, and station directories across BJ's Wholesale Club gas stations. Checked approximately every two hours.",
   },
 };
 
@@ -57,13 +57,8 @@ export default function RootLayout({
                 <Link href="/states" className="nav-link">
                   States
                 </Link>
-                <Link
-                  href="/status"
-                  className="nav-link nav-status-link"
-                  title="Data status"
-                >
-                  <span className="status-dot status-dot-healthy" aria-hidden="true" />
-                  <span>Data status</span>
+                <Link href="/about" className="nav-link">
+                  About
                 </Link>
               </nav>
             </div>
@@ -78,8 +73,8 @@ export default function RootLayout({
                 <Link href="/states" className="footer-link">
                   States
                 </Link>
-                <Link href="/status" className="footer-link">
-                  Data status
+                <Link href="/about" className="footer-link">
+                  About
                 </Link>
               </nav>
               <div className="footer-copy">

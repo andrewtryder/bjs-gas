@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: "Gas prices by state — Compare BJ's Gas Rates",
   description:
-    "Compare current BJ's Wholesale Club gas prices across all operating states. Find lowest state fuel medians, price ranges, and local station directories. Updated hourly.",
+    "Compare current BJ's Wholesale Club gas prices across all operating states. Find lowest state fuel medians, price ranges, and local station directories. Checked approximately every two hours.",
   alternates: {
     canonical: `${getWebBaseUrl()}/states`,
   },
@@ -49,7 +49,8 @@ export default async function StatesIndexPage() {
           Gas prices by state
         </h1>
         <p className="page-subtitle">
-          Compare current BJ&apos;s Regular prices across states. Updated hourly.
+          Compare current BJ&apos;s Regular prices across states. Checked approximately every two
+          hours.
         </p>
       </div>
 
