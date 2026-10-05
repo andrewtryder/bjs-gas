@@ -302,15 +302,22 @@ SQL stays next to the use case. Response DTOs come from `@bjs-gas/contracts`.
 
 **Gas-only rule:** public analytics join/filter `Club.hasGas = true`. Price tables may still hold alias-parent or formerly active rows. A fuel-specific `stationCount` can be **lower** than the public gas-station list when some `hasGas` clubs have no current row for that SKU.
 
-Admission (`src/api/limiter.ts` singleton `analyticsLimiter`):
+Admission (`src/api/limiter.ts` singletons `publicDbLimiter` and `analyticsLimiter`):
 
 ```text
-maxConcurrency: 1
-maxQueueLength: 8
-maxQueueWaitMs: 8000
+publicDbLimiter (all public operational + analytics routes):
+  maxConcurrency: 2
+  maxQueueLength: 16
+  maxQueueWaitMs: 5000
+
+analyticsLimiter (analytics-specific sub-budget):
+  maxConcurrency: 1
+  maxQueueLength: 8
+  maxQueueWaitMs: 8000
 ```
 
-Analytics queries are serialized so they cannot monopolize the API process pool. Do not change these numbers without production evidence. Queue pressure and P2024 are **different** 503s.
+With `connection_limit = 3`, restricting concurrent public database queries to 2 guarantees that at least 1 database connection is always reserved for background collection runs and persistence transactions, while preventing concurrent homepage renders from exhausting the Prisma connection pool (`P2024`). Analytics queries are serialized to 1 so heavy aggregations cannot monopolize the public pool. Queue pressure (`database_overloaded` / `analytics_overloaded`) and `P2024` are **different** 503s.
+
 
 ---
 

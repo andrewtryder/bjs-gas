@@ -28,13 +28,45 @@ export function getWebBaseUrl(): string {
   return envUrl.endsWith("/") ? envUrl.slice(0, -1) : envUrl;
 }
 
+export async function parseApiErrorMessage(res: Response, fallbackPrefix: string): Promise<string> {
+  const statusInfo = `${res.status} ${res.statusText}`.trim();
+  let detail = "";
+  try {
+    const rawText = await res.text();
+    if (rawText) {
+      try {
+        const json = JSON.parse(rawText);
+        if (json && typeof json === "object") {
+          const parts: string[] = [];
+          if (json.code) parts.push(String(json.code));
+          if (json.error) parts.push(String(json.error));
+          if (json.reason) parts.push(String(json.reason));
+          if (json.message) parts.push(String(json.message));
+          detail = parts.join(": ");
+        }
+      } catch {
+        const stripped = rawText.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+        if (stripped) {
+          detail = stripped.length > 120 ? `${stripped.slice(0, 117)}...` : stripped;
+        }
+      }
+    }
+  } catch {
+    // Ignore response read errors
+  }
+  const detailSuffix = detail ? ` (${detail})` : "";
+  return `${fallbackPrefix}: ${statusInfo}${detailSuffix}`;
+}
+
 export async function getStations(): Promise<StationsResponse> {
   const baseUrl = getApiBaseUrl();
   const res = await fetch(`${baseUrl}/api/v1/stations`, {
     cache: "no-store",
   });
   if (!res.ok) {
-    throw new Error(`Failed to fetch stations from ${baseUrl}/api/v1/stations: ${res.status} ${res.statusText}`);
+    throw new Error(
+      await parseApiErrorMessage(res, `Failed to fetch stations from ${baseUrl}/api/v1/stations`),
+    );
   }
   return res.json();
 }
@@ -46,7 +78,9 @@ export async function getStation(clubNumber: number): Promise<StationDetailRespo
   });
   if (res.status === 404) return null;
   if (!res.ok) {
-    throw new Error(`Failed to fetch station ${clubNumber}: ${res.status} ${res.statusText}`);
+    throw new Error(
+      await parseApiErrorMessage(res, `Failed to fetch station ${clubNumber}`),
+    );
   }
   return res.json();
 }
@@ -58,7 +92,9 @@ export async function getStationHistory(clubNumber: number, limit = 100): Promis
   });
   if (res.status === 404) return null;
   if (!res.ok) {
-    throw new Error(`Failed to fetch history for station ${clubNumber}: ${res.status} ${res.statusText}`);
+    throw new Error(
+      await parseApiErrorMessage(res, `Failed to fetch history for station ${clubNumber}`),
+    );
   }
   return res.json();
 }
@@ -78,7 +114,9 @@ export async function getNearbyStations(
   });
   if (res.status === 404) return null;
   if (!res.ok) {
-    throw new Error(`Failed to fetch nearby stations for ${clubNumber}: ${res.status} ${res.statusText}`);
+    throw new Error(
+      await parseApiErrorMessage(res, `Failed to fetch nearby stations for ${clubNumber}`),
+    );
   }
   return res.json();
 }
@@ -89,9 +127,12 @@ export async function getSystemStatus(): Promise<SystemStatusResponse> {
     cache: "no-store",
   });
   if (!res.ok) {
-    throw new Error(`Failed to fetch system status: ${res.status} ${res.statusText}`);
+    throw new Error(
+      await parseApiErrorMessage(res, "Failed to fetch system status"),
+    );
   }
   return res.json();
 }
+
 
 

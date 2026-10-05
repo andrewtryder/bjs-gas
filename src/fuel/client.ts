@@ -47,6 +47,7 @@ export function sleep(
       return;
     }
     let sleepMs = ms;
+    let isCappedByDeadline = false;
     if (deadlineAtMs !== undefined) {
       const remainingMs = deadlineAtMs - Date.now();
       if (remainingMs <= 0) {
@@ -55,11 +56,14 @@ export function sleep(
         reject(err);
         return;
       }
-      sleepMs = Math.min(ms, remainingMs);
+      if (remainingMs <= ms) {
+        sleepMs = remainingMs;
+        isCappedByDeadline = true;
+      }
     }
     const timer = setTimeout(() => {
       signal?.removeEventListener("abort", onAbort);
-      if (deadlineAtMs !== undefined && Date.now() >= deadlineAtMs) {
+      if (deadlineAtMs !== undefined && (isCappedByDeadline || Date.now() >= deadlineAtMs)) {
         const err = new Error("collection_aborted: wall-clock deadline exceeded");
         (err as { code?: string }).code = "COLLECTION_ABORTED";
         reject(err);

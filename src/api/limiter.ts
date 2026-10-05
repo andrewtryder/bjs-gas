@@ -12,6 +12,7 @@ export class LimiterOverloadError extends Error {
 }
 
 export interface ConcurrencyLimiterOptions {
+  name?: string;
   maxConcurrency?: number;
   maxQueueLength?: number;
   maxQueueWaitMs?: number;
@@ -25,17 +26,19 @@ interface QueuedItem {
 
 /**
  * Process-local concurrency limiter for admission control.
- * Used to bound concurrent database work (e.g. heavy analytics queries)
- * to prevent exhausting Prisma's connection pool.
+ * Used to bound concurrent database work (e.g. heavy analytics queries
+ * and operational queries) to prevent exhausting Prisma's connection pool.
  */
 export class ConcurrencyLimiter {
   private active = 0;
   private readonly queue: QueuedItem[] = [];
+  public readonly name: string;
   public readonly maxConcurrency: number;
   public readonly maxQueueLength: number;
   public readonly maxQueueWaitMs: number;
 
   constructor(options: ConcurrencyLimiterOptions = {}) {
+    this.name = options.name ?? "Database";
     const maxConcurrency = options.maxConcurrency ?? 1;
     const maxQueueLength = options.maxQueueLength ?? 8;
     const maxQueueWaitMs = options.maxQueueWaitMs ?? 8_000;
@@ -81,7 +84,7 @@ export class ConcurrencyLimiter {
 
     if (this.queue.length >= this.maxQueueLength) {
       throw new LimiterOverloadError(
-        `Analytics queue full (limit: ${this.maxQueueLength})`,
+        `${this.name} queue full (limit: ${this.maxQueueLength})`,
         "QUEUE_FULL",
       );
     }
@@ -101,7 +104,7 @@ export class ConcurrencyLimiter {
         }
         reject(
           new LimiterOverloadError(
-            `Analytics queue wait exceeded ${this.maxQueueWaitMs}ms`,
+            `${this.name} queue wait exceeded ${this.maxQueueWaitMs}ms`,
             "QUEUE_TIMEOUT",
           ),
         );
@@ -140,7 +143,23 @@ export class ConcurrencyLimiter {
  * up to 8 queued queries with an 8-second timeout before failing fast.
  */
 export const analyticsLimiter = new ConcurrencyLimiter({
+  name: "Analytics",
   maxConcurrency: 1,
   maxQueueLength: 8,
   maxQueueWaitMs: 8_000,
 });
+
+/**
+ * Global limiter for public database queries (operational routes + analytics).
+ * With connection_limit=3, restricting concurrent public database queries to 2
+ * guarantees that at least 1 database connection is always reserved for
+ * background collection runs and persistence transactions, while preventing
+ * concurrent homepage renders from exhausting the Prisma connection pool (P2024).
+ */
+export const publicDbLimiter = new ConcurrencyLimiter({
+  name: "Database",
+  maxConcurrency: 2,
+  maxQueueLength: 16,
+  maxQueueWaitMs: 5_000,
+});
+
