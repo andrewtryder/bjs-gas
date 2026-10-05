@@ -1,4 +1,4 @@
-import { getApiBaseUrl } from "./api";
+import { getApiBaseUrl, parseApiErrorMessage } from "./api";
 import type {
   NationalSummaryResponse,
   NationalTrendsResponse,
@@ -22,7 +22,7 @@ export async function getNationalSummary(fuelSku = "1"): Promise<NationalSummary
     cache: "no-store",
   });
   if (!res.ok) {
-    throw new Error(`Failed to fetch national summary: ${res.status} ${res.statusText}`);
+    throw new Error(await parseApiErrorMessage(res, "Failed to fetch national summary"));
   }
   return res.json();
 }
@@ -44,7 +44,7 @@ export async function getNationalTrends(
     cache: "no-store",
   });
   if (!res.ok) {
-    throw new Error(`Failed to fetch trends: ${res.status} ${res.statusText}`);
+    throw new Error(await parseApiErrorMessage(res, "Failed to fetch trends"));
   }
   return res.json();
 }
@@ -55,7 +55,7 @@ export async function getStateSummaries(fuelSku = "1"): Promise<StateSummariesRe
     cache: "no-store",
   });
   if (!res.ok) {
-    throw new Error(`Failed to fetch state summaries: ${res.status} ${res.statusText}`);
+    throw new Error(await parseApiErrorMessage(res, "Failed to fetch state summaries"));
   }
   return res.json();
 }
@@ -69,7 +69,8 @@ export async function getPriceMovers(days = 7, fuelSku = "1"): Promise<PriceMove
     },
   );
   if (!res.ok) {
-    throw new Error(`Failed to fetch price movers: ${res.status} ${res.statusText}`);
+    throw new Error(await parseApiErrorMessage(res, "Failed to fetch price movers"));
   }
   return res.json();
 }
+

@@ -7,7 +7,12 @@ import {
   getPriceMovers,
 } from "../analytics/queries.js";
 import { isPrismaPoolTimeout, prismaPoolTimeoutBody } from "./errors.js";
-import { ConcurrencyLimiter, LimiterOverloadError, analyticsLimiter } from "./limiter.js";
+import {
+  ConcurrencyLimiter,
+  LimiterOverloadError,
+  analyticsLimiter,
+  publicDbLimiter,
+} from "./limiter.js";
 
 const SUMMARY_CACHE_CONTROL =
   "public, max-age=60, s-maxage=120, stale-while-revalidate=60";
@@ -20,6 +25,7 @@ function handleAnalyticsError(
   event: string,
   fallbackError: string,
   limiter: ConcurrencyLimiter,
+  dbLimiter?: ConcurrencyLimiter,
 ) {
   if (err instanceof LimiterOverloadError) {
     console.warn(
@@ -33,6 +39,12 @@ function handleAnalyticsError(
         poolPressure: {
           activeAnalytics: limiter.activeCount,
           waitingAnalytics: limiter.waitingCount,
+          ...(dbLimiter
+            ? {
+                activeDb: dbLimiter.activeCount,
+                waitingDb: dbLimiter.waitingCount,
+              }
+            : {}),
         },
       }),
     );
@@ -57,6 +69,12 @@ function handleAnalyticsError(
         poolPressure: {
           activeAnalytics: limiter.activeCount,
           waitingAnalytics: limiter.waitingCount,
+          ...(dbLimiter
+            ? {
+                activeDb: dbLimiter.activeCount,
+                waitingDb: dbLimiter.waitingCount,
+              }
+            : {}),
         },
       }),
     );
@@ -75,6 +93,7 @@ function handleAnalyticsError(
 async function runAnalyticsQuery<T>(
   c: Context,
   limiter: ConcurrencyLimiter,
+  dbLimiter: ConcurrencyLimiter | undefined,
   options: {
     cacheControl: string;
     event: string;
@@ -83,24 +102,29 @@ async function runAnalyticsQuery<T>(
   },
 ) {
   try {
-    const result = await limiter.run(options.query);
+    const execute =
+      dbLimiter && dbLimiter !== limiter
+        ? () => limiter.run(() => dbLimiter.run(options.query))
+        : () => limiter.run(options.query);
+    const result = await execute();
     c.header("Cache-Control", options.cacheControl);
     return c.json(result);
   } catch (err) {
-    return handleAnalyticsError(err, c, options.event, options.fallbackError, limiter);
+    return handleAnalyticsError(err, c, options.event, options.fallbackError, limiter, dbLimiter);
   }
 }
 
 export function createAnalyticsRouter(
   prisma: PrismaClient,
   limiter: ConcurrencyLimiter = analyticsLimiter,
+  dbLimiter: ConcurrencyLimiter = publicDbLimiter,
 ): Hono {
   const router = new Hono();
 
   // 1. National Summary
   router.get("/summary", async (c) => {
     const fuelSku = c.req.query("fuelSku");
-    return runAnalyticsQuery(c, limiter, {
+    return runAnalyticsQuery(c, limiter, dbLimiter, {
       cacheControl: SUMMARY_CACHE_CONTROL,
       event: "analytics_summary_error",
       fallbackError: "analytics_summary_failed",
@@ -115,7 +139,7 @@ export function createAnalyticsRouter(
     const state = c.req.query("state");
     const days = daysRaw ? Number.parseInt(daysRaw, 10) : 30;
 
-    return runAnalyticsQuery(c, limiter, {
+    return runAnalyticsQuery(c, limiter, dbLimiter, {
       cacheControl: ANALYTICS_CACHE_CONTROL,
       event: "analytics_trends_error",
       fallbackError: "analytics_trends_failed",
@@ -129,7 +153,7 @@ export function createAnalyticsRouter(
     const daysRaw = c.req.query("days");
     const days = daysRaw ? Number.parseInt(daysRaw, 10) : 30;
 
-    return runAnalyticsQuery(c, limiter, {
+    return runAnalyticsQuery(c, limiter, dbLimiter, {
       cacheControl: ANALYTICS_CACHE_CONTROL,
       event: "analytics_state_trends_error",
       fallbackError: "analytics_state_trends_failed",
@@ -140,7 +164,7 @@ export function createAnalyticsRouter(
   // 3. State Summaries
   router.get("/states", async (c) => {
     const fuelSku = c.req.query("fuelSku");
-    return runAnalyticsQuery(c, limiter, {
+    return runAnalyticsQuery(c, limiter, dbLimiter, {
       cacheControl: ANALYTICS_CACHE_CONTROL,
       event: "analytics_states_error",
       fallbackError: "analytics_states_failed",
@@ -156,7 +180,7 @@ export function createAnalyticsRouter(
     const limitRaw = c.req.query("limit");
     const limit = limitRaw ? Number.parseInt(limitRaw, 10) : 10;
 
-    return runAnalyticsQuery(c, limiter, {
+    return runAnalyticsQuery(c, limiter, dbLimiter, {
       cacheControl: ANALYTICS_CACHE_CONTROL,
       event: "analytics_movers_error",
       fallbackError: "analytics_movers_failed",

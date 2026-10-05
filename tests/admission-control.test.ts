@@ -517,4 +517,153 @@ describe("Admission Control and Concurrency Limiter", () => {
       }),
     );
   });
+
+  // 11. Operational routes run through dbLimiter and return structured 503 on queue overload
+  it("operational routes return 503 database_overloaded when dbLimiter queue overflows", async () => {
+    const mockPrisma = {
+      club: {
+        findMany: vi.fn().mockImplementation(() => new Promise((r) => setTimeout(r, 100))),
+      },
+    } as unknown as PrismaClient;
+
+    const overloadedDbLimiter = new ConcurrencyLimiter({
+      maxConcurrency: 1,
+      maxQueueLength: 0,
+    });
+
+    const app = createApp({
+      prisma: mockPrisma,
+      collectorSecret: "secret",
+      dbLimiter: overloadedDbLimiter,
+    });
+
+    // First request occupies the active slot
+    const req1 = app.request("/api/v1/stations");
+    // Second request immediately exceeds maxQueueLength: 0
+    const req2 = await app.request("/api/v1/stations");
+
+    expect(req2.status).toBe(503);
+    const body = await req2.json();
+    expect(body).toEqual({
+      error: "database_overloaded",
+      code: "503",
+      reason: "QUEUE_FULL",
+      message: "Database admission queue full or timed out. Please retry.",
+    });
+
+    await req1;
+  });
+
+  // 12. Simultaneous homepage workload (stations + status + analytics) respects concurrency ceiling
+  it("bounds simultaneous homepage requests to maxConcurrency without pool exhaustion", async () => {
+    let activeDb = 0;
+    let maxObservedDb = 0;
+    let activeAnalytics = 0;
+    let maxObservedAnalytics = 0;
+
+    const trackDb = async <T>(fn: () => Promise<T>): Promise<T> => {
+      activeDb++;
+      maxObservedDb = Math.max(maxObservedDb, activeDb);
+      try {
+        await new Promise((r) => setTimeout(r, 20));
+        return await fn();
+      } finally {
+        activeDb--;
+      }
+    };
+
+    const mockPrisma = {
+      club: {
+        findMany: vi.fn().mockImplementation(() => trackDb(async () => [])),
+      },
+      collectionRun: {
+        findMany: vi.fn().mockImplementation(() =>
+          trackDb(async () => [
+            {
+              startedAt: new Date(),
+              finishedAt: new Date(),
+              durationMs: 1000,
+              clubsConfigured: 214,
+              clubsSucceeded: 214,
+              clubsEmptyFuels: 0,
+              clubsHardFailed: 0,
+              fuelObservations: 500,
+              historyChanges: 0,
+              databaseQueries: 1,
+              degraded: false,
+              failures: [],
+            },
+          ]),
+        ),
+      },
+      fuelPriceCurrent: {
+        findFirst: vi.fn().mockImplementation(() =>
+          trackDb(async () => {
+            activeAnalytics++;
+            maxObservedAnalytics = Math.max(maxObservedAnalytics, activeAnalytics);
+            try {
+              await new Promise((r) => setTimeout(r, 20));
+              return { fuelName: "Regular" };
+            } finally {
+              activeAnalytics--;
+            }
+          }),
+        ),
+      },
+      $queryRaw: vi.fn().mockImplementation(() =>
+        trackDb(async () => [
+          {
+            latest: new Date(),
+            oldest: new Date(),
+            rows: 500n,
+            stations_recent: 214n,
+          },
+        ]),
+      ),
+    } as unknown as PrismaClient;
+
+    const dbLimiter = new ConcurrencyLimiter({
+      maxConcurrency: 2,
+      maxQueueLength: 20,
+    });
+    const analyticsLimiter = new ConcurrencyLimiter({
+      maxConcurrency: 1,
+      maxQueueLength: 10,
+    });
+
+    const app = createApp({
+      prisma: mockPrisma,
+      collectorSecret: "secret",
+      dbLimiter,
+      analyticsLimiter,
+    });
+
+    // Simulate 2 concurrent homepage renders: each makes stations, status, and analytics summary requests
+    const promises = [
+      app.request("/api/v1/stations"),
+      app.request("/api/v1/status"),
+      app.request("/api/v1/analytics/summary"),
+      app.request("/api/v1/stations"),
+      app.request("/api/v1/status"),
+      app.request("/api/v1/analytics/summary"),
+    ];
+
+    const responses = await Promise.all(promises);
+
+    for (const res of responses) {
+      expect(res.status).toBe(200);
+    }
+
+    // Invariants:
+    // 1. Total concurrent DB operations never exceeded 2 (preserving connection 3 for collector)
+    expect(maxObservedDb).toBeLessThanOrEqual(2);
+    // 2. Total concurrent analytics operations never exceeded 1
+    expect(maxObservedAnalytics).toBeLessThanOrEqual(1);
+    // 3. Metrics settled back to 0
+    expect(dbLimiter.activeCount).toBe(0);
+    expect(dbLimiter.waitingCount).toBe(0);
+    expect(analyticsLimiter.activeCount).toBe(0);
+    expect(analyticsLimiter.waitingCount).toBe(0);
+  });
 });
+

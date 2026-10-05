@@ -10,7 +10,12 @@ import {
 import { getNearbyStations, getStationHistory, getStationWithPrices, listStationsWithPrices } from "./api/stations.js";
 import { getCollectionStatus, type StatusPayload } from "./api/status.js";
 import { createAnalyticsRouter } from "./api/analytics.js";
-import { analyticsLimiter } from "./api/limiter.js";
+import {
+  type ConcurrencyLimiter,
+  LimiterOverloadError,
+  analyticsLimiter,
+  publicDbLimiter,
+} from "./api/limiter.js";
 import { isPrismaPoolTimeout, prismaPoolTimeoutBody } from "./api/errors.js";
 import { isClosedConnectionError } from "./persistence/transaction-policy.js";
 import { fetchClubFuel } from "./fuel/client.js";
@@ -31,12 +36,43 @@ export type AppEnv = {
   prisma: PrismaClient;
   collectorSecret: string;
   honeybadgerApiKey?: string | undefined;
+  dbLimiter?: ConcurrencyLimiter | undefined;
+  analyticsLimiter?: ConcurrencyLimiter | undefined;
 };
 
 export function createApp(env: AppEnv): Hono {
   const app = new Hono();
+  const dbLimiter = env.dbLimiter ?? publicDbLimiter;
+  const analyticsLimiterInstance = env.analyticsLimiter ?? analyticsLimiter;
 
   app.onError((err, c) => {
+    if (err instanceof LimiterOverloadError) {
+      console.warn(
+        JSON.stringify({
+          event: "database_overloaded",
+          route: c.req.path,
+          method: c.req.method,
+          reason: err.code,
+          message: err.message,
+          poolPressure: {
+            activeDb: dbLimiter.activeCount,
+            waitingDb: dbLimiter.waitingCount,
+            activeAnalytics: analyticsLimiterInstance.activeCount,
+            waitingAnalytics: analyticsLimiterInstance.waitingCount,
+          },
+        }),
+      );
+      return c.json(
+        {
+          error: "database_overloaded",
+          code: "503",
+          reason: err.code,
+          message: "Database admission queue full or timed out. Please retry.",
+        },
+        503,
+      );
+    }
+
     if (isPrismaPoolTimeout(err)) {
       console.error(
         JSON.stringify({
@@ -47,8 +83,10 @@ export function createApp(env: AppEnv): Hono {
           code: "P2024",
           message: err instanceof Error ? err.message : String(err),
           poolPressure: {
-            activeAnalytics: analyticsLimiter.activeCount,
-            waitingAnalytics: analyticsLimiter.waitingCount,
+            activeDb: dbLimiter.activeCount,
+            waitingDb: dbLimiter.waitingCount,
+            activeAnalytics: analyticsLimiterInstance.activeCount,
+            waitingAnalytics: analyticsLimiterInstance.waitingCount,
           },
         }),
       );
@@ -152,7 +190,7 @@ export function createApp(env: AppEnv): Hono {
   app.get("/api/v1/status", async (c) => {
     let payload: StatusPayload;
     try {
-      payload = await getCollectionStatus(env.prisma);
+      payload = await dbLimiter.run(() => getCollectionStatus(env.prisma));
     } catch (error) {
       // This endpoint is read-only. A single retry is safe when an idle pooled
       // socket was closed by the database before the query could run.
@@ -165,7 +203,7 @@ export function createApp(env: AppEnv): Hono {
           code: "P1017",
         }),
       );
-      payload = await getCollectionStatus(env.prisma);
+      payload = await dbLimiter.run(() => getCollectionStatus(env.prisma));
     }
     // Status must stay highly fresh while diagnosing collector/scheduler health.
     c.header("Cache-Control", "public, max-age=15, s-maxage=15, stale-while-revalidate=30");
@@ -173,7 +211,7 @@ export function createApp(env: AppEnv): Hono {
   });
 
   app.get("/api/v1/stations", async (c) => {
-    const payload = await listStationsWithPrices(env.prisma);
+    const payload = await dbLimiter.run(() => listStationsWithPrices(env.prisma));
     // Two-hour collector → ~5 minute CDN cache is safe; avoid longer stale windows.
     c.header("Cache-Control", "public, max-age=60, s-maxage=300, stale-while-revalidate=60");
     return c.json(payload);
@@ -184,7 +222,7 @@ export function createApp(env: AppEnv): Hono {
     if (!Number.isFinite(clubNumber)) {
       return c.json({ error: "invalid_club_number" }, 400);
     }
-    const station = await getStationWithPrices(env.prisma, clubNumber);
+    const station = await dbLimiter.run(() => getStationWithPrices(env.prisma, clubNumber));
     if (!station) return c.json({ error: "not_found" }, 404);
     c.header("Cache-Control", "public, max-age=60, s-maxage=300, stale-while-revalidate=60");
     return c.json({ generatedAt: new Date().toISOString(), station });
@@ -195,15 +233,19 @@ export function createApp(env: AppEnv): Hono {
     if (!Number.isFinite(clubNumber)) {
       return c.json({ error: "invalid_club_number" }, 400);
     }
-    const club = await env.prisma.club.findUnique({ where: { clubNumber } });
-    if (!club) return c.json({ error: "not_found" }, 404);
     const limitRaw = c.req.query("limit");
     const limit = limitRaw ? Number.parseInt(limitRaw, 10) : 100;
-    const history = await getStationHistory(env.prisma, clubNumber, {
-      limit: Number.isFinite(limit) ? limit : 100,
+    const historyData = await dbLimiter.run(async () => {
+      const club = await env.prisma.club.findUnique({ where: { clubNumber } });
+      if (!club) return null;
+      const history = await getStationHistory(env.prisma, clubNumber, {
+        limit: Number.isFinite(limit) ? limit : 100,
+      });
+      return { clubNumber, history };
     });
+    if (!historyData) return c.json({ error: "not_found" }, 404);
     c.header("Cache-Control", "public, max-age=120, s-maxage=300, stale-while-revalidate=120");
-    return c.json({ clubNumber, history });
+    return c.json(historyData);
   });
 
   app.get("/api/v1/stations/:clubNumber/nearby", async (c) => {
@@ -216,10 +258,12 @@ export function createApp(env: AppEnv): Hono {
     const limit = limitRaw ? Number.parseInt(limitRaw, 10) : 5;
     const maxMiles = milesRaw ? Number.parseFloat(milesRaw) : undefined;
 
-    const result = await getNearbyStations(env.prisma, clubNumber, {
-      limit: Number.isFinite(limit) ? limit : 5,
-      maxMiles: maxMiles != null && Number.isFinite(maxMiles) ? maxMiles : undefined,
-    });
+    const result = await dbLimiter.run(() =>
+      getNearbyStations(env.prisma, clubNumber, {
+        limit: Number.isFinite(limit) ? limit : 5,
+        maxMiles: maxMiles != null && Number.isFinite(maxMiles) ? maxMiles : undefined,
+      }),
+    );
 
     if (!result) return c.json({ error: "not_found" }, 404);
 
@@ -232,7 +276,10 @@ export function createApp(env: AppEnv): Hono {
     });
   });
 
-  app.route("/api/v1/analytics", createAnalyticsRouter(env.prisma));
+  app.route(
+    "/api/v1/analytics",
+    createAnalyticsRouter(env.prisma, analyticsLimiterInstance, dbLimiter),
+  );
 
   return app;
 }
