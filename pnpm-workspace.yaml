@@ -34,6 +34,8 @@ overrides:
   "@effect/platform-node>undici": "8.10.2"
   "alchemy>undici": "7.29.1"
   fast-uri: ^3.1.8
+  source-map-js: ^1.2.2
+  sharp: ^0.35.5
 # braces@3.0.3 (via alchemy → micromatch) has no patched release for GHSA-vfj7-8cjw-p6xm.
 audit:
   ignore:
