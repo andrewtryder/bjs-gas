@@ -44,6 +44,7 @@ describe("monitor-health.mjs checkHealth function", () => {
 
     const result = await checkHealth("http://mock-api", {
       fetchFn: mockFetch,
+      sleepFn: async () => {},
       now,
     });
 
@@ -51,6 +52,7 @@ describe("monitor-health.mjs checkHealth function", () => {
     expect(result.output?.status).toBe("PASS");
     expect(result.output?.freshWindowMinutes).toBe(120);
     expect(result.output?.revision).toBe("test-rev-123");
+    expect(result.output?.transientRetries).toBe(0);
   });
 
   it("fails when collection age exceeds the API-provided freshWindowMinutes", async () => {
@@ -71,6 +73,7 @@ describe("monitor-health.mjs checkHealth function", () => {
 
     const result = await checkHealth("http://mock-api", {
       fetchFn: mockFetch,
+      sleepFn: async () => {},
       now,
     });
 
@@ -117,11 +120,78 @@ describe("monitor-health.mjs checkHealth function", () => {
 
     const result = await checkHealth("http://mock-api", {
       fetchFn: mockFetch,
+      sleepFn: async () => {},
       now,
     });
 
     expect(result.ok).toBe(false);
     expect(result.alert?.failureCount).toBeGreaterThanOrEqual(3);
     expect(result.alert?.failures).toContain("/health returned HTTP 503");
+  });
+
+  it("retries a transient status error and passes when the retry succeeds", async () => {
+    const now = Date.now();
+    let statusRequests = 0;
+    const mockFetch = (async (input: string | URL | Request) => {
+      const url = String(input);
+      if (url.endsWith("/health")) {
+        return { ok: true, status: 200, json: async () => ({ ok: true }) } as Response;
+      }
+      if (url.endsWith("/api/v1/status")) {
+        statusRequests += 1;
+        if (statusRequests === 1) return { ok: false, status: 500 } as Response;
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            healthy: true,
+            collectionLock: { stale: false },
+            freshness: {
+              freshStationRatio: 1,
+              freshWindowMinutes: 180,
+              latestObservedAt: new Date(now).toISOString(),
+            },
+            lastSuccessfulCollection: { startedAt: new Date(now).toISOString() },
+          }),
+        } as Response;
+      }
+      return { ok: false, status: 404 } as Response;
+    }) as typeof fetch;
+
+    const result = await checkHealth("http://mock-api", {
+      fetchFn: mockFetch,
+      sleepFn: async () => {},
+      now,
+    });
+
+    expect(result.ok).toBe(true);
+    expect(statusRequests).toBe(2);
+    expect(result.output?.transientRetries).toBe(1);
+  });
+
+  it("fails after all transient status retries are exhausted", async () => {
+    const now = Date.now();
+    let statusRequests = 0;
+    const mockFetch = (async (input: string | URL | Request) => {
+      const url = String(input);
+      if (url.endsWith("/health")) {
+        return { ok: true, status: 200, json: async () => ({ ok: true }) } as Response;
+      }
+      if (url.endsWith("/api/v1/status")) {
+        statusRequests += 1;
+        return { ok: false, status: 500 } as Response;
+      }
+      return { ok: false, status: 404 } as Response;
+    }) as typeof fetch;
+
+    const result = await checkHealth("http://mock-api", {
+      fetchFn: mockFetch,
+      sleepFn: async () => {},
+      now,
+    });
+
+    expect(result.ok).toBe(false);
+    expect(statusRequests).toBe(3);
+    expect(result.alert?.failures).toContain("/api/v1/status returned HTTP 500");
   });
 });

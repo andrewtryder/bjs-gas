@@ -21,17 +21,54 @@ import { fileURLToPath } from "node:url";
 export const DEFAULT_API_URL = "https://a3i9pecpa5hxogp2hpozah6d.ewr.prisma.build";
 export const FALLBACK_MAX_STALENESS_MINUTES = 180;
 export const MIN_FRESH_STATION_RATIO = 0.8;
+export const TRANSIENT_REQUEST_ATTEMPTS = 3;
+export const TRANSIENT_RETRY_DELAYS_MS = [1_000, 3_000];
+
+function isTransientStatus(status) {
+  return status >= 500 && status <= 599;
+}
+
+function wait(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function fetchWithTransientRetry(url, fetchFn, sleepFn) {
+  let transientRetries = 0;
+
+  for (let attempt = 1; attempt <= TRANSIENT_REQUEST_ATTEMPTS; attempt += 1) {
+    try {
+      const response = await fetchFn(url, { signal: AbortSignal.timeout(10_000) });
+      if (!isTransientStatus(response.status) || attempt === TRANSIENT_REQUEST_ATTEMPTS) {
+        return { response, transientRetries };
+      }
+    } catch (error) {
+      if (attempt === TRANSIENT_REQUEST_ATTEMPTS) throw error;
+    }
+
+    transientRetries += 1;
+    await sleepFn(TRANSIENT_RETRY_DELAYS_MS[attempt - 1]);
+  }
+
+  throw new Error("Transient retry exhausted without a response");
+}
 
 export async function checkHealth(apiUrl = DEFAULT_API_URL, options = {}) {
   const targetUrl = (apiUrl || DEFAULT_API_URL).replace(/\/$/, "");
   const fetchFn = options.fetchFn || fetch;
+  const sleepFn = options.sleepFn || wait;
   const now = options.now || Date.now();
   const failures = [];
+  let transientRetries = 0;
 
   // Check 1: /health HTTP 200 & ok: true
   let healthJson;
   try {
-    const res = await fetchFn(`${targetUrl}/health`, { signal: AbortSignal.timeout(10_000) });
+    const { response: res, transientRetries: retries } = await fetchWithTransientRetry(
+      `${targetUrl}/health`,
+      fetchFn,
+      sleepFn,
+    );
+    transientRetries += retries;
     if (!res.ok) {
       failures.push(`/health returned HTTP ${res.status}`);
     } else {
@@ -47,7 +84,12 @@ export async function checkHealth(apiUrl = DEFAULT_API_URL, options = {}) {
   // Check 2: /api/v1/status HTTP 200
   let statusJson;
   try {
-    const res = await fetchFn(`${targetUrl}/api/v1/status`, { signal: AbortSignal.timeout(10_000) });
+    const { response: res, transientRetries: retries } = await fetchWithTransientRetry(
+      `${targetUrl}/api/v1/status`,
+      fetchFn,
+      sleepFn,
+    );
+    transientRetries += retries;
     if (!res.ok) {
       failures.push(`/api/v1/status returned HTTP ${res.status}`);
     } else {
@@ -129,6 +171,7 @@ export async function checkHealth(apiUrl = DEFAULT_API_URL, options = {}) {
       freshStationRatio: statusJson?.freshness?.freshStationRatio,
       freshWindowMinutes: statusJson?.freshness?.freshWindowMinutes ?? maxStalenessMinutes,
       lastCollectionStartedAt: statusJson?.lastSuccessfulCollection?.startedAt,
+      transientRetries,
       timestamp: new Date(now).toISOString(),
     },
   };
