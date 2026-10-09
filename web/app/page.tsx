@@ -54,10 +54,8 @@ export default async function HomePage() {
     if (stationsRes.status === "fulfilled") {
       stations = stationsRes.value.stations || [];
     } else {
-      fetchError =
-        stationsRes.reason instanceof Error
-          ? stationsRes.reason.message
-          : "Failed to load stations";
+      console.error("Homepage station fetch failed:", stationsRes.reason);
+      fetchError = "Station price data is temporarily unavailable. Please refresh the page in a moment.";
     }
 
     if (summaryRes.status === "fulfilled") {
@@ -76,7 +74,8 @@ export default async function HomePage() {
       systemStatus = statusRes.value;
     }
   } catch (err) {
-    fetchError = err instanceof Error ? err.message : "Failed to load data";
+    console.error("Homepage data fetch failed:", err);
+    fetchError = "Station price data is temporarily unavailable. Please refresh the page in a moment.";
   }
 
   const latestObservedAt = systemStatus?.freshness?.latestObservedAt;
@@ -114,7 +113,15 @@ export default async function HomePage() {
       <header className="hero-section">
         <div className="hero-content">
           <div className="hero-badge-row">
-            {freshnessInfo ? (
+            {fetchError ? (
+              <StatusPill
+                text="Price data unavailable"
+                showDot={false}
+                ariaLabel="Station price data is temporarily unavailable"
+                href="/about"
+                title="About this site"
+              />
+            ) : freshnessInfo ? (
               <StatusPill
                 level={freshnessInfo.level}
                 text={freshnessInfo.relativeText}
@@ -126,6 +133,8 @@ export default async function HomePage() {
               <StatusPill
                 level="fresh"
                 text="About every 2 hours"
+                showDot={false}
+                ariaLabel="Price freshness currently unknown; updates are normally checked every two hours"
                 href="/about"
                 title="About this site"
               />
@@ -151,7 +160,7 @@ export default async function HomePage() {
 
       {fetchError && (
         <div className="notice-banner notice-banner-error" role="alert">
-          <p className="notice-title">Unable to load complete gas price data</p>
+          <p className="notice-title">Gas price data temporarily unavailable</p>
           <p className="notice-message">{fetchError}</p>
         </div>
       )}
@@ -169,7 +178,11 @@ export default async function HomePage() {
             )}
           </div>
           <span className="national-median-fuel">
-            Regular across {summary?.stationCount ?? stations.length} stations
+            {summary
+              ? `Regular across ${summary.stationCount} stations`
+              : fetchError
+                ? "Regular price data unavailable"
+                : `Regular across ${stations.length} stations`}
           </span>
         </div>
 
@@ -190,7 +203,7 @@ export default async function HomePage() {
                   {summary.min.station.name}, {summary.min.station.state} &middot; #{summary.min.station.clubNumber}
                 </Link>
               ) : (
-                "No price reported"
+                summary ? "No price reported" : "Price data unavailable"
               )}
             </div>
           </div>
@@ -210,7 +223,7 @@ export default async function HomePage() {
                   {summary.max.station.name}, {summary.max.station.state} &middot; #{summary.max.station.clubNumber}
                 </Link>
               ) : (
-                "No price reported"
+                summary ? "No price reported" : "Price data unavailable"
               )}
             </div>
           </div>
@@ -219,10 +232,10 @@ export default async function HomePage() {
           <div className="supporting-metric-item">
             <span className="supporting-metric-label">LOCATIONS TRACKED</span>
             <span className="supporting-metric-value tabular-nums">
-              {stations.length}
+              {fetchError ? "—" : stations.length}
             </span>
             <div className="supporting-metric-subtext">
-              BJ&apos;s clubs with fuel stations
+              {fetchError ? "Station count unavailable" : "BJ's clubs with fuel stations"}
             </div>
           </div>
         </div>
@@ -257,9 +270,11 @@ export default async function HomePage() {
       <section id="stations" className="section-block station-directory-section">
         <SectionHeader
           title="Find a station"
-          subtitle={`Browse all ${stations.length} BJ's gas stations with current fuel prices`}
+          subtitle={fetchError
+            ? "Station list temporarily unavailable"
+            : `Browse all ${stations.length} BJ's gas stations with current fuel prices`}
         />
-        <StationList stations={stations} />
+        {!fetchError && <StationList stations={stations} />}
       </section>
     </div>
   );
