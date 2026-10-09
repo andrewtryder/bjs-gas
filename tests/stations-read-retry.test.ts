@@ -21,7 +21,7 @@ describe("GET /api/v1/stations closed-connection recovery", () => {
     const res = await createStationsApp(findMany).request("/api/v1/stations");
 
     expect(res.status).toBe(200);
-    expect((await res.json()).stations).toEqual([]);
+    expect((await res.json() as { stations: unknown[] }).stations).toEqual([]);
     expect(findMany).toHaveBeenCalledTimes(2);
     expect(res.headers.get("cache-control")).toContain("s-maxage=300");
   });
@@ -55,7 +55,7 @@ describe("GET /api/v1/stations closed-connection recovery", () => {
     const res = await createStationsApp(findMany).request("/api/v1/stations");
 
     expect(res.status).toBe(503);
-    expect((await res.json()).error).toBe("database_pool_timeout");
+    expect((await res.json() as { error: string }).error).toBe("database_pool_timeout");
     expect(findMany).toHaveBeenCalledTimes(1);
   });
 });
