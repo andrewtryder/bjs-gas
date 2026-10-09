@@ -60,9 +60,16 @@ export async function parseApiErrorMessage(res: Response, fallbackPrefix: string
 
 export async function getStations(): Promise<StationsResponse> {
   const baseUrl = getApiBaseUrl();
-  const res = await fetch(`${baseUrl}/api/v1/stations`, {
-    cache: "no-store",
-  });
+  const url = `${baseUrl}/api/v1/stations`;
+  let res = await fetch(url, { cache: "no-store" });
+
+  // A cold or briefly unhealthy API can return a transient 5xx. Give this
+  // read-only request one short retry; do not retry permanent 4xx failures.
+  if ([500, 502, 503, 504].includes(res.status)) {
+    await new Promise<void>((resolve) => setTimeout(resolve, 500));
+    res = await fetch(url, { cache: "no-store" });
+  }
+
   if (!res.ok) {
     throw new Error(
       await parseApiErrorMessage(res, `Failed to fetch stations from ${baseUrl}/api/v1/stations`),
