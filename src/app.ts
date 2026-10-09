@@ -211,7 +211,23 @@ export function createApp(env: AppEnv): Hono {
   });
 
   app.get("/api/v1/stations", async (c) => {
-    const payload = await dbLimiter.run(() => listStationsWithPrices(env.prisma));
+    let payload: Awaited<ReturnType<typeof listStationsWithPrices>>;
+    try {
+      payload = await dbLimiter.run(() => listStationsWithPrices(env.prisma));
+    } catch (error) {
+      // This GET is read-only: retry once if an idle pooled socket was closed.
+      // Do not retry unrelated Prisma errors (including P2024 pool timeouts).
+      if (!isClosedConnectionError(error)) throw error;
+      console.warn(
+        JSON.stringify({
+          event: "stations_read_connection_retry",
+          route: c.req.path,
+          method: c.req.method,
+          code: "P1017",
+        }),
+      );
+      payload = await dbLimiter.run(() => listStationsWithPrices(env.prisma));
+    }
     // Two-hour collector → ~5 minute CDN cache is safe; avoid longer stale windows.
     c.header("Cache-Control", "public, max-age=60, s-maxage=300, stale-while-revalidate=60");
     return c.json(payload);
