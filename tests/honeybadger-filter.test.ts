@@ -256,22 +256,20 @@ describe("Environment and config helpers", () => {
 });
 
 describe("CARTO basemap style configuration", () => {
-  it("generates unauthenticated tile URLs when API key is omitted", async () => {
+  it("generates unauthenticated vector style URL when API key is omitted", async () => {
     const { getMapStyle } = await import("../web/lib/map-config.js");
     const style = getMapStyle();
-    const rasterSource = style.sources["carto-positron"] as any;
-    expect(rasterSource.tiles[0]).toBe(
-      "https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}@2x.png",
+    expect(style).toBe(
+      "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
     );
-    expect(rasterSource.tiles[0]).not.toContain("?key=");
+    expect(style).not.toContain("?key=");
   });
 
   it("appends encoded key when provided", async () => {
     const { getMapStyle } = await import("../web/lib/map-config.js");
     const style = getMapStyle("test-carto-key-123");
-    const rasterSource = style.sources["carto-positron"] as any;
-    expect(rasterSource.tiles[0]).toBe(
-      "https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}@2x.png?key=test-carto-key-123",
+    expect(style).toBe(
+      "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json?key=test-carto-key-123",
     );
   });
 });
