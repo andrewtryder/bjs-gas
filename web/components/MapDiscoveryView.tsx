@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 
@@ -96,9 +96,9 @@ export default function MapDiscoveryView({
     return stationsToGeoJson(filteredStations, selectedFuel);
   }, [filteredStations, selectedFuel]);
 
-  const handleSelectStation = (station: StationDto | null) => {
+  const handleSelectStation = useCallback((station: StationDto | null) => {
     setSelectedStation(station);
-  };
+  }, []);
 
   const stateOptions = useMemo(
     () => [
