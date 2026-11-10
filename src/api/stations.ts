@@ -97,7 +97,7 @@ export async function getStationHistory(
 ): Promise<
   FuelPriceHistoryItem[]
 > {
-  const limit = Math.min(Math.max(options.limit ?? 100, 1), 500);
+  const limit = Math.min(Math.max(options.limit ?? 500, 1), 1000);
   const rows = await prisma.fuelPriceHistory.findMany({
     where: { clubNumber },
     orderBy: { observedAt: "desc" },

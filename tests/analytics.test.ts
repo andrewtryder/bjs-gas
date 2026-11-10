@@ -277,6 +277,13 @@ describeDb("analytics queries against Postgres", () => {
     }
   });
 
+  it("calculates 90-day national trends with valid intervals and metrics", async () => {
+    const trends = await getNationalTrends(prisma, { fuelSku: "1", days: 90 });
+    expect(trends.fuel.sku).toBe("1");
+    expect(trends.days).toBe(90);
+    expect(trends.points.length).toBeGreaterThan(0);
+  });
+
   it("calculates state summaries with valid metrics per state", async () => {
     const states = await getStateSummaries(prisma, "1");
     expect(states.fuel.sku).toBe("1");

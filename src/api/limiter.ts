@@ -176,7 +176,7 @@ export const analyticsLimiter = new ConcurrencyLimiter({
   maxConcurrency: 1,
   maxQueueLength: 8,
   maxQueueWaitMs: 8_000,
-  maxExecutionMs: 10_000,
+  maxExecutionMs: 20_000,
 });
 
 /**
@@ -191,6 +191,6 @@ export const publicDbLimiter = new ConcurrencyLimiter({
   maxConcurrency: 2,
   maxQueueLength: 16,
   maxQueueWaitMs: 5_000,
-  maxExecutionMs: 10_000,
+  maxExecutionMs: 20_000,
 });
 

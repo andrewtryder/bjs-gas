@@ -19,6 +19,16 @@ if (honeybadgerApiKey) {
 }
 
 const prisma = createPrismaClient(db.url);
+// Pre-warm database connection on startup to avoid cold-start query timeouts
+prisma.$connect().catch((err) => {
+  console.warn(
+    JSON.stringify({
+      event: "database_prewarm_failed",
+      error: err instanceof Error ? err.message : String(err),
+    }),
+  );
+});
+
 const app = createApp({
   prisma,
   collectorSecret,
@@ -69,6 +79,7 @@ const cronHandler = serveSchedule(service, schedule, {
 Bun.serve({
   port: service.port(),
   hostname: "0.0.0.0",
+  idleTimeout: 30,
   async fetch(req) {
     const url = new URL(req.url);
     // Prisma Composer RPC contract: POST /rpc/<method> (here: /rpc/trigger)

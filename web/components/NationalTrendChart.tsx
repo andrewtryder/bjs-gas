@@ -125,6 +125,7 @@ export default function NationalTrendChart({
               { value: 7, label: "7D", ariaLabel: "7 day price trend" },
               { value: 14, label: "14D", ariaLabel: "14 day price trend" },
               { value: 30, label: "30D", ariaLabel: "30 day price trend" },
+              { value: 90, label: "90D", ariaLabel: "90 day price trend" },
             ]}
             value={selectedDays}
             onChange={(val) => setSelectedDays(val)}
