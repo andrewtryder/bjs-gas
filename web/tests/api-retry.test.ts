@@ -1,12 +1,17 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../src/service", () => ({
   default: { load: () => ({ api: { url: "https://api.example.test" } }) },
 }));
 
 import { getStations } from "../lib/api";
+import { clearMemoryCache } from "../lib/cache";
 
 const stationPayload = { generatedAt: "2026-10-09T00:00:00Z", stations: [] };
+
+beforeEach(() => {
+  clearMemoryCache();
+});
 
 afterEach(() => {
   vi.unstubAllGlobals();

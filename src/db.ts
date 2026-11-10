@@ -2,9 +2,24 @@ import { PrismaClient } from "@prisma/client";
 
 let client: PrismaClient | null = null;
 
+export function configureDatabaseUrl(databaseUrl: string): string {
+  try {
+    const url = new URL(databaseUrl);
+    if (!url.searchParams.has("connection_limit")) {
+      url.searchParams.set("connection_limit", "10");
+    }
+    if (!url.searchParams.has("pool_timeout")) {
+      url.searchParams.set("pool_timeout", "20");
+    }
+    return url.toString();
+  } catch {
+    return databaseUrl;
+  }
+}
+
 export function createPrismaClient(databaseUrl: string): PrismaClient {
   return new PrismaClient({
-    datasources: { db: { url: databaseUrl } },
+    datasources: { db: { url: configureDatabaseUrl(databaseUrl) } },
   });
 }
 
