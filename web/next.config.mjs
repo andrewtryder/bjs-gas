@@ -62,6 +62,7 @@ const nextConfig = {
               "font-src 'self' data:",
               "img-src 'self' data: blob: https://*.basemaps.cartocdn.com https://basemaps.cartocdn.com https://demotiles.maplibre.org",
               "worker-src 'self' blob:",
+              "child-src 'self' blob:",
               "connect-src 'self' https://*.basemaps.cartocdn.com https://basemaps.cartocdn.com https://demotiles.maplibre.org https://*.prisma.build https://api.honeybadger.io",
               "frame-ancestors 'self'",
             ].join("; "),

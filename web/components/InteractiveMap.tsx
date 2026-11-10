@@ -6,8 +6,12 @@ import type { Map as MapLibreMap, GeoJSONSource } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 
 // Configure MapLibre GL v6 worker URL to static local worker script
-if (typeof window !== "undefined" && maplibregl.config) {
-  maplibregl.config.WORKER_URL = "/maplibre-gl-worker.mjs";
+if (typeof window !== "undefined") {
+  if (typeof (maplibregl as any).setWorkerUrl === "function") {
+    (maplibregl as any).setWorkerUrl("/maplibre-gl-worker.mjs");
+  } else if (maplibregl.config) {
+    maplibregl.config.WORKER_URL = "/maplibre-gl-worker.mjs";
+  }
 }
 
 import { MAP_CONFIG, MAP_THEME_TOKENS, getMapStyle } from "../lib/map-config";
@@ -54,6 +58,7 @@ export default function InteractiveMap({
   const suppressNextSelectionCameraRef = useRef(false);
   const selectedStationRef = useRef(selectedStation);
   const [mapLoaded, setMapLoaded] = useState(false);
+  const [mapError, setMapError] = useState<string | null>(null);
 
   useEffect(() => {
     selectedStationRef.current = selectedStation;
@@ -139,18 +144,29 @@ export default function InteractiveMap({
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
 
-    if (maplibregl.config) {
+    if (typeof (maplibregl as any).setWorkerUrl === "function") {
+      (maplibregl as any).setWorkerUrl("/maplibre-gl-worker.mjs");
+    } else if (maplibregl.config) {
       maplibregl.config.WORKER_URL = "/maplibre-gl-worker.mjs";
     }
 
-    const map = new maplibregl.Map({
-      container: containerRef.current,
-      style: getMapStyle(cartoApiKey),
-      center: MAP_CONFIG.defaultCenter,
-      zoom: MAP_CONFIG.defaultZoom,
-      minZoom: MAP_CONFIG.minZoom,
-      maxZoom: MAP_CONFIG.maxZoom,
-    });
+    let map: MapLibreMap;
+    try {
+      map = new maplibregl.Map({
+        container: containerRef.current,
+        style: getMapStyle(cartoApiKey),
+        center: MAP_CONFIG.defaultCenter,
+        zoom: MAP_CONFIG.defaultZoom,
+        minZoom: MAP_CONFIG.minZoom,
+        maxZoom: MAP_CONFIG.maxZoom,
+      });
+    } catch (err) {
+      console.warn("map_initialization_failed", err);
+      setMapError(
+        "Interactive map could not be initialized in this browser. You can still view all station prices and details in the list below.",
+      );
+      return;
+    }
 
     map.on("error", () => {
       // Graceful degradation log: never expose API key or query string in logs
@@ -357,7 +373,20 @@ export default function InteractiveMap({
       setMapLoaded(true);
     });
 
-    // Window resize observer (DS-4 Section 20)
+    // Window and container resize observers (DS-4 Section 20)
+    const resizeObserver =
+      typeof ResizeObserver !== "undefined" && containerRef.current
+        ? new ResizeObserver(() => {
+            if (mapRef.current) {
+              mapRef.current.resize();
+            }
+          })
+        : null;
+
+    if (resizeObserver && containerRef.current) {
+      resizeObserver.observe(containerRef.current);
+    }
+
     const handleResize = () => {
       if (mapRef.current) {
         mapRef.current.resize();
@@ -369,6 +398,9 @@ export default function InteractiveMap({
 
     return () => {
       window.removeEventListener("resize", handleResize);
+      if (resizeObserver) {
+        resizeObserver.disconnect();
+      }
       if (popupRef.current) {
         popupRef.current.remove();
         popupRef.current = null;
@@ -454,6 +486,26 @@ export default function InteractiveMap({
       duration: 1000,
     });
   };
+
+  if (mapError) {
+    return (
+      <div className="map-container-wrapper">
+        <div className="map-loading-placeholder">
+          <p
+            style={{
+              color: "var(--color-text-muted)",
+              padding: "1.5rem",
+              textAlign: "center",
+              maxWidth: "420px",
+              lineHeight: 1.5,
+            }}
+          >
+            {mapError}
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="map-container-wrapper">

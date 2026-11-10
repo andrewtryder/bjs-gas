@@ -10,11 +10,17 @@
   position: relative;
   width: 100%;
   height: 100%;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .map-element {
   width: 100%;
   height: 100%;
+  flex: 1;
+  min-height: 0;
 }
 
 .map-overlay-controls {
@@ -777,6 +783,8 @@ select:focus-visible {
   border-radius: var(--radius-lg);
   overflow: hidden;
   height: 100%;
+  display: flex;
+  flex-direction: column;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 
@@ -1037,14 +1045,17 @@ select:focus-visible {
   .map-split-v2 {
     flex-direction: column;
     height: auto;
+    min-height: 0;
     max-height: none;
     gap: 1rem;
   }
 
   .map-canvas-pane {
-    height: 380px;
+    height: 420px;
+    min-height: 380px;
     width: 100%;
     order: 1;
+    flex: none;
   }
 
   .map-sidebar-pane {
@@ -1052,6 +1063,7 @@ select:focus-visible {
     min-width: 0;
     order: 2;
     height: 380px;
+    flex: none;
   }
 
   .map-mobile-station-panel {
