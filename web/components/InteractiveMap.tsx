@@ -57,12 +57,22 @@ export default function InteractiveMap({
   const popupRef = useRef<maplibregl.Popup | null>(null);
   const suppressNextSelectionCameraRef = useRef(false);
   const selectedStationRef = useRef(selectedStation);
+  const stationsRef = useRef(stations);
+  const onSelectStationRef = useRef(onSelectStation);
   const [mapLoaded, setMapLoaded] = useState(false);
   const [mapError, setMapError] = useState<string | null>(null);
 
   useEffect(() => {
     selectedStationRef.current = selectedStation;
   }, [selectedStation]);
+
+  useEffect(() => {
+    stationsRef.current = stations;
+  }, [stations]);
+
+  useEffect(() => {
+    onSelectStationRef.current = onSelectStation;
+  }, [onSelectStation]);
 
   const showStationPopup = useCallback(
     (
@@ -339,7 +349,7 @@ export default function InteractiveMap({
         ).slice() as [number, number];
         const props = feature.properties as unknown as StationGeoJsonProperties;
         const station =
-          stations.find((s) => s.clubNumber === Number(props.clubNumber)) ||
+          stationsRef.current.find((s) => s.clubNumber === Number(props.clubNumber)) ||
           null;
 
         const isAlreadySelected =
@@ -348,7 +358,7 @@ export default function InteractiveMap({
           suppressNextSelectionCameraRef.current = true;
         }
 
-        onSelectStation(station);
+        onSelectStationRef.current(station);
         showStationPopup(coords, props, station);
       };
 
@@ -409,7 +419,7 @@ export default function InteractiveMap({
       mapRef.current = null;
       setMapLoaded(false);
     };
-  }, [showStationPopup, stations, stationsGeoJson, onSelectStation]);
+  }, [cartoApiKey]);
 
   // Update source data when stationsGeoJson updates
   useEffect(() => {
@@ -457,9 +467,10 @@ export default function InteractiveMap({
       Number.isFinite(lat) &&
       Number.isFinite(lng)
     ) {
-      mapRef.current.flyTo({
+      mapRef.current.easeTo({
         center: [lng, lat],
         zoom: Math.max(mapRef.current.getZoom(), 12),
+        duration: 800,
         essential: true,
       });
 
