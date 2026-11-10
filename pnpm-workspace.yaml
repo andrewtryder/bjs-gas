@@ -10,16 +10,16 @@ allowBuilds:
   prisma: true
   workerd: true
 minimumReleaseAgeExclude:
-  - '@next/env@16.3.5'
-  - '@next/swc-darwin-arm64@16.3.5'
-  - '@next/swc-darwin-x64@16.3.5'
-  - '@next/swc-linux-arm64-gnu@16.3.5'
-  - '@next/swc-linux-arm64-musl@16.3.5'
-  - '@next/swc-linux-x64-gnu@16.3.5'
-  - '@next/swc-linux-x64-musl@16.3.5'
-  - '@next/swc-win32-arm64-msvc@16.3.5'
-  - '@next/swc-win32-x64-msvc@16.3.5'
-  - next@16.3.5
+  - '@next/env@16.4.6'
+  - '@next/swc-darwin-arm64@16.4.6'
+  - '@next/swc-darwin-x64@16.4.6'
+  - '@next/swc-linux-arm64-gnu@16.4.6'
+  - '@next/swc-linux-arm64-musl@16.4.6'
+  - '@next/swc-linux-x64-gnu@16.4.6'
+  - '@next/swc-linux-x64-musl@16.4.6'
+  - '@next/swc-win32-arm64-msvc@16.4.6'
+  - '@next/swc-win32-x64-msvc@16.4.6'
+  - next@16.4.6
 overrides:
   # Composer 0.18 + Alchemy need Effect 4 at the workspace root.
   # Prisma CLI 6 still needs Effect 3 on @prisma/config only.
@@ -31,8 +31,10 @@ overrides:
   valibot: ^1.4.2
   deepmerge-ts: ^8.0.2
   vitest: ^4.1.11
-  "@effect/platform-node>undici": "8.10.2"
-  "alchemy>undici": "7.29.1"
+  "@effect/platform-node>undici": "8.12.4"
+  "alchemy>undici": "7.30.2"
+  vite: ^8.3.7
+  next: ^16.4.6
   fast-uri: ^3.1.8
   source-map-js: ^1.2.2
   sharp: ^0.35.5
@@ -40,12 +42,3 @@ overrides:
 audit:
   ignore:
     - GHSA-vfj7-8cjw-p6xm
-    - GHSA-2464-fhr4-w9xw
-    - GHSA-2m5v-pch6-74hx
-    - GHSA-4w7w-5xrc-9h26
-    - GHSA-587h-7wmj-h5pm
-    - GHSA-673q-mjm6-r5xr
-    - GHSA-mrhx-c7xc-m3w5
-    - GHSA-p3m5-59mp-jv5r
-    - GHSA-qrxm-fqhp-jwvm
-    - GHSA-xjj6-f33q-929c
