@@ -1,4 +1,5 @@
 import webService from "../src/service";
+import { fetchWithCache } from "./cache";
 import type {
   NearbyStationsResponse,
   StationDetailResponse,
@@ -59,51 +60,57 @@ export async function parseApiErrorMessage(res: Response, fallbackPrefix: string
 }
 
 export async function getStations(): Promise<StationsResponse> {
-  const baseUrl = getApiBaseUrl();
-  const url = `${baseUrl}/api/v1/stations`;
-  let res = await fetch(url, { cache: "no-store" });
+  return fetchWithCache("api:stations", 300, async () => {
+    const baseUrl = getApiBaseUrl();
+    const url = `${baseUrl}/api/v1/stations`;
+    let res = await fetch(url, { cache: "no-store" });
 
-  // A cold or briefly unhealthy API can return a transient 5xx. Give this
-  // read-only request one short retry; do not retry permanent 4xx failures.
-  if ([500, 502, 503, 504].includes(res.status)) {
-    await new Promise<void>((resolve) => setTimeout(resolve, 500));
-    res = await fetch(url, { cache: "no-store" });
-  }
+    // A cold or briefly unhealthy API can return a transient 5xx. Give this
+    // read-only request one short retry; do not retry permanent 4xx failures.
+    if ([500, 502, 503, 504].includes(res.status)) {
+      await new Promise<void>((resolve) => setTimeout(resolve, 500));
+      res = await fetch(url, { cache: "no-store" });
+    }
 
-  if (!res.ok) {
-    throw new Error(
-      await parseApiErrorMessage(res, `Failed to fetch stations from ${baseUrl}/api/v1/stations`),
-    );
-  }
-  return res.json();
+    if (!res.ok) {
+      throw new Error(
+        await parseApiErrorMessage(res, `Failed to fetch stations from ${baseUrl}/api/v1/stations`),
+      );
+    }
+    return res.json();
+  });
 }
 
 export async function getStation(clubNumber: number): Promise<StationDetailResponse | null> {
-  const baseUrl = getApiBaseUrl();
-  const res = await fetch(`${baseUrl}/api/v1/stations/${clubNumber}`, {
-    cache: "no-store",
+  return fetchWithCache(`api:station:${clubNumber}`, 300, async () => {
+    const baseUrl = getApiBaseUrl();
+    const res = await fetch(`${baseUrl}/api/v1/stations/${clubNumber}`, {
+      cache: "no-store",
+    });
+    if (res.status === 404) return null;
+    if (!res.ok) {
+      throw new Error(
+        await parseApiErrorMessage(res, `Failed to fetch station ${clubNumber}`),
+      );
+    }
+    return res.json();
   });
-  if (res.status === 404) return null;
-  if (!res.ok) {
-    throw new Error(
-      await parseApiErrorMessage(res, `Failed to fetch station ${clubNumber}`),
-    );
-  }
-  return res.json();
 }
 
 export async function getStationHistory(clubNumber: number, limit = 500): Promise<StationHistoryResponse | null> {
-  const baseUrl = getApiBaseUrl();
-  const res = await fetch(`${baseUrl}/api/v1/stations/${clubNumber}/history?limit=${limit}`, {
-    cache: "no-store",
+  return fetchWithCache(`api:station-history:${clubNumber}:${limit}`, 300, async () => {
+    const baseUrl = getApiBaseUrl();
+    const res = await fetch(`${baseUrl}/api/v1/stations/${clubNumber}/history?limit=${limit}`, {
+      cache: "no-store",
+    });
+    if (res.status === 404) return null;
+    if (!res.ok) {
+      throw new Error(
+        await parseApiErrorMessage(res, `Failed to fetch history for station ${clubNumber}`),
+      );
+    }
+    return res.json();
   });
-  if (res.status === 404) return null;
-  if (!res.ok) {
-    throw new Error(
-      await parseApiErrorMessage(res, `Failed to fetch history for station ${clubNumber}`),
-    );
-  }
-  return res.json();
 }
 
 export async function getNearbyStations(
@@ -111,34 +118,39 @@ export async function getNearbyStations(
   limit = 5,
   miles?: number,
 ): Promise<NearbyStationsResponse | null> {
-  const baseUrl = getApiBaseUrl();
-  const query = new URLSearchParams({ limit: String(limit) });
-  if (miles != null) {
-    query.set("miles", String(miles));
-  }
-  const res = await fetch(`${baseUrl}/api/v1/stations/${clubNumber}/nearby?${query.toString()}`, {
-    cache: "no-store",
+  const milesKey = miles != null ? miles : "default";
+  return fetchWithCache(`api:nearby:${clubNumber}:${limit}:${milesKey}`, 300, async () => {
+    const baseUrl = getApiBaseUrl();
+    const query = new URLSearchParams({ limit: String(limit) });
+    if (miles != null) {
+      query.set("miles", String(miles));
+    }
+    const res = await fetch(`${baseUrl}/api/v1/stations/${clubNumber}/nearby?${query.toString()}`, {
+      cache: "no-store",
+    });
+    if (res.status === 404) return null;
+    if (!res.ok) {
+      throw new Error(
+        await parseApiErrorMessage(res, `Failed to fetch nearby stations for ${clubNumber}`),
+      );
+    }
+    return res.json();
   });
-  if (res.status === 404) return null;
-  if (!res.ok) {
-    throw new Error(
-      await parseApiErrorMessage(res, `Failed to fetch nearby stations for ${clubNumber}`),
-    );
-  }
-  return res.json();
 }
 
 export async function getSystemStatus(): Promise<SystemStatusResponse> {
-  const baseUrl = getApiBaseUrl();
-  const res = await fetch(`${baseUrl}/api/v1/status`, {
-    cache: "no-store",
+  return fetchWithCache("api:status", 60, async () => {
+    const baseUrl = getApiBaseUrl();
+    const res = await fetch(`${baseUrl}/api/v1/status`, {
+      cache: "no-store",
+    });
+    if (!res.ok) {
+      throw new Error(
+        await parseApiErrorMessage(res, "Failed to fetch system status"),
+      );
+    }
+    return res.json();
   });
-  if (!res.ok) {
-    throw new Error(
-      await parseApiErrorMessage(res, "Failed to fetch system status"),
-    );
-  }
-  return res.json();
 }
 
 
