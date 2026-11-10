@@ -254,12 +254,12 @@ export function createApp(env: AppEnv): Hono {
       return c.json({ error: "invalid_club_number" }, 400);
     }
     const limitRaw = c.req.query("limit");
-    const limit = limitRaw ? Number.parseInt(limitRaw, 10) : 100;
+    const limit = limitRaw ? Number.parseInt(limitRaw, 10) : 500;
     const historyData = await dbLimiter.run(async () => {
       const club = await env.prisma.club.findUnique({ where: { clubNumber } });
       if (!club) return null;
       const history = await getStationHistory(env.prisma, clubNumber, {
-        limit: Number.isFinite(limit) ? limit : 100,
+        limit: Number.isFinite(limit) ? limit : 500,
       });
       return { clubNumber, history };
     });

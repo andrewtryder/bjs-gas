@@ -52,4 +52,35 @@ describe("modular station utilities", () => {
     expect(getAvailableFuels(stations)).toEqual([{ sku: "1", name: "Regular", count: 1 }]);
     expect(stationsToGeoJson(stations).features).toHaveLength(1);
   });
+
+  it("applies default limit of 500 and clamps limit to max 1000 for station history", async () => {
+    const { getStationHistory } = await import("../src/api/stations.js");
+    let capturedArgs: any = null;
+    const mockPrisma = {
+      fuelPriceHistory: {
+        findMany: async (args: any) => {
+          capturedArgs = args;
+          return [
+            {
+              fuelSku: "1",
+              fuelName: "Unleaded",
+              price: "3.500",
+              sourcePriceAtLocal: null,
+              observedAt: new Date("2026-09-04T12:00:00Z"),
+            },
+          ];
+        },
+      },
+    } as any;
+
+    const resDefault = await getStationHistory(mockPrisma, 1);
+    expect(capturedArgs.take).toBe(500);
+    expect(resDefault).toHaveLength(1);
+
+    await getStationHistory(mockPrisma, 1, { limit: 2000 });
+    expect(capturedArgs.take).toBe(1000);
+
+    await getStationHistory(mockPrisma, 1, { limit: 50 });
+    expect(capturedArgs.take).toBe(50);
+  });
 });

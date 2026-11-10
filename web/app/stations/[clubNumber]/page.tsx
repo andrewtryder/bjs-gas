@@ -59,7 +59,7 @@ export default async function StationDetailPage({ params }: StationPageProps) {
   const [stationData, historyData, nationalSummaryRes, stateSummariesRes, nearbyData] =
     await Promise.allSettled([
       getStation(clubNumber),
-      getStationHistory(clubNumber),
+      getStationHistory(clubNumber, 500),
       getNationalSummary("1"),
       getStateSummaries("1"),
       getNearbyStations(clubNumber, 5),

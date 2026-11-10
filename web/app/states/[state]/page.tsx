@@ -38,7 +38,7 @@ export default async function StateDetailPage({ params }: StatePageProps) {
   const [stationsRes, stateSummariesRes, trendsRes] = await Promise.allSettled([
     getStations(),
     getStateSummaries("1"),
-    getNationalTrends(30, "1", stateCode),
+    getNationalTrends(90, "1", stateCode),
   ]);
 
   if (stationsRes.status !== "fulfilled") {

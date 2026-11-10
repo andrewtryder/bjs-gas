@@ -46,7 +46,7 @@ export default async function HomePage() {
     const [summaryRes, trendsRes, statesRes, moversRes] =
       await Promise.allSettled([
         getNationalSummary("1"),
-        getNationalTrends(30, "1"),
+        getNationalTrends(90, "1"),
         getStateSummaries("1"),
         getPriceMovers(7, "1"),
       ]);

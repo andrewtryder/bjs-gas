@@ -92,7 +92,7 @@ export async function getStation(clubNumber: number): Promise<StationDetailRespo
   return res.json();
 }
 
-export async function getStationHistory(clubNumber: number, limit = 100): Promise<StationHistoryResponse | null> {
+export async function getStationHistory(clubNumber: number, limit = 500): Promise<StationHistoryResponse | null> {
   const baseUrl = getApiBaseUrl();
   const res = await fetch(`${baseUrl}/api/v1/stations/${clubNumber}/history?limit=${limit}`, {
     cache: "no-store",
