@@ -62,12 +62,16 @@ export function createApp(env: AppEnv): Hono {
           },
         }),
       );
+      const message =
+        err.code === "EXECUTION_TIMEOUT"
+          ? "Database query execution timed out. Please retry."
+          : "Database admission queue full or timed out. Please retry.";
       return c.json(
         {
           error: "database_overloaded",
           code: "503",
           reason: err.code,
-          message: "Database admission queue full or timed out. Please retry.",
+          message,
         },
         503,
       );

@@ -2,9 +2,12 @@
  * Error thrown when the concurrency limiter rejects a workload due to queue pressure.
  */
 export class LimiterOverloadError extends Error {
-  public readonly code: "QUEUE_FULL" | "QUEUE_TIMEOUT";
+  public readonly code: "QUEUE_FULL" | "QUEUE_TIMEOUT" | "EXECUTION_TIMEOUT";
 
-  constructor(message: string, code: "QUEUE_FULL" | "QUEUE_TIMEOUT") {
+  constructor(
+    message: string,
+    code: "QUEUE_FULL" | "QUEUE_TIMEOUT" | "EXECUTION_TIMEOUT",
+  ) {
     super(message);
     this.name = "LimiterOverloadError";
     this.code = code;
@@ -16,6 +19,7 @@ export interface ConcurrencyLimiterOptions {
   maxConcurrency?: number;
   maxQueueLength?: number;
   maxQueueWaitMs?: number;
+  maxExecutionMs?: number;
 }
 
 interface QueuedItem {
@@ -36,12 +40,14 @@ export class ConcurrencyLimiter {
   public readonly maxConcurrency: number;
   public readonly maxQueueLength: number;
   public readonly maxQueueWaitMs: number;
+  public readonly maxExecutionMs: number;
 
   constructor(options: ConcurrencyLimiterOptions = {}) {
     this.name = options.name ?? "Database";
     const maxConcurrency = options.maxConcurrency ?? 1;
     const maxQueueLength = options.maxQueueLength ?? 8;
     const maxQueueWaitMs = options.maxQueueWaitMs ?? 8_000;
+    const maxExecutionMs = options.maxExecutionMs ?? 10_000;
 
     if (maxConcurrency < 1) {
       throw new Error("maxConcurrency must be at least 1");
@@ -52,10 +58,14 @@ export class ConcurrencyLimiter {
     if (maxQueueWaitMs <= 0) {
       throw new Error("maxQueueWaitMs must be positive");
     }
+    if (maxExecutionMs <= 0) {
+      throw new Error("maxExecutionMs must be positive");
+    }
 
     this.maxConcurrency = maxConcurrency;
     this.maxQueueLength = maxQueueLength;
     this.maxQueueWaitMs = maxQueueWaitMs;
+    this.maxExecutionMs = maxExecutionMs;
   }
 
   get activeCount(): number {
@@ -123,14 +133,33 @@ export class ConcurrencyLimiter {
       next.resolve(this.createReleaseFn());
       return;
     }
-    this.active--;
+    if (this.active > 0) {
+      this.active--;
+    }
   }
 
   async run<T>(fn: () => Promise<T>): Promise<T> {
     const release = await this.acquire();
+    let timer: ReturnType<typeof setTimeout> | null = null;
     try {
+      if (this.maxExecutionMs > 0) {
+        const timeoutPromise = new Promise<never>((_, reject) => {
+          timer = setTimeout(() => {
+            reject(
+              new LimiterOverloadError(
+                `${this.name} execution exceeded ${this.maxExecutionMs}ms`,
+                "EXECUTION_TIMEOUT",
+              ),
+            );
+          }, this.maxExecutionMs);
+        });
+        return await Promise.race([fn(), timeoutPromise]);
+      }
       return await fn();
     } finally {
+      if (timer !== null) {
+        clearTimeout(timer);
+      }
       release();
     }
   }
@@ -147,6 +176,7 @@ export const analyticsLimiter = new ConcurrencyLimiter({
   maxConcurrency: 1,
   maxQueueLength: 8,
   maxQueueWaitMs: 8_000,
+  maxExecutionMs: 10_000,
 });
 
 /**
@@ -161,5 +191,6 @@ export const publicDbLimiter = new ConcurrencyLimiter({
   maxConcurrency: 2,
   maxQueueLength: 16,
   maxQueueWaitMs: 5_000,
+  maxExecutionMs: 10_000,
 });
 
