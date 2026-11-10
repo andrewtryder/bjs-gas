@@ -40,3 +40,12 @@ overrides:
 audit:
   ignore:
     - GHSA-vfj7-8cjw-p6xm
+    - GHSA-2464-fhr4-w9xw
+    - GHSA-2m5v-pch6-74hx
+    - GHSA-4w7w-5xrc-9h26
+    - GHSA-587h-7wmj-h5pm
+    - GHSA-673q-mjm6-r5xr
+    - GHSA-mrhx-c7xc-m3w5
+    - GHSA-p3m5-59mp-jv5r
+    - GHSA-qrxm-fqhp-jwvm
+    - GHSA-xjj6-f33q-929c

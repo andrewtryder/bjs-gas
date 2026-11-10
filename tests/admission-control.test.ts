@@ -171,6 +171,37 @@ describe("Admission Control and Concurrency Limiter", () => {
     expect(limiter.waitingCount).toBe(0);
   });
 
+  // 5b. active work exceeding maxExecutionMs receives controlled EXECUTION_TIMEOUT and releases permit
+  it("rejects running tasks exceeding maxExecutionMs with EXECUTION_TIMEOUT and releases permit", async () => {
+    const limiter = new ConcurrencyLimiter({
+      maxConcurrency: 1,
+      maxExecutionMs: 30, // 30ms execution timeout
+    });
+
+    const hangingTask = limiter.run(async () => {
+      await new Promise((r) => setTimeout(r, 200));
+      return "never_reached";
+    });
+
+    expect(limiter.activeCount).toBe(1);
+
+    await expect(hangingTask).rejects.toSatisfy(
+      (err: any) =>
+        err instanceof LimiterOverloadError &&
+        err.code === "EXECUTION_TIMEOUT" &&
+        err.message.includes("execution exceeded 30ms"),
+    );
+
+    // Active permit was released on execution timeout
+    expect(limiter.activeCount).toBe(0);
+    expect(limiter.waitingCount).toBe(0);
+
+    // Subsequent task proceeds immediately
+    const subsequent = await limiter.run(async () => "next_ok");
+    expect(subsequent).toBe("next_ok");
+    expect(limiter.activeCount).toBe(0);
+  });
+
   // 7. /api/v1/status completes while analytics work is queued
   it("status can complete while analytics work is queued", async () => {
     const limiter = new ConcurrencyLimiter({ maxConcurrency: 1, maxQueueLength: 5 });
@@ -552,6 +583,35 @@ describe("Admission Control and Concurrency Limiter", () => {
     });
 
     await req1;
+  });
+
+  it("operational routes return 503 database_overloaded with execution timeout message when query hangs", async () => {
+    const mockPrisma = {
+      club: {
+        findMany: vi.fn().mockImplementation(() => new Promise((r) => setTimeout(r, 200))),
+      },
+    } as unknown as PrismaClient;
+
+    const timedOutDbLimiter = new ConcurrencyLimiter({
+      maxConcurrency: 1,
+      maxExecutionMs: 20,
+    });
+
+    const app = createApp({
+      prisma: mockPrisma,
+      collectorSecret: "secret",
+      dbLimiter: timedOutDbLimiter,
+    });
+
+    const res = await app.request("/api/v1/stations");
+    expect(res.status).toBe(503);
+    const body = await res.json();
+    expect(body).toEqual({
+      error: "database_overloaded",
+      code: "503",
+      reason: "EXECUTION_TIMEOUT",
+      message: "Database query execution timed out. Please retry.",
+    });
   });
 
   // 12. Simultaneous homepage workload (stations + status + analytics) respects concurrency ceiling
