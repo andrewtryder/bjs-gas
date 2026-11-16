@@ -251,6 +251,7 @@ export default async function StationDetailPage({ params }: StationPageProps) {
             <div
               className="station-freshness-text"
               title={latestObservation ? `Exact timestamp: ${new Date(latestObservation).toLocaleString()}` : undefined}
+              suppressHydrationWarning
             >
               {freshness.relativeText}
               {freshness.level === "aging" && (

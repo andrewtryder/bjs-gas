@@ -164,6 +164,7 @@ export default function StationLedger({
                             : "text-muted"
                         }`}
                         title={latestObs ? formatDate(latestObs) : undefined}
+                        suppressHydrationWarning
                       >
                         {freshness.relativeText}
                         {freshness.level === "aging" && " · Aging"}
@@ -250,6 +251,7 @@ export default function StationLedger({
                           : "text-muted"
                       }`}
                       title={latestObs ? formatDate(latestObs) : undefined}
+                      suppressHydrationWarning
                     >
                       {freshness.relativeText}
                       {freshness.level === "aging" && " · Aging"}
