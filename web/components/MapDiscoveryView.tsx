@@ -238,7 +238,10 @@ export default function MapDiscoveryView({
 
               <div className="map-selected-footer">
                 {selectedStationFreshnessText && (
-                  <span className={`map-selected-freshness freshness-${selectedStationFreshness?.level || "fresh"}`}>
+                  <span
+                    className={`map-selected-freshness freshness-${selectedStationFreshness?.level || "fresh"}`}
+                    suppressHydrationWarning
+                  >
                     {selectedStationFreshnessText}
                   </span>
                 )}

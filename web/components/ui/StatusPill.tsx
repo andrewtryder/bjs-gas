@@ -39,7 +39,7 @@ export default function StatusPill({
   const displayContent = (
     <>
       {showDot && <span className={`status-pill-dot ${dotClass}`} aria-hidden="true" />}
-      <span className="status-pill-text">
+      <span className="status-pill-text" suppressHydrationWarning>
         {cadencePrefix ? `About every 2 hours \u2022 ${text}` : text}
       </span>
     </>
@@ -55,6 +55,7 @@ export default function StatusPill({
         className={combinedClass}
         title={title || levelLabel}
         aria-label={fullAriaLabel}
+        suppressHydrationWarning
       >
         {displayContent}
       </Link>
@@ -66,6 +67,7 @@ export default function StatusPill({
       className={combinedClass}
       title={title || levelLabel}
       aria-label={fullAriaLabel}
+      suppressHydrationWarning
     >
       {displayContent}
     </span>
