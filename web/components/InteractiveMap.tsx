@@ -384,12 +384,26 @@ export default function InteractiveMap({
     });
 
     // Window and container resize observers (DS-4 Section 20)
+    // Defer resize execution via requestAnimationFrame to avoid synchronous DOM mutations
+    // during observer notifications ("ResizeObserver loop completed with undelivered notifications")
+    let resizeRafId: number | null = null;
+    const scheduleResize = () => {
+      if (typeof window === "undefined") return;
+      if (resizeRafId !== null) {
+        window.cancelAnimationFrame(resizeRafId);
+      }
+      resizeRafId = window.requestAnimationFrame(() => {
+        resizeRafId = null;
+        if (mapRef.current) {
+          mapRef.current.resize();
+        }
+      });
+    };
+
     const resizeObserver =
       typeof ResizeObserver !== "undefined" && containerRef.current
         ? new ResizeObserver(() => {
-            if (mapRef.current) {
-              mapRef.current.resize();
-            }
+            scheduleResize();
           })
         : null;
 
@@ -398,9 +412,7 @@ export default function InteractiveMap({
     }
 
     const handleResize = () => {
-      if (mapRef.current) {
-        mapRef.current.resize();
-      }
+      scheduleResize();
     };
     window.addEventListener("resize", handleResize);
 
@@ -408,6 +420,10 @@ export default function InteractiveMap({
 
     return () => {
       window.removeEventListener("resize", handleResize);
+      if (resizeRafId !== null) {
+        window.cancelAnimationFrame(resizeRafId);
+        resizeRafId = null;
+      }
       if (resizeObserver) {
         resizeObserver.disconnect();
       }

@@ -16,6 +16,7 @@
  *    - Do NOT suppress errors if MapLibre, Recharts, React, or npm deps appear.
  *    - Do NOT suppress application errors just because an extension appears deeper in stack.
  * 3. Ignore expected control flow (NEXT_NOT_FOUND, 404s).
+ * 4. Ignore benign browser engine noise (ResizeObserver loop completed / limit exceeded).
  */
 
 export interface StackFrameLike {
@@ -42,6 +43,23 @@ const EXTENSION_SCHEMES = [
   "extension://",
 ];
 
+const BENIGN_BROWSER_PATTERNS = [
+  "ResizeObserver loop completed with undelivered notifications",
+  "ResizeObserver loop limit exceeded",
+];
+
+export function isBenignBrowserError(notice?: NoticeLike | null): boolean {
+  if (!notice) return false;
+  const msg = typeof notice.message === "string" ? notice.message : "";
+  const name = typeof notice.name === "string" ? notice.name : "";
+  const stack = typeof notice.stack === "string" ? notice.stack : "";
+
+  return BENIGN_BROWSER_PATTERNS.some(
+    (pattern) =>
+      msg.includes(pattern) || name.includes(pattern) || stack.includes(pattern),
+  );
+}
+
 export function isExtensionUrl(url?: string): boolean {
   if (!url || typeof url !== "string") return false;
   return EXTENSION_SCHEMES.some((scheme) => url.startsWith(scheme));
@@ -62,6 +80,11 @@ export function shouldReportNotice(notice?: NoticeLike | null): boolean {
     notice.context?.statusCode === 404 ||
     notice.context?.status === 404
   ) {
+    return false;
+  }
+
+  // 2. Filter benign browser engine noise (ResizeObserver loop notifications)
+  if (isBenignBrowserError(notice)) {
     return false;
   }
 
