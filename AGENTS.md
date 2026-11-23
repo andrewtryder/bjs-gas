@@ -42,7 +42,7 @@ pnpm run build
 A repository-wide Biome format rewrite is deferred: a check-only run would change ~167 files (~67k lines), mostly CSS wrapping. Formatter enforcement currently covers `biome.json` only.
 
 ### Composer dependency pins
-Root `alchemy@2.0.0-beta.74` and `effect@4.0.0-rc.112` are **not** application imports. They pin Prisma Composer's runtime graph (Composer 0.18 fails when the Effect constellation resolves incompatibly). `pnpm-workspace.yaml` `overrides` is the authoritative pin set, including `@prisma/config>effect` at 3.21.0 for Prisma CLI vs Composer Effect 4.
+Root `alchemy@2.0.0-beta.74` and `effect@4.0.0-rc.112` are **not** application imports. They pin Prisma Composer's runtime graph (Composer 0.18 fails when the Effect constellation resolves incompatibly). `pnpm-workspace.yaml` `overrides` is the authoritative pin set, including `@prisma/config>effect` at 3.22.1 for Prisma CLI vs Composer Effect 4.
 
 ### Audit ignore
 `GHSA-vfj7-8cjw-p6xm` remains ignored: transitive `braces@3.0.3` via `alchemy` → `fast-glob` → `micromatch`. Latest `braces` is still 3.0.3 (unpatched). CI still fails on any other high/critical advisory.

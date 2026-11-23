@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  isBenignBrowserError,
   isContentScript,
   isExtensionUrl,
   shouldReportNotice,
@@ -188,6 +189,72 @@ describe("Honeybadger noise & browser-extension filtering", () => {
     expect(shouldReportNotice(status404Notice)).toBe(false);
   });
 
+  it("filters benign ResizeObserver loop completed notifications from window.onerror", () => {
+    // Exact Honeybadger notice shape from fault 135784281
+    const notice: NoticeLike = {
+      name: "window.onerror",
+      message: "ResizeObserver loop completed with undelivered notifications.",
+      stack:
+        "ResizeObserver loop completed with undelivered notifications.\n    at ? (https://bjsgas.andrewtryder.com/map?state=MI:0:0)",
+      backtrace: [
+        {
+          file: "https://bjsgas.andrewtryder.com/map?state=MI",
+          number: 0,
+          column: 0,
+        },
+      ],
+    };
+    expect(shouldReportNotice(notice)).toBe(false);
+  });
+
+  it("filters benign ResizeObserver loop limit exceeded notifications", () => {
+    const notice: NoticeLike = {
+      name: "Error",
+      message: "ResizeObserver loop limit exceeded",
+      stack:
+        "Error: ResizeObserver loop limit exceeded\n    at HTMLDivElement.resize",
+    };
+    expect(shouldReportNotice(notice)).toBe(false);
+  });
+
+  it("filters notices where name contains ResizeObserver message", () => {
+    const notice: NoticeLike = {
+      name: "ResizeObserver loop completed with undelivered notifications.",
+      message: "",
+    };
+    expect(shouldReportNotice(notice)).toBe(false);
+  });
+
+  it("isBenignBrowserError helper accurately identifies benign browser engine notices", () => {
+    expect(
+      isBenignBrowserError({
+        message: "ResizeObserver loop completed with undelivered notifications.",
+      }),
+    ).toBe(true);
+    expect(
+      isBenignBrowserError({
+        message: "ResizeObserver loop limit exceeded",
+      }),
+    ).toBe(true);
+    expect(
+      isBenignBrowserError({
+        name: "ResizeObserver loop completed with undelivered notifications.",
+      }),
+    ).toBe(true);
+    expect(
+      isBenignBrowserError({
+        stack: "ResizeObserver loop limit exceeded\n  at fn (app.js:1:1)",
+      }),
+    ).toBe(true);
+    expect(
+      isBenignBrowserError({
+        message: "TypeError: Cannot read properties of undefined",
+      }),
+    ).toBe(false);
+    expect(isBenignBrowserError(null)).toBe(false);
+    expect(isBenignBrowserError(undefined)).toBe(false);
+  });
+
   it("returns false for null or undefined notice", () => {
     expect(shouldReportNotice(null)).toBe(false);
     expect(shouldReportNotice(undefined)).toBe(false);
@@ -250,6 +317,12 @@ describe("Environment and config helpers", () => {
     expect(() => {
       reportErrorToHoneybadger(new Error("simulated web test error that must not go to honeybadger"), {
         route: "/",
+      });
+      reportErrorToHoneybadger(new Error("ResizeObserver loop completed with undelivered notifications."), {
+        route: "/map",
+      });
+      reportErrorToHoneybadger("ResizeObserver loop limit exceeded", {
+        route: "/map",
       });
     }).not.toThrow();
   });

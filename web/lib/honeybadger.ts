@@ -100,6 +100,22 @@ export function reportErrorToHoneybadger(
       return;
     }
 
+    // Avoid reporting benign browser engine notifications
+    const errorMessage =
+      error instanceof Error
+        ? error.message
+        : typeof error === "string"
+          ? error
+          : "";
+    if (
+      errorMessage.includes(
+        "ResizeObserver loop completed with undelivered notifications",
+      ) ||
+      errorMessage.includes("ResizeObserver loop limit exceeded")
+    ) {
+      return;
+    }
+
     const hb = initHoneybadger();
 
     // Whitelist only safe debugging context

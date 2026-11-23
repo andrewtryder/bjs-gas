@@ -305,6 +305,19 @@ describe("MapLibre GL worker assets & configuration", () => {
     );
     expect(componentSource).toContain('WORKER_URL = "/maplibre-gl-worker.mjs"');
   });
+
+  it("schedules container resizes via requestAnimationFrame in InteractiveMap component", async () => {
+    const fs = await import("node:fs");
+    const path = await import("node:path");
+    const componentSource = fs.readFileSync(
+      path.resolve(process.cwd(), "web/components/InteractiveMap.tsx"),
+      "utf-8",
+    );
+    // Verifies protection against "ResizeObserver loop completed with undelivered notifications"
+    expect(componentSource).toContain("window.requestAnimationFrame");
+    expect(componentSource).toContain("window.cancelAnimationFrame");
+    expect(componentSource).toContain("scheduleResize");
+  });
 });
 
 describe("validateUniqueStations", () => {
