@@ -1,5 +1,6 @@
 import { type } from "arktype";
 import { secretString } from "@prisma/composer/arktype";
+import { rawHttpContract } from "@prisma/composer/http";
 import node from "@prisma/composer/node";
 import { compute, rawPostgres } from "@prisma/composer-prisma-cloud";
 import { triggerContract } from "@prisma/composer-prisma-cloud/cron";
@@ -13,7 +14,7 @@ export default compute({
   name: "bjsgasapi",
   deps: { db: rawPostgres() },
   input: apiInput,
-  expose: { trigger: triggerContract },
+  expose: { trigger: triggerContract, http: rawHttpContract },
   // Ship the whole dist/ tree (server.mjs + Linux query engine).
   build: node({
     module: import.meta.url,
