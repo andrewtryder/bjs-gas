@@ -1,0 +1,107 @@
+name: Deploy Staging
+
+on:
+  workflow_dispatch:
+    inputs:
+      commit_sha:
+        description: "Commit SHA to deploy to staging (defaults to main HEAD)"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-staging
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy Staging & Smoke Test
+    runs-on: ubuntu-latest
+    environment:
+      name: staging
+      url: ${{ steps.urls.outputs.web_url }}
+
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v7
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Resolve immutable commit SHA
+        id: sha
+        run: |
+          TARGET_SHA="${{ inputs.commit_sha }}"
+          if [ -z "$TARGET_SHA" ]; then
+            TARGET_SHA="$(git rev-parse HEAD)"
+          else
+            git cat-file -e "${TARGET_SHA}^{commit}"
+            git checkout --detach "$TARGET_SHA"
+          fi
+          SHORT_SHA="$(git rev-parse --short=7 "$TARGET_SHA")"
+          echo "full=$TARGET_SHA" >> "$GITHUB_OUTPUT"
+          echo "short=$SHORT_SHA" >> "$GITHUB_OUTPUT"
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: ".nvmrc"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma Client & Validate
+        run: |
+          pnpm run prisma:generate
+          pnpm typecheck
+          pnpm composer:check
+          pnpm run build
+
+      - name: Deploy to Prisma Cloud (staging)
+        env:
+          PRISMA_SERVICE_TOKEN: ${{ secrets.PRISMA_SERVICE_TOKEN }}
+          PRISMA_WORKSPACE_ID: ${{ secrets.PRISMA_WORKSPACE_ID }}
+          CARTO_API_KEY: ${{ secrets.CARTO_API_KEY }}
+          HONEYBADGER_API_KEY: ${{ secrets.HONEYBADGER_API_KEY }}
+          COLLECTOR_SECRET: ${{ secrets.COLLECTOR_SECRET }}
+        run: |
+          pnpm dlx --allow-build=esbuild @prisma/cli@8.0.0-rc.34 deploy \
+            --config prisma.composer.config.ts \
+            --name bjs-gas \
+            --environment staging \
+            --report /tmp/deploy-report.json
+
+      - name: Resolve deployed URLs
+        id: urls
+        env:
+          PRISMA_SERVICE_TOKEN: ${{ secrets.PRISMA_SERVICE_TOKEN }}
+          PRISMA_WORKSPACE_ID: ${{ secrets.PRISMA_WORKSPACE_ID }}
+        run: |
+          DEPLOY_LIST=$(pnpm dlx --allow-build=esbuild @prisma/cli@8.0.0-rc.34 deploy list --config prisma.composer.config.ts --name bjs-gas --environment staging --json)
+          API_URL=$(echo "$DEPLOY_LIST" | jq -r '.envelope.result[] | select(.address == "bjs-gas.bjsgasapi" or .address == "bjsgasapi") | .url // empty')
+          WEB_URL=$(echo "$DEPLOY_LIST" | jq -r '.envelope.result[] | select(.address == "bjs-gas.bjsgasweb" or .address == "bjsgasweb") | .url // empty')
+          if [ -z "$API_URL" ] || [ -z "$WEB_URL" ]; then
+            echo "Failed to resolve staging URLs"
+            exit 1
+          fi
+          echo "api_url=$API_URL" >> "$GITHUB_OUTPUT"
+          echo "web_url=$WEB_URL" >> "$GITHUB_OUTPUT"
+
+      - name: Post-deploy smoke test & revision check
+        run: |
+          node scripts/smoke-test.mjs \
+            --api-url "${{ steps.urls.outputs.api_url }}" \
+            --web-url "${{ steps.urls.outputs.web_url }}" \
+            --expected-revision "${{ steps.sha.outputs.short }}" \
+            --allow-unhealthy-status
