@@ -191,47 +191,50 @@ export function createApp(env: AppEnv): Hono {
     }
   });
 
-  app.get("/api/v1/status", async (c) => {
-    let payload: StatusPayload;
+  async function runReadWithClosedConnectionRetry<T>(
+    event: string,
+    route: string,
+    method: string,
+    query: () => Promise<T>,
+  ): Promise<T> {
     try {
-      payload = await dbLimiter.run(() => getCollectionStatus(env.prisma));
+      return await dbLimiter.run(query);
     } catch (error) {
-      // This endpoint is read-only. A single retry is safe when an idle pooled
-      // socket was closed by the database before the query could run.
+      // Read-only GETs: retry once if an idle pooled socket was closed (P1017).
+      // Do not retry unrelated Prisma errors (including P2024 pool timeouts).
       if (!isClosedConnectionError(error)) throw error;
       console.warn(
         JSON.stringify({
-          event: "status_read_connection_retry",
-          route: c.req.path,
-          method: c.req.method,
+          event,
+          route,
+          method,
           code: "P1017",
         }),
       );
-      payload = await dbLimiter.run(() => getCollectionStatus(env.prisma));
+      await env.prisma.$disconnect?.().catch(() => {});
+      return await dbLimiter.run(query);
     }
+  }
+
+  app.get("/api/v1/status", async (c) => {
+    const payload: StatusPayload = await runReadWithClosedConnectionRetry(
+      "status_read_connection_retry",
+      c.req.path,
+      c.req.method,
+      () => getCollectionStatus(env.prisma),
+    );
     // Status must stay highly fresh while diagnosing collector/scheduler health.
     c.header("Cache-Control", "public, max-age=15, s-maxage=15, stale-while-revalidate=30");
     return c.json(payload);
   });
 
   app.get("/api/v1/stations", async (c) => {
-    let payload: Awaited<ReturnType<typeof listStationsWithPrices>>;
-    try {
-      payload = await dbLimiter.run(() => listStationsWithPrices(env.prisma));
-    } catch (error) {
-      // This GET is read-only: retry once if an idle pooled socket was closed.
-      // Do not retry unrelated Prisma errors (including P2024 pool timeouts).
-      if (!isClosedConnectionError(error)) throw error;
-      console.warn(
-        JSON.stringify({
-          event: "stations_read_connection_retry",
-          route: c.req.path,
-          method: c.req.method,
-          code: "P1017",
-        }),
-      );
-      payload = await dbLimiter.run(() => listStationsWithPrices(env.prisma));
-    }
+    const payload = await runReadWithClosedConnectionRetry(
+      "stations_read_connection_retry",
+      c.req.path,
+      c.req.method,
+      () => listStationsWithPrices(env.prisma),
+    );
     // Two-hour collector → ~5 minute CDN cache is safe; avoid longer stale windows.
     c.header("Cache-Control", "public, max-age=60, s-maxage=300, stale-while-revalidate=60");
     return c.json(payload);
