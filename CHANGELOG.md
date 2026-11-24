@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.1.3](https://github.com/andrewtryder/bjs-gas/compare/v0.1.2...v0.1.3) (2026-11-24)
+
+
+### Features
+
+* **db:** migrate to Prisma ORM 7.10.1 with @prisma/adapter-pg and upgrade Composer to 0.40.0 ([#83](https://github.com/andrewtryder/bjs-gas/issues/83)) ([0d9f102](https://github.com/andrewtryder/bjs-gas/commit/0d9f102ecfce89ce5d3ce9c76ab9a4713768e980))
+* **web:** add 60D time window option to trend and price history charts ([#80](https://github.com/andrewtryder/bjs-gas/issues/80)) ([975b254](https://github.com/andrewtryder/bjs-gas/commit/975b25490140f78832b37756557b0e8471ef3b9d))
+
+
+### Bug Fixes
+
+* **api:** add Postgres socket/connect timeouts and disconnect before P1017 retry ([#82](https://github.com/andrewtryder/bjs-gas/issues/82)) ([5f22d44](https://github.com/andrewtryder/bjs-gas/commit/5f22d440446d04a0d576f77c24eac2c80383d260))
+* **api:** prevent premature permit release on execution timeout and add graceful DB shutdown ([#84](https://github.com/andrewtryder/bjs-gas/issues/84)) ([d00690e](https://github.com/andrewtryder/bjs-gas/commit/d00690e7e7321d4a96ad76f270685f7d3d83dd19))
+
+
+### Documentation
+
+* update architecture, AGENTS, Dependabot, and Prisma skills for Prisma 7 and Composer 0.40 ([#85](https://github.com/andrewtryder/bjs-gas/issues/85)) ([8679811](https://github.com/andrewtryder/bjs-gas/commit/86798111ee8f3b9a899d0a99d6f104787f1d25f2))
+
 ## [0.1.2](https://github.com/andrewtryder/bjs-gas/compare/v0.1.1...v0.1.2) (2026-11-24)
 
 
