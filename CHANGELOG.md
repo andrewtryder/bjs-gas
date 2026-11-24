@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.2](https://github.com/andrewtryder/bjs-gas/compare/v0.1.1...v0.1.2) (2026-11-24)
+
+
+### Bug Fixes
+
+* **ci:** handle stale collection data in post-deploy smoke test ([#78](https://github.com/andrewtryder/bjs-gas/issues/78)) ([2d8dae9](https://github.com/andrewtryder/bjs-gas/commit/2d8dae9fb6e452d8bcfdc803aa4ca86aeff71532))
+
 ## [0.1.1](https://github.com/andrewtryder/bjs-gas/compare/v0.1.0...v0.1.1) (2026-11-24)
 
 
