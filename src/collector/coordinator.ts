@@ -1,4 +1,4 @@
-import type { PrismaClient } from "@prisma/client";
+import type { PrismaClient } from "../generated/prisma/client.js";
 import { fetchClubFuel, mapPool } from "../fuel/client.js";
 import {
   COLLECTION_RUN_SCOPE,

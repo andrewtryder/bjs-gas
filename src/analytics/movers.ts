@@ -1,4 +1,4 @@
-import type { PrismaClient } from "@prisma/client";
+import type { PrismaClient } from "../generated/prisma/client.js";
 import type { PriceMoverItem, PriceMoversResponse } from "@bjs-gas/contracts";
 import { CANONICAL_FUEL_SKU, resolveFuelInfo } from "./fuel-info.js";
 import { formatPriceString } from "./median.js";

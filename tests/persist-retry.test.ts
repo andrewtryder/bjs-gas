@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import type { PrismaClient } from "@prisma/client";
+import type { PrismaClient } from "../src/generated/prisma/client.js";
 import { isClosedConnectionError, persistFuelObservations } from "../src/persist.js";
 import type { CollectionRunInput, FuelObservation } from "../src/fuel/types.js";
 

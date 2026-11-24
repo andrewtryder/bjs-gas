@@ -1,4 +1,4 @@
-import { CollectionRunScope, type PrismaClient } from "@prisma/client";
+import { CollectionRunScope, type PrismaClient } from "../generated/prisma/client.js";
 import type {
   StatusFreshness,
   StatusLastCollection,

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import type { PrismaClient } from "@prisma/client";
+import type { PrismaClient } from "../src/generated/prisma/client.js";
 import { CANONICAL_FUEL_SKU, resolveFuelInfo } from "../src/analytics/fuel-info.js";
 
 function prismaWithFuelName(fuelName: string | null): PrismaClient {

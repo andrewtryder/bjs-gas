@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { spawnSync } from "node:child_process";
-import { mkdirSync, copyFileSync, existsSync, statSync } from "node:fs";
+import { mkdirSync, copyFileSync } from "node:fs";
 import path from "node:path";
 
 function run(command, args, opts = {}) {
@@ -52,13 +52,6 @@ run("bun", [
   "dist/server.mjs",
   ...defines.flatMap((d) => ["--define", d]),
 ]);
-
-run("node", ["scripts/copy-prisma-engine.mjs"]);
-
-const expectedEngine = path.join("dist", "libquery_engine-debian-openssl-3.0.x.so.node");
-if (!existsSync(expectedEngine) || statSync(expectedEngine).size < 1000) {
-  throw new Error(`Build assertion failed: ${expectedEngine} is missing or empty`);
-}
 
 const dataDir = path.join("dist", "data");
 mkdirSync(dataDir, { recursive: true });

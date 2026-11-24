@@ -1,12 +1,10 @@
 generator client {
-  provider      = "prisma-client-js"
-  // Compute runs Bun on Linux (debian openssl 3); local Mac needs native.
-  binaryTargets = ["native", "debian-openssl-3.0.x"]
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
 }
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 model Club {

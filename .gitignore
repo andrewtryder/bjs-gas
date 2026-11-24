@@ -1,3 +1,6 @@
+# Generated Prisma 7 client
+src/generated/
+
 # Dependencies
 node_modules/
 

@@ -17,7 +17,7 @@ import {
   DEFAULT_DB_MAX_WAIT_MS,
   DEFAULT_PERSIST_WATCHDOG_TIMEOUT_MS,
 } from "../src/persist.js";
-import type { PrismaClient } from "@prisma/client";
+import type { PrismaClient } from "../src/generated/prisma/client.js";
 
 describe("price normalization", () => {
   it("keeps three decimal places exactly", () => {

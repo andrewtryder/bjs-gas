@@ -1,24 +1,24 @@
 import { describe, expect, it } from "vitest";
-import { configureDatabaseUrl } from "../src/db.js";
+import { buildPoolConfig } from "../src/db.js";
 
-describe("configureDatabaseUrl", () => {
-  it("adds default pool, connect, and socket timeouts when absent", () => {
-    const configured = new URL(configureDatabaseUrl("postgresql://user:pass@db.example:5432/bjs"));
-    expect(configured.searchParams.get("connection_limit")).toBe("10");
-    expect(configured.searchParams.get("pool_timeout")).toBe("20");
-    expect(configured.searchParams.get("connect_timeout")).toBe("10");
-    expect(configured.searchParams.get("socket_timeout")).toBe("20");
+describe("buildPoolConfig", () => {
+  it("applies bounded pool, connection, idle, lifetime, and statement timeouts by default", () => {
+    const config = buildPoolConfig("postgresql://user:pass@db.example:5432/bjs");
+    expect(config.connectionString).toBe("postgresql://user:pass@db.example:5432/bjs");
+    expect(config.max).toBe(10);
+    expect(config.connectionTimeoutMillis).toBe(10_000);
+    expect(config.idleTimeoutMillis).toBe(30_000);
+    expect(config.maxLifetimeSeconds).toBe(1800);
+    expect(config.statement_timeout).toBe(20_000);
   });
 
-  it("preserves explicit timeout and pool parameters", () => {
-    const configured = new URL(
-      configureDatabaseUrl(
-        "postgresql://user:pass@db.example:5432/bjs?connection_limit=5&pool_timeout=15&connect_timeout=5&socket_timeout=12",
-      ),
+  it("respects explicit URL timeout, limit, and options parameters", () => {
+    const config = buildPoolConfig(
+      "postgresql://user:pass@db.example:5432/bjs?connection_limit=5&connect_timeout=4&socket_timeout=12&options=-c%20timezone%3DAmerica%2FNew_York",
     );
-    expect(configured.searchParams.get("connection_limit")).toBe("5");
-    expect(configured.searchParams.get("pool_timeout")).toBe("15");
-    expect(configured.searchParams.get("connect_timeout")).toBe("5");
-    expect(configured.searchParams.get("socket_timeout")).toBe("12");
+    expect(config.max).toBe(5);
+    expect(config.connectionTimeoutMillis).toBe(4_000);
+    expect(config.statement_timeout).toBe(12_000);
+    expect(config.options).toBe("-c timezone=America/New_York");
   });
 });
