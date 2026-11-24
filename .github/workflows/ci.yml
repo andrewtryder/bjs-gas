@@ -43,20 +43,6 @@ jobs:
           node-version-file: ".nvmrc"
           cache: "pnpm"
 
-      # Temporary migration bootstrap: remove after committing the generated lockfile.
-      - name: Generate migration lockfile
-        run: pnpm install --lockfile-only --no-frozen-lockfile
-
-      - name: Upload generated migration lockfile
-        uses: actions/upload-artifact@v7
-        with:
-          name: composer-migration-lockfile
-          path: pnpm-lock.yaml
-          retention-days: 1
-
-      - name: Capture lockfile for migration commit
-        run: node -e 'const s = require("node:fs").readFileSync("pnpm-lock.yaml").toString("base64"); for (let i = 0; i < s.length; i += 4096) console.log("COMPOSER_LOCK_CHUNK " + i + " " + s.slice(i, i + 4096)); console.log("COMPOSER_LOCK_END " + s.length);'
-
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 

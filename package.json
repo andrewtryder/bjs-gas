@@ -32,7 +32,7 @@
     "prisma:migrate": "prisma migrate deploy",
     "prisma:migrate:dev": "prisma migrate dev",
     "deploy:compute": "node scripts/check-clean-tree.mjs && pnpm run build && pnpm dlx @prisma/cli@8.0.0-rc.34 deploy --config prisma.composer.config.ts --name bjs-gas",
-    "composer:check": "tsx -e \"Promise.all([import('./module.ts'), import('./prisma.composer.config.ts')]).catch((error) => { console.error(error); process.exitCode = 1; })\""
+    "composer:check": "tsx scripts/check-composer.ts"
   },
   "engines": {
     "node": "^26.13.0"
