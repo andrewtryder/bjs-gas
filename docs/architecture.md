@@ -374,13 +374,15 @@ API build (`scripts/build-api.mjs`): Bun bundle `src/server.ts` → `dist/server
 
 GitHub Actions job name (required-check **context** when protection exists): **`Typecheck, Test & Build`**.
 
-Order: frozen install → `pnpm audit --audit-level=high` → Prisma generate → Biome lint → Biome format check → typecheck → unit tests → `prisma db push` on CI Postgres → integration tests → API+web build.
+Order: frozen install → `pnpm audit --audit-level=high` → Prisma generate → Biome lint → Biome format check → typecheck → Composer smoke check → unit tests → `prisma db push` on CI Postgres → integration tests → API+web build.
 
-Release discipline is operational: branch → PR → CI → merge → pull exact `main` → deploy that SHA → smoke. See [AGENTS.md](../AGENTS.md).
+Runtime versions are aligned across CI, staging, and production builds: Node 26 (`.nvmrc`), Bun `1.4.5` (`.bun-version`), `pnpm@11.22.0`, and TypeScript `7.0.2`.
+
+Release discipline is operational: branch → PR → CI → merge → pull exact `main` → deploy that SHA → smoke test (`scripts/smoke-test.mjs --refresh-if-stale`). Production deployments require GitHub `production` environment reviewer approval and `confirm == "deploy-production"`. See [AGENTS.md](../AGENTS.md).
 
 ### Formatting policy
 
-Biome **2.5.15** is installed.
+Biome **2.6.8** is installed.
 
 - Lint is enforced on maintained source.
 - Formatter exists.
@@ -400,15 +402,16 @@ Intentionally retained (not application imports):
 
 | Pin | Why |
 | --- | --- |
-| `alchemy@2.0.0-beta.74` | Composer/Alchemy graph |
-| `effect@4.0.0-rc.112` | Composer 0.18 Effect constellation |
-| `@prisma/config>effect@3.21.0` | Prisma CLI 6 vs Composer Effect 4 |
+| `alchemy@2.0.0-beta.85` | Composer/Alchemy graph |
+| `effect@4.1.0` | Composer `0.39.0` Effect constellation |
+| `@prisma/config>effect@3.22.1` | Prisma CLI 6 vs Composer Effect 4 |
+| `@prisma/orm-postgres@8.0.0-rc.23` | Composer `0.39.0` control-plane peer |
 
 Authoritative overrides: `pnpm-workspace.yaml` (also hono, undici splits, vitest, etc.). Removing or bumping these requires frozen install, typecheck, tests, build, and a real Composer deploy.
 
 Audit ignore **`GHSA-vfj7-8cjw-p6xm`**: transitive `braces@3.0.3` via alchemy → fast-glob → micromatch. No patched `braces` release beyond 3.0.3. CI still fails any other high/critical advisory.
 
-Prisma skills for agents are generated from installed `@prisma/composer` **0.18.0**. Canonical on-disk copy: `.agents/skills/prisma-composer-core-concepts/`. Sync with `pnpm skills:sync` (see AGENTS.md). Do not add `prisma.config.ts` while Prisma Client remains 6.x — that filename is parsed by `prisma generate` and is incompatible with the CLI 8 skills marker.
+Prisma skills for agents are generated from installed `@prisma/composer` **0.39.0** (`@prisma/cli@8.0.0-rc.34`). Canonical on-disk copy: `.agents/skills/`. Sync with `pnpm skills:sync` (see AGENTS.md). Do not add `prisma.config.ts` while Prisma Client remains 6.x — that filename is parsed by `prisma generate` and is incompatible with the CLI 8 skills marker.
 
 ---
 

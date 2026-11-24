@@ -57,7 +57,7 @@ Only a future authoritative locator discovery → `discovery:accept` → `import
 
 ## Local scripts (pnpm)
 
-Use Node.js 26 LTS (26.13.0 or newer in the 26.x line; `nvm use` reads `.nvmrc`), pnpm as pinned in `package.json`, and Bun for the Compute runtime.
+Use Node.js 26 LTS (`^26.13.0`; `nvm use` reads `.nvmrc`), `pnpm@11.22.0` (`packageManager`), TypeScript `7.0.2`, and Bun `1.4.5` (`.bun-version`) for the Compute runtime.
 
 ```bash
 pnpm discover                 # Playwright → data/*.candidate.json
@@ -116,13 +116,19 @@ Expected healthy signals:
 - `collectionLock.inProgress` may be true briefly during a normal run
 - `/health.revision` matches the deployed git SHA with `dirty: false`
 
-### Diagnose stale data
+### Diagnose stale data & scheduler logs
 
-1. Check `/api/v1/status` → `unhealthyReasons` (`last_collection_stale`, `zero_fuel_observations`, `collection_over_expected_duration`, …).
+1. Check `/api/v1/status` → `unhealthyReasons` (`last_collection_stale`, `fresh_stations_below_majority`, `zero_fuel_observations`, `collection_over_expected_duration`, …).
 2. A short `collectionLock.inProgress: true` is normal. Unhealthy only when `overExpectedDuration` / `stale` is true.
-3. If `lastSuccessfulCollection` is old but lock is idle, the scheduler may not be reaching `/rpc/trigger` — redeploy the full Composer module (API + scheduler + web together).
-4. Probe upstream without touching Postgres: `GET /internal/probe/fuel/:clubNumber` with collector auth.
-5. Confirm `/health.revision` matches `git rev-parse --short HEAD` after a **clean** deploy. Dirty builds report `<sha>-dirty`.
+3. Inspect live Prisma Cloud logs for the API and scheduler:
+   ```bash
+   pnpm dlx --allow-build=esbuild @prisma/cli@8.0.0-rc.34 service logs bjs-gas.scheduler --tail 100
+   pnpm dlx --allow-build=esbuild @prisma/cli@8.0.0-rc.34 service logs bjs-gas.bjsgasapi --tail 100
+   ```
+   Look for `cron_collection_start`, `cron_collection_complete`, `cron_collection_skipped`, or `cron_collection_error` events. Remember that `defineSchedule({ collect: "120m" })` ticks 120 minutes after scheduler boot (`setInterval` semantics).
+4. If `lastSuccessfulCollection` is old but lock is idle and no `cron_collection_start` appears after >120 minutes of scheduler uptime, redeploy the full Composer module (API + scheduler + web together).
+5. Probe upstream without touching Postgres: `GET /internal/probe/fuel/:clubNumber` with collector auth.
+6. Confirm `/health.revision` matches `git rev-parse --short=7 HEAD` after a **clean** deploy. Dirty builds report `<sha>-dirty`.
 
 ## Price semantics
 
@@ -158,7 +164,7 @@ Never commit `.env`, `.dev.vars`, or secret values.
 
 ## Prisma deploy (API + scheduler + web together)
 
-Composer 0.39 uses CLI 8.0.0-rc.34 and `prisma.composer.config.ts` explicitly; the database client and Prisma ORM commands remain on 6.x. The first deployment across Composer 0.35+ renames resources in place and replaces Composer-managed connection strings and access keys. Before that deployment, verify existing resource ids/state, database backup and recovery access, external connection-string consumers, custom domains, and the production platform variables (`COLLECTOR_SECRET` required; `CARTO_API_KEY` and `HONEYBADGER_API_KEY` optional). Composer 0.39 never seeds platform secrets from local `.env` or the shell. Do not use an older Composer CLI against an upgraded environment. Validate a separate staging environment before production; do not point staging at the production database. See [upstream address upgrade notes](https://www.prisma.io/changelog/2026-10-30).
+Composer `0.39.0` uses `@prisma/cli@8.0.0-rc.34` and `prisma.composer.config.ts` explicitly; the application database client and Prisma ORM commands remain on `6.19.3`. Platform secrets (`COLLECTOR_SECRET` required; `CARTO_API_KEY` and `HONEYBADGER_API_KEY` optional) are managed in Prisma Cloud and scoped per GitHub environment — Composer 0.39 never seeds platform secrets from local `.env` or the shell. Do not use an older Composer CLI against an upgraded environment. Validate changes on `staging` before deploying to `production`.
 
 ```bash
 # Requires a clean git worktree so /health.revision matches HEAD.
@@ -213,10 +219,11 @@ Public Compute API URL:
 - ~77k upstream BJ's fuel HTTP requests / month (≈214 × 12 × 30)
 - ~360 fleet `CollectionRun` rows / month (plus reads/migrations/admin)
 
-## CI/CD, Staging & Recovery
+## CI/CD, Staging & Operations
 
-- **CI (`.github/workflows/ci.yml`)**: Runs on PRs and pushes to `main` with least-privilege `contents: read` permissions and PR concurrency cancellation. Executes frozen install, `pnpm audit --audit-level=high`, `prisma:generate`, Biome lint/format, TypeScript typecheck, `composer:check`, unit tests, Postgres integration tests, and API + web builds.
-- **Staging (`deploy-staging.yml`)**: Manual `workflow_dispatch` targeting the `staging` GitHub environment and Prisma Cloud `--environment staging` (isolated database and `COLLECTOR_SECRET`), followed by `scripts/smoke-test.mjs` revision and health verification.
-- **Production (`deploy-production.yml`)**: Manual `workflow_dispatch` targeting the `production` GitHub environment. Requires `confirm == "deploy-production"`, verifies `commit_sha` is an ancestor of `origin/main`, deploys that exact SHA, and runs `scripts/smoke-test.mjs`.
-- **Releases (`release-please.yml`)**: Automated versioning and changelog PRs on `main` via Release Please (`release-please-config.json`, `.release-please-manifest.json`).
-- **Database Backup & Recovery**: Prisma Postgres on the current plan has `retention: 0 days` (no automatic platform backups). Before major infrastructure or schema changes, take a logical backup with `pg_dump` against `DATABASE_URL` (`pg_dump "$DATABASE_URL" -Fc -f backup.dump`). Do not use older Composer (< 0.39) CLIs against an upgraded environment.
+- **CI (`.github/workflows/ci.yml`)**: Runs on PRs and pushes to `main` with least-privilege `contents: read` permissions and PR concurrency cancellation. Uses Node 26 (`.nvmrc`), Bun `1.4.5` (`.bun-version`), and `pnpm@11.22.0`. Executes frozen install, `pnpm audit --audit-level=high`, `prisma:generate`, Biome lint/format, TypeScript typecheck, `composer:check`, unit tests, Postgres integration tests, and API + web builds.
+- **Staging (`deploy-staging.yml`)**: Manual `workflow_dispatch` targeting the `staging` GitHub environment (isolated `staging` secrets and Prisma Cloud `--environment staging` services/database), followed by `scripts/smoke-test.mjs --refresh-if-stale`. Note on cost: `staging` provisions an isolated copy of the API, web, scheduler, and Prisma Postgres database, incurring separate compute and database usage charges while active.
+- **Production (`deploy-production.yml`)**: Manual `workflow_dispatch` targeting the `production` GitHub environment, which enforces **required reviewer approval** in GitHub environment protection rules. Also requires `confirm == "deploy-production"`, verifies `commit_sha` is an ancestor of `origin/main`, deploys that exact SHA, and runs `scripts/smoke-test.mjs --refresh-if-stale`.
+- **Smoke testing (`scripts/smoke-test.mjs`)**: Distinguishes deployment availability failures (`/health`, revision, `dirty: false`, `/api/v1/stations`, web routes `/`, `/map`, `/maplibre-gl-worker.mjs`, and `/api/v1/status` reachability) from collection freshness failures. When data is already fresh, no collection is triggered. When status is unhealthy solely due to staleness (`no_collection_run`, `last_collection_stale`, `latest_observation_stale`, `fresh_stations_below_majority`), it triggers a single bounded, authenticated `POST /internal/collect` (respecting active `collectionLock` / `409` concurrency and `429` rate limits) and rechecks `/api/v1/status`. Genuine non-staleness health errors fail immediately.
+- **Releases (`release-please.yml`)**: Automated versioning and changelog PRs on `main` via Release Please (`release-please-config.json`, `.release-please-manifest.json`). Merging a Release Please PR creates the GitHub release tag and bumps `package.json` / `CHANGELOG.md`.
+- **Database Backup & Recovery**: Prisma Postgres on the current plan has `retention: 0 days` (no automatic platform backups). Database backups are outside the automated project scope; for ad-hoc manual snapshots before major changes, use `pg_dump "$DATABASE_URL" -Fc -f backup.dump`. Do not use older Composer (< 0.39) CLIs against an upgraded environment.

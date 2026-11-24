@@ -47,7 +47,7 @@ jobs:
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
         with:
-          bun-version: 1.4.2
+          bun-version: 1.4.5
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v6
@@ -99,9 +99,11 @@ jobs:
           echo "web_url=$WEB_URL" >> "$GITHUB_OUTPUT"
 
       - name: Post-deploy smoke test & revision check
+        env:
+          COLLECTOR_SECRET: ${{ secrets.COLLECTOR_SECRET }}
         run: |
           node scripts/smoke-test.mjs \
             --api-url "${{ steps.urls.outputs.api_url }}" \
             --web-url "${{ steps.urls.outputs.web_url }}" \
             --expected-revision "${{ steps.sha.outputs.short }}" \
-            --allow-unhealthy-status
+            --refresh-if-stale
