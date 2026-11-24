@@ -171,17 +171,20 @@ describe("Admission Control and Concurrency Limiter", () => {
     expect(limiter.waitingCount).toBe(0);
   });
 
-  // 5b. active work exceeding maxExecutionMs receives controlled EXECUTION_TIMEOUT and releases permit
-  it("rejects running tasks exceeding maxExecutionMs with EXECUTION_TIMEOUT and releases permit", async () => {
+  // 5b. active work exceeding maxExecutionMs receives controlled EXECUTION_TIMEOUT and holds permit until settled
+  it("rejects running tasks exceeding maxExecutionMs with EXECUTION_TIMEOUT and holds permit until underlying work settles", async () => {
     const limiter = new ConcurrencyLimiter({
       maxConcurrency: 1,
       maxExecutionMs: 30, // 30ms execution timeout
     });
 
-    const hangingTask = limiter.run(async () => {
-      await new Promise((r) => setTimeout(r, 200));
-      return "never_reached";
-    });
+    let resolveHanging!: (v: string) => void;
+    const hangingTask = limiter.run(
+      () =>
+        new Promise<string>((resolve) => {
+          resolveHanging = resolve;
+        }),
+    );
 
     expect(limiter.activeCount).toBe(1);
 
@@ -192,13 +195,48 @@ describe("Admission Control and Concurrency Limiter", () => {
         err.message.includes("execution exceeded 30ms"),
     );
 
-    // Active permit was released on execution timeout
+    // Permit remains held while underlying work is still in flight
+    expect(limiter.activeCount).toBe(1);
+    expect(limiter.waitingCount).toBe(0);
+
+    // Once underlying work settles, permit is released cleanly
+    resolveHanging("late_completion");
+    await new Promise((r) => setTimeout(r, 10));
+
     expect(limiter.activeCount).toBe(0);
     expect(limiter.waitingCount).toBe(0);
 
     // Subsequent task proceeds immediately
     const subsequent = await limiter.run(async () => "next_ok");
     expect(subsequent).toBe("next_ok");
+    expect(limiter.activeCount).toBe(0);
+  });
+
+  it("does not emit unhandled rejection or double-release when timed-out work later rejects", async () => {
+    const limiter = new ConcurrencyLimiter({
+      maxConcurrency: 1,
+      maxExecutionMs: 20,
+    });
+
+    let rejectHanging!: (err: Error) => void;
+    const hangingTask = limiter.run(
+      () =>
+        new Promise<string>((_resolve, reject) => {
+          rejectHanging = reject;
+        }),
+    );
+
+    await expect(hangingTask).rejects.toSatisfy(
+      (err: any) => err instanceof LimiterOverloadError && err.code === "EXECUTION_TIMEOUT",
+    );
+
+    expect(limiter.activeCount).toBe(1);
+    rejectHanging(new Error("late_db_error"));
+    await new Promise((r) => setTimeout(r, 10));
+
+    expect(limiter.activeCount).toBe(0);
+    const next = await limiter.run(async () => "recovered");
+    expect(next).toBe("recovered");
     expect(limiter.activeCount).toBe(0);
   });
 

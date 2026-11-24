@@ -211,7 +211,8 @@ export function createApp(env: AppEnv): Hono {
           code: "P1017",
         }),
       );
-      await env.prisma.$disconnect?.().catch(() => {});
+      // Do not call $disconnect() on the shared PrismaClient during concurrent
+      // requests; pg.Pool discards the broken socket and acquires a fresh one.
       return await dbLimiter.run(query);
     }
   }

@@ -140,36 +140,46 @@ export class ConcurrencyLimiter {
 
   async run<T>(fn: () => Promise<T>): Promise<T> {
     const release = await this.acquire();
-    let timer: ReturnType<typeof setTimeout> | null = null;
-    try {
-      if (this.maxExecutionMs > 0) {
-        const timeoutPromise = new Promise<never>((_, reject) => {
-          timer = setTimeout(() => {
-            reject(
-              new LimiterOverloadError(
-                `${this.name} execution exceeded ${this.maxExecutionMs}ms`,
-                "EXECUTION_TIMEOUT",
-              ),
-            );
-          }, this.maxExecutionMs);
-        });
-        return await Promise.race([fn(), timeoutPromise]);
-      }
-      return await fn();
-    } finally {
-      if (timer !== null) {
-        clearTimeout(timer);
-      }
+    const taskPromise = Promise.resolve().then(fn);
+    // Prevent unhandled rejections if taskPromise rejects after EXECUTION_TIMEOUT.
+    taskPromise.catch(() => {});
+
+    // Keep the concurrency permit held until the underlying work settles so
+    // timed-out database queries cannot accumulate beyond maxConcurrency.
+    taskPromise.finally(() => {
       release();
+    });
+
+    if (this.maxExecutionMs > 0) {
+      let timer: ReturnType<typeof setTimeout> | null = null;
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        timer = setTimeout(() => {
+          reject(
+            new LimiterOverloadError(
+              `${this.name} execution exceeded ${this.maxExecutionMs}ms`,
+              "EXECUTION_TIMEOUT",
+            ),
+          );
+        }, this.maxExecutionMs);
+      });
+      try {
+        return await Promise.race([taskPromise, timeoutPromise]);
+      } finally {
+        if (timer !== null) {
+          clearTimeout(timer);
+        }
+      }
     }
+
+    return await taskPromise;
   }
 }
 
 /**
  * Singleton limiter for analytics endpoints.
- * With connection_limit=3, restricting analytics to max 1 concurrency
- * ensures analytics workloads cannot monopolize the pool, while allowing
- * up to 8 queued queries with an 8-second timeout before failing fast.
+ * With pg.Pool max=10, restricting analytics to max 1 concurrency ensures
+ * analytics workloads cannot monopolize the pool, while allowing up to 8
+ * queued queries with an 8-second wait timeout before failing fast.
  */
 export const analyticsLimiter = new ConcurrencyLimiter({
   name: "Analytics",
@@ -181,10 +191,10 @@ export const analyticsLimiter = new ConcurrencyLimiter({
 
 /**
  * Global limiter for public database queries (operational routes + analytics).
- * With connection_limit=3, restricting concurrent public database queries to 2
- * guarantees that at least 1 database connection is always reserved for
- * background collection runs and persistence transactions, while preventing
- * concurrent homepage renders from exhausting the Prisma connection pool (P2024).
+ * With pg.Pool max=10, restricting concurrent public database queries to 2
+ * guarantees ample pool capacity is reserved for background collection runs
+ * and persistence transactions, while preventing request bursts from
+ * exhausting the connection pool.
  */
 export const publicDbLimiter = new ConcurrencyLimiter({
   name: "Database",
