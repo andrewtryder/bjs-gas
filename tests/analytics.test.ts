@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { PrismaClient } from "@prisma/client";
+import { createPrismaClient } from "../src/db.js";
+import type { PrismaClient } from "../src/generated/prisma/client.js";
 import { calculateMedian, formatPriceString } from "../src/analytics/median.js";
 import {
   getNationalSummary,
@@ -236,7 +237,7 @@ describeDb("analytics queries against Postgres", () => {
   let prisma: PrismaClient;
 
   beforeAll(() => {
-    prisma = new PrismaClient({ datasources: { db: { url: url! } } });
+    prisma = createPrismaClient(url!);
   });
 
   afterAll(async () => {

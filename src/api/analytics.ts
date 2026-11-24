@@ -1,5 +1,5 @@
 import { Hono, type Context } from "hono";
-import type { PrismaClient } from "@prisma/client";
+import type { PrismaClient } from "../generated/prisma/client.js";
 import {
   getNationalSummary,
   getNationalTrends,

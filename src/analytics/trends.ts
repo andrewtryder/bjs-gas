@@ -1,4 +1,4 @@
-import { type PrismaClient, Prisma } from "@prisma/client";
+import { type PrismaClient, Prisma } from "../generated/prisma/client.js";
 import type { NationalTrendsResponse } from "@bjs-gas/contracts";
 import { CANONICAL_FUEL_SKU, resolveFuelInfo } from "./fuel-info.js";
 import { timedQuery } from "./query-timing.js";

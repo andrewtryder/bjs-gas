@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { PrismaClient } from "@prisma/client";
+import { createPrismaClient, disconnectPrismaClient } from "../src/db.js";
+import type { PrismaClient } from "../src/generated/prisma/client.js";
 import { persistFuelObservations } from "../src/persist.js";
 import type { CollectionRunInput, FuelObservation } from "../src/fuel/types.js";
 
@@ -12,7 +13,7 @@ describeDb("bulk persistence against Postgres", () => {
   let runSeq = 0;
 
   beforeAll(async () => {
-    prisma = new PrismaClient({ datasources: { db: { url: url! } } });
+    prisma = createPrismaClient(url!);
     await prisma.club.upsert({
       where: { clubNumber },
       create: {
@@ -221,12 +222,8 @@ describeDb("bulk persistence against Postgres", () => {
   it(
     "preserves exact ISO-8601 UTC instant when database session timezone is non-UTC (America/New_York)",
     async () => {
-    const nyPrisma = new PrismaClient({
-      datasources: {
-        db: {
-          url: `${url}${url!.includes("?") ? "&" : "?"}options=-c%20timezone=America/New_York`,
-        },
-      },
+    const nyPrisma = createPrismaClient(url!, {
+      options: "-c timezone=America/New_York",
     });
 
     try {
@@ -306,7 +303,7 @@ describeDb("bulk persistence against Postgres", () => {
       await nyPrisma.collectionRun.deleteMany({ where: { startedAt: new Date(inputStartedAt) } });
       await nyPrisma.club.deleteMany({ where: { clubNumber: testClubNumber } });
     } finally {
-      await nyPrisma.$disconnect();
+      await disconnectPrismaClient(nyPrisma);
     }
   }, 15_000);
 

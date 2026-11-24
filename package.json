@@ -27,11 +27,11 @@
     "pretest": "node web/scripts/copy-maplibre-worker.js",
     "test": "vitest run",
     "test:integration": "vitest run tests/persist.integration.test.ts tests/analytics-scope.integration.test.ts",
-    "skills:sync": "pnpm dlx --allow-build=esbuild @prisma/cli@8.0.0-rc.34 skills sync --config prisma.skills.config.ts",
+    "skills:sync": "pnpm dlx --allow-build=esbuild @prisma/cli@8.0.0-rc.35 skills sync --config prisma.skills.config.ts",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate deploy",
     "prisma:migrate:dev": "prisma migrate dev",
-    "deploy:compute": "node scripts/check-clean-tree.mjs && pnpm run build && pnpm dlx --allow-build=esbuild @prisma/cli@8.0.0-rc.34 deploy --config prisma.composer.config.ts --name bjs-gas",
+    "deploy:compute": "node scripts/check-clean-tree.mjs && pnpm run build && pnpm dlx --allow-build=esbuild @prisma/cli@8.0.0-rc.35 deploy --config prisma.composer.config.ts --name bjs-gas",
     "composer:check": "tsx scripts/check-composer.ts"
   },
   "engines": {
@@ -42,7 +42,9 @@
     "@biomejs/biome": "2.6.8",
     "@types/bun": "^1.4.5",
     "@types/node": "^26.6.6",
-    "prisma": "^6.19.3",
+    "@types/pg": "^8.20.0",
+    "dotenv": "^16.4.7",
+    "prisma": "^7.10.1",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2",
     "vitest": "^4.1.12"
@@ -50,14 +52,16 @@
   "dependencies": {
     "@bjs-gas/contracts": "workspace:*",
     "@honeybadger-io/js": "^6.17.4",
-    "@prisma/client": "^6.19.3",
-    "@prisma/composer": "0.39.0",
-    "@prisma/composer-prisma-cloud": "0.39.0",
-    "@prisma/orm-postgres": "8.0.0-rc.23",
-    "alchemy": "2.0.0-beta.85",
+    "@prisma/adapter-pg": "^7.10.1",
+    "@prisma/client": "^7.10.1",
+    "@prisma/composer": "0.40.0",
+    "@prisma/composer-prisma-cloud": "0.40.0",
+    "@prisma/orm-postgres": "8.0.0-rc.25",
+    "alchemy": "2.0.0-beta.87",
     "arktype": "^2.2.10",
-    "effect": "4.1.0",
+    "effect": "4.1.4",
     "hono": "^4.13.20",
+    "pg": "^8.23.1",
     "playwright": "^1.65.1",
     "zod": "^4.6.7"
   }

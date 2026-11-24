@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { CollectionRunScope, type PrismaClient } from "@prisma/client";
+import { CollectionRunScope, type PrismaClient } from "../src/generated/prisma/client.js";
 import { createApp } from "../src/app.js";
 import { getCollectionStatus } from "../src/api/status.js";
 import {

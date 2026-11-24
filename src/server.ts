@@ -1,4 +1,3 @@
-import "./prisma-engine.ts";
 import { serveSchedule } from "@prisma/composer-prisma-cloud/cron";
 import { createApp } from "./app.ts";
 import { createPrismaClient } from "./db.ts";

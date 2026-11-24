@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { PrismaClient } from "@prisma/client";
+import { createPrismaClient } from "../src/db.js";
+import type { PrismaClient } from "../src/generated/prisma/client.js";
 import {
   getNationalSummary,
   getPriceMovers,
@@ -17,7 +18,7 @@ describeDb("analytics exclude non-gas clubs", () => {
   const state = "ZZ";
 
   beforeAll(async () => {
-    prisma = new PrismaClient({ datasources: { db: { url: url! } } });
+    prisma = createPrismaClient(url!);
     await prisma.fuelPriceHistory.deleteMany({
       where: { clubNumber: { in: [gasClub, nonGasClub] } },
     });

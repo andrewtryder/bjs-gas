@@ -4,7 +4,7 @@ import { getCollectionStatus } from "../src/api/status.js";
 import { createAnalyticsRouter } from "../src/api/analytics.js";
 import { createApp } from "../src/app.js";
 import { persistFuelObservations } from "../src/persist.js";
-import { CollectionRunScope, type PrismaClient } from "@prisma/client";
+import { CollectionRunScope, type PrismaClient } from "../src/generated/prisma/client.js";
 
 describe("Admission Control and Concurrency Limiter", () => {
   // 1. concurrent analytics work never exceeds maxConcurrency

@@ -75,7 +75,7 @@ jobs:
         run: pnpm test
 
       - name: Setup Test Database Schema
-        run: pnpm prisma db push --skip-generate
+        run: pnpm prisma db push
         env:
           DATABASE_URL: "postgresql://postgres:postgrespassword@localhost:5432/bjs_gas_test"
 

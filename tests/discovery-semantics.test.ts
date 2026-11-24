@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { diffClubRegistries } from "../src/discover.js";
 import { runCollection } from "../src/collector.js";
 import type { BjsClub } from "../src/types.js";
-import type { PrismaClient } from "@prisma/client";
+import type { PrismaClient } from "../src/generated/prisma/client.js";
 
 function club(partial: Partial<BjsClub> & Pick<BjsClub, "clubNumber" | "name" | "hasGas">): BjsClub {
   return {
