@@ -12,6 +12,12 @@ updates:
     open-pull-requests-limit: 5
     labels:
       - "dependencies"
+    ignore:
+      # Pinned by Prisma Composer 0.39 / Alchemy 2.0.0-beta.85 runtime graph
+      - dependency-name: "effect"
+      - dependency-name: "@prisma/composer*"
+      - dependency-name: "@prisma/orm-postgres"
+      - dependency-name: "alchemy"
     groups:
       minor-and-patch:
         patterns:
