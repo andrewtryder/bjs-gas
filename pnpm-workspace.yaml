@@ -25,17 +25,17 @@ overrides:
   # Prisma CLI 6 still needs Effect 3 on @prisma/config only.
   "@prisma/config>effect": "3.22.1"
   # Keep Composer's peer contexts identical across the API and web workspaces.
-  arktype: 2.2.3
+  arktype: 2.2.10
   effect: 4.1.0
   "@effect/platform-bun": 4.1.0
   "@effect/platform-node": 4.1.0
   "@effect/platform-node-shared": 4.1.0
-  hono: ^4.13.7
+  hono: ^4.13.20
   "@hono/node-server": ^1.19.15
   lodash: ^4.18.1
   valibot: ^1.4.2
   deepmerge-ts: ^8.0.2
-  vitest: ^4.1.11
+  vitest: ^4.1.12
   "@effect/platform-node>undici": "8.12.4"
   "alchemy>undici": "7.30.2"
   vite: ^8.3.7
