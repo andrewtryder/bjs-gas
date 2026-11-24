@@ -1,5 +1,5 @@
 import { PrismaPg } from "@prisma/adapter-pg";
-import { Pool, type PoolConfig } from "pg";
+import type { PoolConfig } from "pg";
 import { PrismaClient } from "./generated/prisma/client.js";
 
 const DEFAULT_POOL_MAX = 10;
@@ -9,7 +9,6 @@ const DEFAULT_MAX_LIFETIME_SECONDS = 1800;
 const DEFAULT_STATEMENT_TIMEOUT_MS = 20_000;
 
 let client: PrismaClient | null = null;
-const pools = new WeakMap<PrismaClient, Pool>();
 
 function parsePositiveInt(value: string | null, fallback: number): number {
   if (!value) return fallback;
@@ -58,19 +57,17 @@ export function createPrismaClient(
   databaseUrl: string,
   poolOverrides: Partial<PoolConfig> = {},
 ): PrismaClient {
-  const pool = new Pool(buildPoolConfig(databaseUrl, poolOverrides));
-  pool.on("error", (err) => {
-    console.error(
-      JSON.stringify({
-        event: "pg_pool_idle_error",
-        error: err instanceof Error ? err.message : String(err),
-      }),
-    );
+  const adapter = new PrismaPg(buildPoolConfig(databaseUrl, poolOverrides), {
+    onPoolError: (err) => {
+      console.error(
+        JSON.stringify({
+          event: "pg_pool_idle_error",
+          error: err instanceof Error ? err.message : String(err),
+        }),
+      );
+    },
   });
-  const adapter = new PrismaPg(pool);
-  const prisma = new PrismaClient({ adapter });
-  pools.set(prisma, pool);
-  return prisma;
+  return new PrismaClient({ adapter });
 }
 
 export function getPrisma(databaseUrl?: string): PrismaClient {
@@ -85,11 +82,6 @@ export function getPrisma(databaseUrl?: string): PrismaClient {
 
 export async function disconnectPrismaClient(prisma: PrismaClient): Promise<void> {
   await prisma.$disconnect();
-  const pool = pools.get(prisma);
-  if (pool) {
-    pools.delete(prisma);
-    await pool.end();
-  }
 }
 
 export async function disconnectPrisma(): Promise<void> {
