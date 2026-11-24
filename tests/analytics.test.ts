@@ -266,6 +266,7 @@ describeDb("analytics queries against Postgres", () => {
     for (const point of trends.points) {
       expect(point.date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
       expect(point.stationCount).toBeGreaterThan(0);
+      expect(Number.parseFloat(point.minPrice)).toBeGreaterThan(0);
       expect(Number.parseFloat(point.minPrice)).toBeLessThanOrEqual(
         Number.parseFloat(point.maxPrice),
       );

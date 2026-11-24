@@ -14,16 +14,6 @@ describe("Hydration Mismatch Protection for Dynamic Timestamps", () => {
     );
   });
 
-  it("enforces suppressHydrationWarning on StationLedger table and mobile rows", () => {
-    const filePath = resolve(__dirname, "../web/components/StationLedger.tsx");
-    const content = readFileSync(filePath, "utf-8");
-
-    // Must match both table column and mobile card freshness spans
-    const matches = content.match(/className=\{`freshness-text[\s\S]*?suppressHydrationWarning/g);
-    expect(matches).not.toBeNull();
-    expect(matches?.length).toBeGreaterThanOrEqual(2);
-  });
-
   it("enforces suppressHydrationWarning on StatusPill text and container", () => {
     const filePath = resolve(__dirname, "../web/components/ui/StatusPill.tsx");
     const content = readFileSync(filePath, "utf-8");

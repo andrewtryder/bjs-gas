@@ -82,6 +82,7 @@ export async function getNationalTrends(
       JOIN "Club" c
         ON c."clubNumber" = p."clubNumber"
       WHERE c."hasGas" = true
+        AND p.price::numeric > 0
       ${stateFilter}
     )
     SELECT
