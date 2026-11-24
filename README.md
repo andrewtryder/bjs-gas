@@ -212,3 +212,11 @@ Public Compute API URL:
 - ~12 full-fleet collections / day (~360 / month)
 - ~77k upstream BJ's fuel HTTP requests / month (≈214 × 12 × 30)
 - ~360 fleet `CollectionRun` rows / month (plus reads/migrations/admin)
+
+## CI/CD, Staging & Recovery
+
+- **CI (`.github/workflows/ci.yml`)**: Runs on PRs and pushes to `main` with least-privilege `contents: read` permissions and PR concurrency cancellation. Executes frozen install, `pnpm audit --audit-level=high`, `prisma:generate`, Biome lint/format, TypeScript typecheck, `composer:check`, unit tests, Postgres integration tests, and API + web builds.
+- **Staging (`deploy-staging.yml`)**: Manual `workflow_dispatch` targeting the `staging` GitHub environment and Prisma Cloud `--environment staging` (isolated database and `COLLECTOR_SECRET`), followed by `scripts/smoke-test.mjs` revision and health verification.
+- **Production (`deploy-production.yml`)**: Manual `workflow_dispatch` targeting the `production` GitHub environment. Requires `confirm == "deploy-production"`, verifies `commit_sha` is an ancestor of `origin/main`, deploys that exact SHA, and runs `scripts/smoke-test.mjs`.
+- **Releases (`release-please.yml`)**: Automated versioning and changelog PRs on `main` via Release Please (`release-please-config.json`, `.release-please-manifest.json`).
+- **Database Backup & Recovery**: Prisma Postgres on the current plan has `retention: 0 days` (no automatic platform backups). Before major infrastructure or schema changes, take a logical backup with `pg_dump` against `DATABASE_URL` (`pg_dump "$DATABASE_URL" -Fc -f backup.dump`). Do not use older Composer (< 0.39) CLIs against an upgraded environment.
