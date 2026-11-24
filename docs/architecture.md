@@ -19,12 +19,12 @@ Three Compute services plus Prisma Postgres:
 
 The web service does not import Prisma Client, `pg`, or other SQL drivers. All database work runs in the API process (or local CLI against `DATABASE_URL`).
 
-Region is pinned in `prisma-composer.config.ts` to **`us-east-1`** (not the platform “inherit” default). Public Compute hostnames are operational locators, not architectural identity; see the README.
+Region is pinned in `prisma.composer.config.ts` to **`us-east-1`** (not the platform “inherit” default). Public Compute hostnames are operational locators, not architectural identity; see the README.
 
 Composer injects:
 
 - API: `rawPostgres()` URL via `service.load().db.url`; secrets `COLLECTOR_SECRET`, `HONEYBADGER_API_KEY`
-- Web: HTTP dep on the API; secrets `CARTO_API_KEY`, `HONEYBADGER_API_KEY`
+- Web: raw HTTP contract dependency on the API; secrets `CARTO_API_KEY`, `HONEYBADGER_API_KEY`
 - Scheduler: `deps: { trigger: api.trigger }`, jobs from `src/schedule.ts`
 
 Application code must not read `process.env` for those injected values in the deployed services. `DATABASE_URL` / `DATABASE_URL_POOLED` are reserved platform names and must not be bound with `envSecret`.
@@ -361,7 +361,7 @@ Authoritative local snapshots: `data/clubs.json`, `data/gas-clubs.json`, `data/g
 | Project | Covers |
 | --- | --- |
 | `tsconfig.json` | Core `src/**` + tests (strict, NodeNext, Node types). Excludes deploy entrypoints. |
-| `tsconfig.deploy.json` | `module.ts`, `prisma-composer.config.ts`, `src/server.ts`, `src/service.ts`, `src/schedule.ts`. Bundler resolution, **Bun types**. |
+| `tsconfig.deploy.json` | `module.ts`, `prisma.composer.config.ts`, `src/server.ts`, `src/service.ts`, `src/schedule.ts`. Bundler resolution, **Bun types**. |
 | `web/tsconfig.json` | Next.js / DOM |
 
 `pnpm typecheck` runs all three. Lint is **not** typecheck.

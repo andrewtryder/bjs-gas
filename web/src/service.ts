@@ -1,5 +1,6 @@
 import nextjs from "@prisma/composer/nextjs";
-import { compute, http } from "@prisma/composer-prisma-cloud";
+import { rawHttp } from "@prisma/composer/http";
+import { compute } from "@prisma/composer-prisma-cloud";
 import { type } from "arktype";
 import { secretString } from "@prisma/composer/arktype";
 
@@ -10,7 +11,7 @@ const webInput = type({
 
 export default compute({
   name: "bjsgasweb",
-  deps: { api: http({ name: "api" }) },
+  deps: { api: rawHttp() },
   input: webInput,
   build: nextjs({
     module: import.meta.url,

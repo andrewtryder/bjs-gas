@@ -158,6 +158,8 @@ Never commit `.env`, `.dev.vars`, or secret values.
 
 ## Prisma deploy (API + scheduler + web together)
 
+Composer 0.39 uses CLI 8.0.0-rc.34 and `prisma.composer.config.ts` explicitly; the database client and Prisma ORM commands remain on 6.x. The first deployment across Composer 0.35+ renames resources in place and replaces Composer-managed connection strings and access keys. Before that deployment, verify existing resource ids/state, database backup and recovery access, external connection-string consumers, custom domains, and the production platform variables (`COLLECTOR_SECRET` required; `CARTO_API_KEY` and `HONEYBADGER_API_KEY` optional). Composer 0.39 never seeds platform secrets from local `.env` or the shell. Do not use an older Composer CLI against an upgraded environment. Validate a separate staging environment before production; do not point staging at the production database. See [upstream address upgrade notes](https://www.prisma.io/changelog/2026-10-30).
+
 ```bash
 # Requires a clean git worktree so /health.revision matches HEAD.
 pnpm run deploy:compute

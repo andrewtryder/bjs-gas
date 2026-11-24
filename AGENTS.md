@@ -42,7 +42,7 @@ pnpm run build
 A repository-wide Biome format rewrite is deferred: a check-only run would change ~167 files (~67k lines), mostly CSS wrapping. Formatter enforcement currently covers `biome.json` only.
 
 ### Composer dependency pins
-Root `alchemy@2.0.0-beta.74` and `effect@4.0.0-rc.112` are **not** application imports. They pin Prisma Composer's runtime graph (Composer 0.18 fails when the Effect constellation resolves incompatibly). `pnpm-workspace.yaml` `overrides` is the authoritative pin set, including `@prisma/config>effect` at 3.22.1 for Prisma CLI vs Composer Effect 4.
+Root `alchemy@2.0.0-beta.85` and `effect@4.1.0` pin Composer 0.39's deployment runtime graph. Keep the Effect platform packages at the same version in `pnpm-workspace.yaml`; preserve the Prisma CLI 6-only `@prisma/config>effect` override.
 
 ### Audit ignore
 `GHSA-vfj7-8cjw-p6xm` remains ignored: transitive `braces@3.0.3` via `alchemy` → `fast-glob` → `micromatch`. Latest `braces` is still 3.0.3 (unpatched). CI still fails on any other high/critical advisory.
@@ -50,7 +50,7 @@ Root `alchemy@2.0.0-beta.74` and `effect@4.0.0-rc.112` are **not** application i
 ### Prisma agent skills
 Canonical generated skill location is `.agents/skills/` (portable Agent Skills path). Sync with `pnpm skills:sync`, which passes `--config prisma.skills.config.ts` (`agents: ["agents"]` only).
 
-Do **not** add `prisma.config.ts` while Prisma Client remains 6.x: `pnpm prisma generate` auto-loads that filename and cannot parse the CLI 8 `$prismaConfig` marker. Unconfigured `pnpm dlx @prisma/cli@8.0.0-rc.19 skills sync` still targets every harness and would recreate `.cursor/skills`, `.claude/skills`, and `.devin/skills` (gitignored).
+Do **not** add a root `prisma.config.ts` while Prisma Client remains 6.x. Composer 0.39 uses the explicitly selected `prisma.composer.config.ts` (CLI 8 marker, `composer` section). Use `pnpm run deploy:compute` rather than invoking the CLI without `--config`. Do not use older Composer CLI releases against an upgraded environment; they may recreate resources. Sync skills only via `pnpm skills:sync`.
 
 ### Synchronized Git Remote
 - Never leave local `main` ahead of `origin/main`.

@@ -21,7 +21,7 @@
   },
   "include": [
     "module.ts",
-    "prisma-composer.config.ts",
+    "prisma.composer.config.ts",
     "src/server.ts",
     "src/service.ts",
     "src/schedule.ts"
