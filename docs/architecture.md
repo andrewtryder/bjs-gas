@@ -366,7 +366,7 @@ Authoritative local snapshots: `data/clubs.json`, `data/gas-clubs.json`, `data/g
 
 `pnpm typecheck` runs all three. Lint is **not** typecheck.
 
-API build (`scripts/build-api.mjs`): Bun bundle `src/server.ts` → `dist/server.mjs` with `BUILD_REVISION` / `BUILD_DIRTY`; copy Debian OpenSSL 3 query engine; **fail if the engine file is missing/tiny**; copy data JSON into `dist/data`. Deploy requires a clean tree (`scripts/check-clean-tree.mjs`) so `/health.revision` matches git.
+API build (`scripts/build-api.mjs`): Bun bundle `src/server.ts` → `dist/server.mjs` with `BUILD_REVISION` / `BUILD_DIRTY` (Rust-free Prisma 7 client via `@prisma/adapter-pg` + `pg.Pool`; no native query engine binary); copy data JSON into `dist/data`. Deploy requires a clean tree (`scripts/check-clean-tree.mjs`) so `/health.revision` matches git.
 
 ---
 
@@ -402,16 +402,17 @@ Intentionally retained (not application imports):
 
 | Pin | Why |
 | --- | --- |
-| `alchemy@2.0.0-beta.85` | Composer/Alchemy graph |
-| `effect@4.1.0` | Composer `0.39.0` Effect constellation |
-| `@prisma/config>effect@3.22.1` | Prisma CLI 6 vs Composer Effect 4 |
-| `@prisma/orm-postgres@8.0.0-rc.23` | Composer `0.39.0` control-plane peer |
+| `prisma`, `@prisma/client`, `@prisma/adapter-pg` (`7.10.1`) | Stable Rust-free Prisma ORM 7 + PostgreSQL driver adapter (`pg@8.23.1`) |
+| `alchemy@2.0.0-beta.87` | Composer/Alchemy graph |
+| `effect@4.1.4` | Composer `0.40.0` Effect constellation |
+| `@prisma/config>effect@3.22.1` | Prisma 7 `@prisma/config` Effect 3 peer (also resolves `GHSA-7589-6fvf-x4pw`) |
+| `@prisma/orm-postgres@8.0.0-rc.25` | Composer `0.40.0` control-plane peer |
 
 Authoritative overrides: `pnpm-workspace.yaml` (also hono, undici splits, vitest, etc.). Removing or bumping these requires frozen install, typecheck, tests, build, and a real Composer deploy.
 
 Audit ignore **`GHSA-vfj7-8cjw-p6xm`**: transitive `braces@3.0.3` via alchemy → fast-glob → micromatch. No patched `braces` release beyond 3.0.3. CI still fails any other high/critical advisory.
 
-Prisma skills for agents are generated from installed `@prisma/composer` **0.39.0** (`@prisma/cli@8.0.0-rc.34`). Canonical on-disk copy: `.agents/skills/`. Sync with `pnpm skills:sync` (see AGENTS.md). Do not add `prisma.config.ts` while Prisma Client remains 6.x — that filename is parsed by `prisma generate` and is incompatible with the CLI 8 skills marker.
+Prisma skills for agents are generated from installed `@prisma/composer` **0.40.0** (`@prisma/cli@8.0.0-rc.35`). Canonical on-disk copy: `.agents/skills/`. Sync with `pnpm skills:sync` (see AGENTS.md). `prisma.config.ts` configures Prisma ORM 7 while `prisma.composer.config.ts` configures Composer 0.40.
 
 ---
 

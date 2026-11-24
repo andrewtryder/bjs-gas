@@ -42,9 +42,9 @@ pnpm run build
 A repository-wide Biome format rewrite is deferred: a check-only run would change ~167 files (~67k lines), mostly CSS wrapping. Formatter enforcement currently covers `biome.json` only.
 
 ### Composer dependency pins
-Root `alchemy@2.0.0-beta.85` and `effect@4.1.0` pin Composer 0.39's deployment runtime graph. Keep the Effect platform packages at the same version in `pnpm-workspace.yaml`; preserve the Prisma CLI 6-only `@prisma/config>effect` override.
+Root `alchemy@2.0.0-beta.87` and `effect@4.1.4` pin Composer 0.40's deployment runtime graph. Keep the Effect platform packages at the same version in `pnpm-workspace.yaml`; preserve the `@prisma/config>effect` 3.x override for Prisma 7 CLI config loading.
 
-Composer 0.39's control plane also imports `@prisma/orm-postgres@8.0.0-rc.23`; keep this peer aligned in both workspaces. It is not the application database client, which remains Prisma 6.
+Composer 0.40's control plane also imports `@prisma/orm-postgres@8.0.0-rc.25`; keep this peer aligned in both workspaces. The application database client is **Prisma ORM 7.10.1** (`prisma-client` generator + `@prisma/adapter-pg` + `pg`).
 
 ### Audit ignore
 `GHSA-vfj7-8cjw-p6xm` remains ignored: transitive `braces@3.0.3` via `alchemy` → `fast-glob` → `micromatch`. Latest `braces` is still 3.0.3 (unpatched). CI still fails on any other high/critical advisory.
@@ -52,7 +52,7 @@ Composer 0.39's control plane also imports `@prisma/orm-postgres@8.0.0-rc.23`; k
 ### Prisma agent skills
 Canonical generated skill location is `.agents/skills/` (portable Agent Skills path). Sync with `pnpm skills:sync`, which passes `--config prisma.skills.config.ts` (`agents: ["agents"]` only).
 
-Do **not** add a root `prisma.config.ts` while Prisma Client remains 6.x. Composer 0.39 uses the explicitly selected `prisma.composer.config.ts` (CLI 8 marker, `composer` section). Use `pnpm run deploy:compute` rather than invoking the CLI without `--config`. Do not use older Composer CLI releases against an upgraded environment; they may recreate resources. Sync skills only via `pnpm skills:sync`.
+Root `prisma.config.ts` configures Prisma ORM 7 (`prisma generate`, `prisma migrate deploy`, `prisma db push`). Composer 0.40 uses the explicitly selected `prisma.composer.config.ts` (CLI 8 marker, `composer` section). Use `pnpm run deploy:compute` rather than invoking the CLI without `--config`. Do not use older Composer CLI releases against an upgraded environment; they may recreate resources. Sync skills only via `pnpm skills:sync`.
 
 ### Synchronized Git Remote
 - Never leave local `main` ahead of `origin/main`.
