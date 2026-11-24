@@ -27,11 +27,11 @@
     "pretest": "node web/scripts/copy-maplibre-worker.js",
     "test": "vitest run",
     "test:integration": "vitest run tests/persist.integration.test.ts tests/analytics-scope.integration.test.ts",
-    "skills:sync": "pnpm dlx @prisma/cli@8.0.0-rc.34 skills sync --config prisma.skills.config.ts",
+    "skills:sync": "pnpm dlx --allow-build=esbuild @prisma/cli@8.0.0-rc.34 skills sync --config prisma.skills.config.ts",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate deploy",
     "prisma:migrate:dev": "prisma migrate dev",
-    "deploy:compute": "node scripts/check-clean-tree.mjs && pnpm run build && pnpm dlx @prisma/cli@8.0.0-rc.34 deploy --config prisma.composer.config.ts --name bjs-gas",
+    "deploy:compute": "node scripts/check-clean-tree.mjs && pnpm run build && pnpm dlx --allow-build=esbuild @prisma/cli@8.0.0-rc.34 deploy --config prisma.composer.config.ts --name bjs-gas",
     "composer:check": "tsx scripts/check-composer.ts"
   },
   "engines": {
