@@ -44,6 +44,8 @@ A repository-wide Biome format rewrite is deferred: a check-only run would chang
 ### Composer dependency pins
 Root `alchemy@2.0.0-beta.85` and `effect@4.1.0` pin Composer 0.39's deployment runtime graph. Keep the Effect platform packages at the same version in `pnpm-workspace.yaml`; preserve the Prisma CLI 6-only `@prisma/config>effect` override.
 
+Composer 0.39's control plane also imports `@prisma/orm-postgres@8.0.0-rc.23`; keep this peer aligned in both workspaces. It is not the application database client, which remains Prisma 6.
+
 ### Audit ignore
 `GHSA-vfj7-8cjw-p6xm` remains ignored: transitive `braces@3.0.3` via `alchemy` → `fast-glob` → `micromatch`. Latest `braces` is still 3.0.3 (unpatched). CI still fails on any other high/critical advisory.
 

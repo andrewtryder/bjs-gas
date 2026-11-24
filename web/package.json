@@ -19,6 +19,7 @@
     "@honeybadger-io/react": "^6.1.34",
     "@prisma/composer": "0.39.0",
     "@prisma/composer-prisma-cloud": "0.39.0",
+    "@prisma/orm-postgres": "8.0.0-rc.23",
     "arktype": "2.2.3",
     "maplibre-gl": "^6.9.0",
     "next": "^16.4.6",

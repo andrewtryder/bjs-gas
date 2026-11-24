@@ -53,6 +53,7 @@
     "@prisma/client": "^6.19.3",
     "@prisma/composer": "0.39.0",
     "@prisma/composer-prisma-cloud": "0.39.0",
+    "@prisma/orm-postgres": "8.0.0-rc.23",
     "alchemy": "2.0.0-beta.85",
     "arktype": "^2.2.3",
     "effect": "4.1.0",
