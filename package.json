@@ -1,6 +1,6 @@
 {
   "name": "bjs-gas",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "private": true,
   "type": "module",
   "description": "BJ's gas price collector on Prisma Compute; native cron scheduler",
