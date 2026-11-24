@@ -1,6 +1,6 @@
 import { serveSchedule } from "@prisma/composer-prisma-cloud/cron";
 import { createApp } from "./app.ts";
-import { createPrismaClient } from "./db.ts";
+import { createPrismaClient, disconnectPrismaClient } from "./db.ts";
 import { initApiHoneybadger, reportApiError } from "./honeybadger.ts";
 import { getCollectionLockState, runCollection } from "./collector.ts";
 import { schedule } from "./schedule.ts";
@@ -96,3 +96,9 @@ console.log(
     scheduleJobs: schedule.jobs,
   }),
 );
+
+for (const signal of ["SIGINT", "SIGTERM"] as const) {
+  process.on(signal, () => {
+    void disconnectPrismaClient(prisma).finally(() => process.exit(0));
+  });
+}
