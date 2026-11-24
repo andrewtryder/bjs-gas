@@ -6,14 +6,15 @@ import {
   Legend,
   Line,
   LineChart,
-  ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from "recharts";
 import type { NationalTrendsResponse, TrendPoint } from "../lib/analytics";
+import { priceSeriesDomain } from "../lib/chart-domain";
 import { formatPrice } from "../lib/stats";
 import { getStateName } from "../lib/states";
+import { useMeasuredChartSize } from "../hooks/useMeasuredChartSize";
 import SegmentedControl from "./ui/SegmentedControl";
 
 import DeltaBadge from "./ui/DeltaBadge";
@@ -31,6 +32,8 @@ export default function NationalTrendChart({
 }: NationalTrendChartProps) {
   const [mounted, setMounted] = useState(false);
   const [selectedDays, setSelectedDays] = useState<number>(30);
+  const { ref: chartContainerRef, width: chartWidth, height: chartHeight, ready: chartReady } =
+    useMeasuredChartSize({ height: 300 });
 
   useEffect(() => {
     setMounted(true);
@@ -76,6 +79,11 @@ export default function NationalTrendChart({
       currentMedian: latest.median,
       cents,
     };
+  }, [chartData]);
+
+  const yDomain = useMemo(() => {
+    const values = chartData.flatMap((d) => [d.median, d.min, d.max]);
+    return priceSeriesDomain(values) ?? (["auto", "auto"] as const);
   }, [chartData]);
 
   if (!initialTrends || initialTrends.points.length === 0) {
@@ -136,17 +144,18 @@ export default function NationalTrendChart({
         </div>
       </div>
 
-      <div className="trend-chart-container">
-        {!mounted ? (
+      <div ref={chartContainerRef} className="trend-chart-container">
+        {!mounted || !chartReady ? (
           <div className="trend-loading-placeholder">
             Loading historical trend chart...
           </div>
         ) : (
-          <ResponsiveContainer width="100%" height={300}>
-            <LineChart
-              data={chartData}
-              margin={{ top: 12, right: 12, left: 0, bottom: 4 }}
-            >
+          <LineChart
+            width={chartWidth}
+            height={chartHeight}
+            data={chartData}
+            margin={{ top: 12, right: 12, left: 0, bottom: 4 }}
+          >
               <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
               <XAxis
                 dataKey="displayDate"
@@ -157,7 +166,7 @@ export default function NationalTrendChart({
                 dy={6}
               />
               <YAxis
-                domain={["auto", "auto"]}
+                domain={yDomain}
                 stroke="#64748b"
                 fontSize={12}
                 tickLine={false}
@@ -227,8 +236,7 @@ export default function NationalTrendChart({
                 dot={false}
                 activeDot={false}
               />
-            </LineChart>
-          </ResponsiveContainer>
+          </LineChart>
         )}
       </div>
 

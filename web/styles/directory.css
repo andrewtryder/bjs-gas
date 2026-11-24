@@ -298,12 +298,6 @@
   background-color: #f1f5f9;
 }
 
-.ledger-col-updated {
-  min-width: 130px;
-  text-align: left;
-  white-space: nowrap;
-}
-
 .ledger-col-actions {
   text-align: right;
   min-width: 80px;

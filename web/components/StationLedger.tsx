@@ -3,11 +3,8 @@ import type { StationDto } from "../lib/types";
 import {
   formatStationTitle,
   getCanonicalFuelPrices,
-  getLatestObservation,
   getMobileStationRowData,
 } from "../lib/discovery";
-import { formatDate } from "../lib/stats";
-import { getFreshnessInfo } from "../lib/freshness";
 
 export interface StationLedgerProps {
   stations: StationDto[];
@@ -77,9 +74,6 @@ export default function StationLedger({
               >
                 Diesel
               </th>
-              <th scope="col" className="ledger-col-updated">
-                Updated
-              </th>
               <th scope="col" className="ledger-col-actions">
                 <span className="sr-only">Actions</span>
               </th>
@@ -88,8 +82,6 @@ export default function StationLedger({
           <tbody>
             {stations.map((station) => {
               const prices = getCanonicalFuelPrices(station);
-              const latestObs = getLatestObservation(station);
-              const freshness = latestObs ? getFreshnessInfo(latestObs) : null;
               const title = formatStationTitle(station, collisionKeys);
 
               return (
@@ -153,28 +145,6 @@ export default function StationLedger({
                     </span>
                   </td>
 
-                  <td className="ledger-col-updated">
-                    {freshness ? (
-                      <span
-                        className={`freshness-text ${
-                          freshness.level === "aging"
-                            ? "text-warning"
-                            : freshness.level === "stale"
-                            ? "text-higher"
-                            : "text-muted"
-                        }`}
-                        title={latestObs ? formatDate(latestObs) : undefined}
-                        suppressHydrationWarning
-                      >
-                        {freshness.relativeText}
-                        {freshness.level === "aging" && " · Aging"}
-                        {freshness.level === "stale" && " · Stale"}
-                      </span>
-                    ) : (
-                      <span className="text-muted">—</span>
-                    )}
-                  </td>
-
                   <td className="ledger-col-actions">
                     <Link
                       href={`/map?station=${station.clubNumber}`}
@@ -195,8 +165,6 @@ export default function StationLedger({
       <div className="directory-mobile-list" aria-label={ariaLabel}>
         {stations.map((station) => {
           const mobileData = getMobileStationRowData(station, selectedFuel);
-          const latestObs = getLatestObservation(station);
-          const freshness = latestObs ? getFreshnessInfo(latestObs) : null;
           const title = formatStationTitle(station, collisionKeys);
 
           return (
@@ -240,37 +208,13 @@ export default function StationLedger({
               )}
 
               <div className="mobile-row-footer">
-                <div className="mobile-row-freshness">
-                  {freshness ? (
-                    <span
-                      className={`freshness-text ${
-                        freshness.level === "aging"
-                          ? "text-warning"
-                          : freshness.level === "stale"
-                          ? "text-higher"
-                          : "text-muted"
-                      }`}
-                      title={latestObs ? formatDate(latestObs) : undefined}
-                      suppressHydrationWarning
-                    >
-                      {freshness.relativeText}
-                      {freshness.level === "aging" && " · Aging"}
-                      {freshness.level === "stale" && " · Stale"}
-                    </span>
-                  ) : (
-                    <span className="text-muted">—</span>
-                  )}
-                </div>
-
-                <div className="mobile-row-actions">
-                  <Link
-                    href={`/map?station=${station.clubNumber}`}
-                    className="mobile-row-action-link"
-                    aria-label={`View ${station.city}, ${station.state} on map`}
-                  >
-                    Map &rarr;
-                  </Link>
-                </div>
+                <Link
+                  href={`/map?station=${station.clubNumber}`}
+                  className="mobile-row-action-link"
+                  aria-label={`View ${station.city}, ${station.state} on map`}
+                >
+                  Map &rarr;
+                </Link>
               </div>
             </div>
           );

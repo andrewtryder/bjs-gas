@@ -5,14 +5,15 @@ import {
   CartesianGrid,
   Line,
   LineChart,
-  ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from "recharts";
 import type { FuelPriceHistoryItem } from "../lib/types";
+import { priceSeriesDomain } from "../lib/chart-domain";
 import { formatPrice } from "../lib/stats";
 import { normalizeFuelDisplayName } from "../lib/fuels";
+import { useMeasuredChartSize } from "../hooks/useMeasuredChartSize";
 import SegmentedControl from "./ui/SegmentedControl";
 
 interface PriceHistoryChartProps {
@@ -27,6 +28,8 @@ export default function PriceHistoryChart({
   const [mounted, setMounted] = useState(false);
   const [selectedDays, setSelectedDays] = useState<number>(30);
   const [selectedFuel, setSelectedFuel] = useState<string>("Regular");
+  const { ref: chartContainerRef, width: chartWidth, height: chartHeight, ready: chartReady } =
+    useMeasuredChartSize({ height: 260 });
 
   useEffect(() => {
     setMounted(true);
@@ -151,6 +154,11 @@ export default function PriceHistoryChart({
     };
   }, [chartData, selectedDays]);
 
+  const yDomain = useMemo(() => {
+    const values = chartData.map((d) => d.price);
+    return priceSeriesDomain(values) ?? (["auto", "auto"] as const);
+  }, [chartData]);
+
   if (history.length === 0 || chartData.length < 2) {
     return (
       <div className="chart-empty-state">
@@ -228,9 +236,20 @@ export default function PriceHistoryChart({
         </div>
       </div>
 
-      <div className="trend-chart-container" style={{ minHeight: "260px", width: "100%" }}>
-        <ResponsiveContainer width="100%" height={260}>
-          <LineChart data={chartData} margin={{ top: 12, right: 12, left: 0, bottom: 4 }}>
+      <div
+        ref={chartContainerRef}
+        className="trend-chart-container"
+        style={{ minHeight: "260px", width: "100%" }}
+      >
+        {!chartReady ? (
+          <div className="trend-loading-placeholder">Loading price history chart...</div>
+        ) : (
+          <LineChart
+            width={chartWidth}
+            height={chartHeight}
+            data={chartData}
+            margin={{ top: 12, right: 12, left: 0, bottom: 4 }}
+          >
             <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
             <XAxis
               dataKey="dateLabel"
@@ -241,7 +260,7 @@ export default function PriceHistoryChart({
               dy={6}
             />
             <YAxis
-              domain={["auto", "auto"]}
+              domain={yDomain}
               stroke="#64748b"
               fontSize={12}
               tickLine={false}
@@ -276,7 +295,7 @@ export default function PriceHistoryChart({
               activeDot={{ r: 5, fill: "#2563eb", stroke: "#ffffff", strokeWidth: 2 }}
             />
           </LineChart>
-        </ResponsiveContainer>
+        )}
       </div>
 
       {/* Screen Reader Accessible Table Fallback */}

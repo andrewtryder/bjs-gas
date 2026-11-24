@@ -92,11 +92,8 @@ export default function StateIndexDirectory({ states }: StateIndexDirectoryProps
                   <th scope="col" className="col-price">
                     Median Regular
                   </th>
-                  <th scope="col" style={{ width: "24%" }}>
+                  <th scope="col" className="col-range">
                     Price Range
-                  </th>
-                  <th scope="col" style={{ width: "16%", textAlign: "right" }}>
-                    Locations
                   </th>
                   <th scope="col" className="col-actions">
                     <span className="sr-only">Actions</span>
@@ -128,15 +125,9 @@ export default function StateIndexDirectory({ states }: StateIndexDirectoryProps
                         </span>
                       </td>
 
-                      <td>
+                      <td className="col-range">
                         <span className="state-table-range tabular-nums">
                           {formatPrice(item.minPrice)} – {formatPrice(item.maxPrice)}
-                        </span>
-                      </td>
-
-                      <td style={{ textAlign: "right" }}>
-                        <span className="state-table-count tabular-nums">
-                          {item.stationCount}
                         </span>
                       </td>
 
