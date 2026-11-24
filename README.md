@@ -164,7 +164,7 @@ Never commit `.env`, `.dev.vars`, or secret values.
 
 ## Prisma deploy (API + scheduler + web together)
 
-Composer `0.39.0` uses `@prisma/cli@8.0.0-rc.34` and `prisma.composer.config.ts` explicitly; the application database client and Prisma ORM commands remain on `6.19.3`. Platform secrets (`COLLECTOR_SECRET` required; `CARTO_API_KEY` and `HONEYBADGER_API_KEY` optional) are managed in Prisma Cloud and scoped per GitHub environment — Composer 0.39 never seeds platform secrets from local `.env` or the shell. Do not use an older Composer CLI against an upgraded environment. Validate changes on `staging` before deploying to `production`.
+Composer `0.40.0` uses `@prisma/cli@8.0.0-rc.35` and `prisma.composer.config.ts` explicitly; the application database client and ORM commands run **Prisma 7.10.1** (`prisma-client` generator + `@prisma/adapter-pg` + `pg.Pool` configured via `prisma.config.ts`). Platform secrets (`COLLECTOR_SECRET` required; `CARTO_API_KEY` and `HONEYBADGER_API_KEY` optional) are managed in Prisma Cloud and scoped per GitHub environment — Composer 0.40 never seeds platform secrets from local `.env` or the shell. Do not use an older Composer CLI against an upgraded environment. Validate changes on `staging` before deploying to `production`.
 
 ```bash
 # Requires a clean git worktree so /health.revision matches HEAD.
@@ -172,14 +172,14 @@ pnpm run deploy:compute
 # Override only when intentional:
 # ALLOW_DIRTY_DEPLOY=1 pnpm run deploy:compute
 
-pnpm dlx prisma@6.19.3 migrate deploy   # against DATABASE_URL for the Composer DB
+pnpm prisma migrate deploy              # against DATABASE_URL (reads prisma.config.ts)
 pnpm import:clubs                       # when registry changes
 ```
 
 `pnpm run deploy:compute` runs `scripts/check-clean-tree.mjs`, then build, then Composer deploy.
 Local `pnpm build` remains allowed on a dirty tree; revision becomes `<sha>-dirty`.
 
-Compute API entry ships `dist/server.mjs` **plus** the Linux Prisma query engine (`debian-openssl-3.0.x`) because Compute runs Bun on Linux. `/health.revision` + `dirty` are baked in at `build:api` time.
+Compute API entry ships the Rust-free `dist/server.mjs` bundle (Bun on Linux) using `@prisma/adapter-pg` + `pg.Pool` (`max: 10`, `connectionTimeoutMillis: 10s`, `idleTimeoutMillis: 30s`, `maxLifetimeSeconds: 1800s`, `statement_timeout: 20s`). `/health.revision` + `dirty` are baked in at `build:api` time.
 
 Public Compute API URL:
 
