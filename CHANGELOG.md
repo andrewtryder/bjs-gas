@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.1.4](https://github.com/andrewtryder/bjs-gas/compare/v0.1.3...v0.1.4) (2026-11-24)
+
+
+### Bug Fixes
+
+* **ci:** update Composer deploy workflows to @prisma/cli@8.0.0-rc.35 ([#89](https://github.com/andrewtryder/bjs-gas/issues/89)) ([64133e8](https://github.com/andrewtryder/bjs-gas/commit/64133e8dbac1be7bc470197f2ae6b0afd4ccdc68))
+
+
+### Miscellaneous Chores
+
+* **deps-dev:** bump @types/pg ([#87](https://github.com/andrewtryder/bjs-gas/issues/87)) ([b8ace61](https://github.com/andrewtryder/bjs-gas/commit/b8ace610c892972f665a8761e6a6994a9c56a9b6))
+* **deps:** bump googleapis/release-please-action ([#86](https://github.com/andrewtryder/bjs-gas/issues/86)) ([bf0a8d0](https://github.com/andrewtryder/bjs-gas/commit/bf0a8d0e375d72a2bc5264fa523a36b06570636d))
+
 ## [0.1.3](https://github.com/andrewtryder/bjs-gas/compare/v0.1.2...v0.1.3) (2026-11-24)
 
 
