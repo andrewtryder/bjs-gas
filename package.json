@@ -34,7 +34,7 @@
     "deploy:compute": "node scripts/check-clean-tree.mjs && pnpm run build && pnpm dlx @prisma/cli@8.0.0-rc.19 deploy module.ts --name bjs-gas"
   },
   "engines": {
-    "node": ">=22.18"
+    "node": "^26.13.0"
   },
   "packageManager": "pnpm@11.22.0",
   "devDependencies": {

@@ -57,6 +57,8 @@ Only a future authoritative locator discovery → `discovery:accept` → `import
 
 ## Local scripts (pnpm)
 
+Use Node.js 26 LTS (26.13.0 or newer in the 26.x line; `nvm use` reads `.nvmrc`), pnpm as pinned in `package.json`, and Bun for the Compute runtime.
+
 ```bash
 pnpm discover                 # Playwright → data/*.candidate.json
 pnpm discovery:diff
