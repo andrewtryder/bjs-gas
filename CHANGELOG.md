@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.5](https://github.com/andrewtryder/bjs-gas/compare/v0.1.4...v0.1.5) (2026-11-24)
+
+
+### Bug Fixes
+
+* **web:** restore trend charts and trim redundant ledger columns ([b9d9c6c](https://github.com/andrewtryder/bjs-gas/commit/b9d9c6c75bb21ccfdf375f76cef19fbbd497e787))
+* **web:** restore trend charts and trim redundant ledger columns ([0831e42](https://github.com/andrewtryder/bjs-gas/commit/0831e420445cefe3147b83dbfa80cc789f7ff46c))
+
 ## [0.1.4](https://github.com/andrewtryder/bjs-gas/compare/v0.1.3...v0.1.4) (2026-11-24)
 
 
