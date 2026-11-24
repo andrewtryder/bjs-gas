@@ -44,7 +44,7 @@
     "@types/node": "^26.6.6",
     "prisma": "^6.19.3",
     "tsx": "^4.23.15",
-    "typescript": "^5.9.2",
+    "typescript": "^7.0.2",
     "vitest": "^4.1.12"
   },
   "dependencies": {
