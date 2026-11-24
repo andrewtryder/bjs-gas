@@ -24,6 +24,8 @@ overrides:
   # Composer 0.39 / Alchemy beta.85 use the Effect 4.1 constellation.
   # Prisma CLI 6 still needs Effect 3 on @prisma/config only.
   "@prisma/config>effect": "3.22.1"
+  # Keep Composer's peer contexts identical across the API and web workspaces.
+  arktype: 2.2.3
   effect: 4.1.0
   "@effect/platform-bun": 4.1.0
   "@effect/platform-node": 4.1.0
